@@ -105,18 +105,13 @@ export function updateBattle(state: GameState, deltaMs: number) {
     const enemyBase = state.battle.bases[enemySide];
     const baseDistance = Math.abs(enemyBase.x - unit.x);
 
-    if (target && Math.abs(target.x - unit.x) <= def.attackRange) {
+    if (target && isInAttackRange(unit, target)) {
       attackUnit(state, unit, target);
       continue;
     }
 
     if (!target && baseDistance <= def.attackRange + 28) {
       attackBase(state, unit, enemyBase.side);
-      continue;
-    }
-
-    if (target && Math.abs(target.x - unit.x) <= def.attackRange + 6) {
-      attackUnit(state, unit, target);
       continue;
     }
 
@@ -128,15 +123,25 @@ export function updateBattle(state: GameState, deltaMs: number) {
 }
 
 function findTarget(state: GameState, unit: BattleUnit, enemySide: Side): BattleUnit | undefined {
-  const def = unitDefs[unit.defId];
-  const rangePad = def.role === 'ranged' ? 20 : 0;
   return state.battle.units
-    .filter((candidate) => candidate.side === enemySide && candidate.hp > 0)
-    .sort((a, b) => Math.abs(a.x - unit.x) - Math.abs(b.x - unit.x))
-    .find((candidate) => Math.abs(candidate.x - unit.x) <= def.attackRange + rangePad)
-    ?? state.battle.units
-      .filter((candidate) => candidate.side === enemySide && candidate.hp > 0)
-      .sort((a, b) => Math.abs(a.x - unit.x) - Math.abs(b.x - unit.x))[0];
+    .filter((candidate) => candidate.side === enemySide && candidate.hp > 0 && isInAggroRange(unit, candidate))
+    .sort((a, b) => getTargetDistance(unit, a) - getTargetDistance(unit, b))[0];
+}
+
+function getTargetDistance(attacker: BattleUnit, candidate: BattleUnit): number {
+  const axisDistance = Math.abs(candidate.x - attacker.x);
+  const laneDistance = Math.abs(candidate.laneOffset - attacker.laneOffset) * 0.72;
+  return axisDistance + laneDistance;
+}
+
+function isInAggroRange(attacker: BattleUnit, candidate: BattleUnit): boolean {
+  const def = unitDefs[attacker.defId];
+  return getTargetDistance(attacker, candidate) <= def.aggroRange;
+}
+
+function isInAttackRange(attacker: BattleUnit, candidate: BattleUnit): boolean {
+  const def = unitDefs[attacker.defId];
+  return getTargetDistance(attacker, candidate) <= def.attackRange;
 }
 
 function attackUnit(state: GameState, attacker: BattleUnit, target: BattleUnit) {

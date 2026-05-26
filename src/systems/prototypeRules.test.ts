@@ -314,6 +314,29 @@ describe('battle simulation', () => {
     expect(attacker.lastAttackAtMs).toBe(state.battle.elapsedMs);
   });
 
+  it('uses aggro range and lane distance when choosing targets', () => {
+    const state = createInitialGameState('mech', 202);
+    const attacker = spawnBattleUnit(state, 'player', 'mech_gunner');
+    const sameLane = spawnBattleUnit(state, 'enemy', 'enemy_raider');
+    const nearOtherLane = spawnBattleUnit(state, 'enemy', 'enemy_raider');
+    attacker.x = 400;
+    attacker.battleLane = 'middle';
+    attacker.laneOffset = 0;
+    sameLane.x = 450;
+    sameLane.battleLane = 'middle';
+    sameLane.laneOffset = 0;
+    sameLane.hp = 30;
+    nearOtherLane.x = 420;
+    nearOtherLane.battleLane = 'top';
+    nearOtherLane.laneOffset = -74;
+    nearOtherLane.hp = 30;
+
+    updateBattle(state, 100);
+
+    expect(sameLane.hp).toBeLessThan(30);
+    expect(nearOtherLane.hp).toBe(30);
+  });
+
   it('units move, attack, die, and damage bases deterministically', () => {
     const state = createInitialGameState('mech', 11);
     startPhase(state);
