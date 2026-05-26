@@ -1,17 +1,17 @@
 import { raceDefs } from '../data/races';
 import { createSlotState } from '../data/slots';
 import { createPhaseStats } from './StatsSystem';
-import type { GameState, RaceId } from '../types/game';
+import type { GameState, RaceId, UnitSlotState } from '../types/game';
 
 export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameState {
   const unitLevels: Record<string, number> = {};
   for (const unitId of [...raceDefs.hive.unitPool, ...raceDefs.mech.unitPool]) {
     unitLevels[unitId] = 1;
   }
-  const unitSlotProgress: Record<string, number> = {};
-  for (const unitId of [...raceDefs.hive.unitPool, ...raceDefs.mech.unitPool]) {
-    unitSlotProgress[unitId] = 0;
-  }
+  const unitSlotStates: Record<RaceId, UnitSlotState[]> = {
+    hive: raceDefs.hive.unitSlots.map((slot) => ({ ...slot, progress: 0 })),
+    mech: raceDefs.mech.unitSlots.map((slot) => ({ ...slot, progress: 0 })),
+  };
 
   return {
     seed,
@@ -39,10 +39,11 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
     battle: {
       units: [],
       bases: {
-        player: { side: 'player', hp: 500, maxHp: 500, x: 70, laneOffset: 40 },
-        enemy: { side: 'enemy', hp: 500, maxHp: 500, x: 710, laneOffset: -50 },
+        player: { side: 'player', hp: 500, maxHp: 500, x: 70, laneOffset: 0, lastHitAtMs: -9999 },
+        enemy: { side: 'enemy', hp: 500, maxHp: 500, x: 710, laneOffset: 0, lastHitAtMs: -9999 },
       },
       elapsedMs: 0,
+      nextFeedbackId: 1,
       projectiles: [],
       transientEffects: [],
     },
@@ -65,7 +66,7 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
       basicUnitDamageBonus: 0,
     },
     unitLevels,
-    unitSlotProgress,
+    unitSlotStates,
     recentFloatingTexts: [],
   };
 }

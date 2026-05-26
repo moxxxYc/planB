@@ -15,6 +15,18 @@ export interface UnitSlotDef {
   requirement: number;
 }
 
+export interface UnitSlotState extends UnitSlotDef {
+  progress: number;
+}
+
+export interface UnitGateState {
+  elapsedMs: number;
+  durationMs: number;
+  openBoundaryRatio: number;
+  openSlotCount: number;
+  openUnitIndex: number;
+}
+
 export interface RaceDef {
   id: RaceId;
   name: string;
@@ -72,6 +84,9 @@ export interface BattleUnit {
   damageDone: number;
   kills: number;
   burstUntilMs: number;
+  spawnedAtMs: number;
+  lastAttackAtMs: number;
+  lastHitAtMs: number;
 }
 
 export interface BaseState {
@@ -80,14 +95,45 @@ export interface BaseState {
   maxHp: number;
   x: number;
   laneOffset: number;
+  lastHitAtMs: number;
+}
+
+export interface BattleProjectile {
+  id: string;
+  side: Side;
+  fromUnitId: string;
+  toUnitId?: string;
+  toBaseSide?: Side;
+  fromX: number;
+  toX: number;
+  fromLaneOffset: number;
+  toLaneOffset: number;
+  createdAtMs: number;
+  impactAtMs: number;
+  color: number;
+}
+
+export type BattleEffectType = 'spawn' | 'hit' | 'death' | 'base_hit';
+
+export interface BattleEffect {
+  id: string;
+  type: BattleEffectType;
+  side: Side;
+  unitId?: string;
+  baseSide?: Side;
+  x: number;
+  laneOffset: number;
+  createdAtMs: number;
+  expiresAtMs: number;
 }
 
 export interface BattleState {
   units: BattleUnit[];
   bases: Record<Side, BaseState>;
   elapsedMs: number;
-  projectiles: string[];
-  transientEffects: string[];
+  nextFeedbackId: number;
+  projectiles: BattleProjectile[];
+  transientEffects: BattleEffect[];
 }
 
 export interface PhaseStats {
@@ -167,7 +213,7 @@ export interface GameState {
   stats: GameStats;
   modifiers: GameModifiers;
   unitLevels: Record<string, number>;
-  unitSlotProgress: Record<string, number>;
+  unitSlotStates: Record<RaceId, UnitSlotState[]>;
   recentFloatingTexts: Array<{ label: string; color: number }>;
 }
 

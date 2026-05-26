@@ -1,13 +1,17 @@
 import { unitDefs } from '../data/units';
 import { randomInt } from '../utils/random';
-import type { BattleUnit, GameState, Side, UnitLifetime } from '../types/game';
+import type { BattleUnit, GameState, LaneName, Side, UnitLifetime } from '../types/game';
 
 const LANE_OFFSETS = {
-  front: 18,
+  front: 42,
   mid: 0,
-  back: -28,
+  back: -46,
 };
 const BASE_EXIT_OFFSET = 72;
+
+export function getBattleLaneOffset(lane: LaneName, jitter: number): number {
+  return LANE_OFFSETS[lane] + jitter;
+}
 
 export function spawnBattleUnit(
   state: GameState,
@@ -38,7 +42,7 @@ export function spawnBattleUnit(
     maxHp,
     damage,
     x: spawnX,
-    laneOffset: LANE_OFFSETS[def.lane] + jitter.value,
+    laneOffset: getBattleLaneOffset(def.lane, jitter.value),
     attackTimerMs: 0,
     level,
     lifetime,
@@ -50,8 +54,12 @@ export function spawnBattleUnit(
     damageDone: 0,
     kills: 0,
     burstUntilMs: burst ? state.battle.elapsedMs + 5000 : 0,
+    spawnedAtMs: state.battle.elapsedMs,
+    lastAttackAtMs: -9999,
+    lastHitAtMs: -9999,
   };
   state.battle.units.push(unit);
+  addEffect(state, 'spawn', side, unit.id, unit.x, unit.laneOffset, 420);
   if (side === 'player') {
     state.stats.currentPhase.unitsSpawned += 1;
   }
@@ -75,6 +83,7 @@ export function dealMagicDamage(state: GameState, baseDamage: number) {
 export function updateBattle(state: GameState, deltaMs: number) {
   state.battle.elapsedMs += deltaMs;
   state.phaseElapsedMs += deltaMs;
+  cleanupFeedback(state);
   const units = [...state.battle.units];
 
   for (const unit of units) {
@@ -129,11 +138,16 @@ function attackUnit(state: GameState, attacker: BattleUnit, target: BattleUnit) 
   target.hp -= damage;
   attacker.damageDone += damage;
   attacker.attackTimerMs = def.attackCooldownMs;
+  attacker.lastAttackAtMs = state.battle.elapsedMs;
+  target.lastHitAtMs = state.battle.elapsedMs;
+  addProjectile(state, attacker, target);
+  addEffect(state, 'hit', attacker.side, target.id, target.x, target.laneOffset, 260);
   if (attacker.side === 'player') {
     state.stats.currentPhase.damageDealt += damage;
   }
   if (target.hp <= 0) {
     attacker.kills += 1;
+    addEffect(state, 'death', target.side, target.id, target.x, target.laneOffset, 520);
     if (attacker.side === 'player') {
       state.stats.currentPhase.kills += 1;
     }
@@ -148,6 +162,10 @@ function attackBase(state: GameState, attacker: BattleUnit, side: Side) {
   state.battle.bases[side].hp = Math.max(0, state.battle.bases[side].hp - damage);
   attacker.damageDone += damage;
   attacker.attackTimerMs = def.attackCooldownMs;
+  attacker.lastAttackAtMs = state.battle.elapsedMs;
+  state.battle.bases[side].lastHitAtMs = state.battle.elapsedMs;
+  addBaseProjectile(state, attacker, side);
+  addEffect(state, 'base_hit', attacker.side, undefined, state.battle.bases[side].x, state.battle.bases[side].laneOffset, 300, side);
   if (attacker.side === 'player') {
     state.stats.currentPhase.enemyBaseDamage += damage;
     state.stats.currentPhase.damageDealt += damage;
@@ -158,4 +176,92 @@ function attackBase(state: GameState, attacker: BattleUnit, side: Side) {
 
 function removeDeadUnits(state: GameState) {
   state.battle.units = state.battle.units.filter((unit) => unit.hp > 0);
+}
+
+export function getBattleFrontlineRatio(state: GameState): number {
+  const playerBaseX = state.battle.bases.player.x;
+  const enemyBaseX = state.battle.bases.enemy.x;
+  const span = Math.max(1, enemyBaseX - playerBaseX);
+  const playerUnits = state.battle.units.filter((unit) => unit.side === 'player' && unit.hp > 0);
+  const enemyUnits = state.battle.units.filter((unit) => unit.side === 'enemy' && unit.hp > 0);
+  const playerFront = playerUnits.length > 0
+    ? Math.max(...playerUnits.map((unit) => unit.x))
+    : playerBaseX;
+  const enemyFront = enemyUnits.length > 0
+    ? Math.min(...enemyUnits.map((unit) => unit.x))
+    : enemyBaseX;
+  const frontlineX = playerUnits.length > 0 && enemyUnits.length > 0
+    ? (playerFront + enemyFront) / 2
+    : playerUnits.length > 0
+      ? playerFront
+      : enemyUnits.length > 0
+        ? enemyFront
+        : (playerBaseX + enemyBaseX) / 2;
+
+  return Math.max(0, Math.min(1, (frontlineX - playerBaseX) / span));
+}
+
+function addProjectile(state: GameState, attacker: BattleUnit, target: BattleUnit) {
+  const def = unitDefs[attacker.defId];
+  if (!['ranged', 'caster', 'siege'].includes(def.role)) return;
+  state.battle.projectiles.push({
+    id: `projectile-${state.battle.nextFeedbackId++}`,
+    side: attacker.side,
+    fromUnitId: attacker.id,
+    toUnitId: target.id,
+    fromX: attacker.x,
+    toX: target.x,
+    fromLaneOffset: attacker.laneOffset,
+    toLaneOffset: target.laneOffset,
+    createdAtMs: state.battle.elapsedMs,
+    impactAtMs: state.battle.elapsedMs + 260,
+    color: attacker.side === 'player' ? 0x60a5fa : 0xfb923c,
+  });
+}
+
+function addBaseProjectile(state: GameState, attacker: BattleUnit, side: Side) {
+  const def = unitDefs[attacker.defId];
+  if (!['ranged', 'caster', 'siege'].includes(def.role)) return;
+  const base = state.battle.bases[side];
+  state.battle.projectiles.push({
+    id: `projectile-${state.battle.nextFeedbackId++}`,
+    side: attacker.side,
+    fromUnitId: attacker.id,
+    toBaseSide: side,
+    fromX: attacker.x,
+    toX: base.x,
+    fromLaneOffset: attacker.laneOffset,
+    toLaneOffset: base.laneOffset,
+    createdAtMs: state.battle.elapsedMs,
+    impactAtMs: state.battle.elapsedMs + 300,
+    color: attacker.side === 'player' ? 0x60a5fa : 0xfb923c,
+  });
+}
+
+function addEffect(
+  state: GameState,
+  type: 'spawn' | 'hit' | 'death' | 'base_hit',
+  side: Side,
+  unitId: string | undefined,
+  x: number,
+  laneOffset: number,
+  durationMs: number,
+  baseSide?: Side,
+) {
+  state.battle.transientEffects.push({
+    id: `effect-${state.battle.nextFeedbackId++}`,
+    type,
+    side,
+    unitId,
+    baseSide,
+    x,
+    laneOffset,
+    createdAtMs: state.battle.elapsedMs,
+    expiresAtMs: state.battle.elapsedMs + durationMs,
+  });
+}
+
+function cleanupFeedback(state: GameState) {
+  state.battle.projectiles = state.battle.projectiles.filter((projectile) => projectile.impactAtMs + 220 > state.battle.elapsedMs);
+  state.battle.transientEffects = state.battle.transientEffects.filter((effect) => effect.expiresAtMs > state.battle.elapsedMs);
 }

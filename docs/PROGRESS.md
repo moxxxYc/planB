@@ -3,8 +3,8 @@
 ## Current Status
 
 - Build status: `npm run build` passes
-- Dev server status: verified on `http://localhost:5176/`
-- Last checkpoint completed: three-stage pinball UI and unit spawn progress rework
+- Dev server status: verified on `http://localhost:5175/`
+- Last checkpoint completed: layout and space-structure pass making the battlefield the main visual area
 
 ## Implemented
 
@@ -40,10 +40,32 @@
 - Replaced the slanted battlefield slab with broken stone/track details embedded in the terrain, and changed both bases to the same low endpoint-district template with matching health-bar placement.
 - Fixed the battlefield render depth so timed enemy waves are visible when they leave the enemy base even if the player has not spawned any units.
 - Moved battle unit spawn exits outward from the base centers so new units appear at the base front instead of inside the base art.
+- Replaced the old per-unit progress map with `UnitSlotState` arrays per race so each slot owns `unitId`, `requirement`, `progress`, and `index`.
+- Added `UnitGateState` calculation for the single high-tier blocker, including open boundary ratio, open slot count, and current highest open unit index.
+- Updated the Unit Spawn Zone to read slot progress from `UnitSlotState`, show the current open range, and keep overflow progress when specific units queue.
+- Added a Matter static collision body for the continuous high-tier blocker while keeping the existing safety redirect so balls cannot bounce forever.
+- Added top-row pipeline arrows and transfer trails for Launch -> Decision and Decision -> Unit handoffs.
+- Added/updated Vitest coverage for gate opening by elapsed time, blocked high-tier slots not gaining progress, open slot progress, spawn threshold behavior, overflow preservation, and data-driven slot state.
+- Adjusted the unit gate semantics so a partially exposed slot counts as a valid landing if the ball actually reaches its slot; the blocker raises entry difficulty but does not invalidate successful landings.
+- Rebuilt the battlefield into a clearer strategy-board composition: wide diagonal main lane, low-noise dark terrain, reduced rocks/trees, unified endpoint bases, visible spawn gates, and a dynamic frontline marker.
+- Enlarged and outlined battle units, added side-colored rings, hit flash, attack pulse, spawn portal, hit spark, death burst, base hit flash, and blue/red ranged projectile rendering.
+- Added deterministic combat feedback state (`projectiles`, `transientEffects`, unit/base hit timestamps) and Vitest coverage for frontline calculation plus attack/death feedback events.
+- Updated the minimap to match the main lane direction and render live frontline/unit density overlays.
+- Saved the battlefield rebuild smoke screenshot to `docs/rebuild-ui-smoke.png`.
+- Added a top-edge launcher turret in the Launch Zone with deterministic 180-degree sweep aiming, replacing random launch angles.
+- Increased peg density in all three pinball zones, randomized cross-zone drops within the next zone's top fifth, and compressed the Unit Spawn Zone high-tier blocker to one-tenth of its previous height.
+- Moved the Unit Spawn Zone high-tier blocker down so its lower edge sits flush against the unit card row's upper edge.
+- Rebalanced the screen proportions so the top three-stage pinball row stays compact while the battlefield occupies the main visual weight.
+- Adjusted the top row widths to keep 发球区 small, 抉择区 medium, and 出兵区 largest.
+- Rebuilt the battlefield layout from a narrow diagonal route into a broad central 3/4 combat plane with the player base at lower-left, enemy base at upper-right, and a wider frontline marker.
+- Updated battle unit lane offsets and battlefield projection so units spread across the central area instead of stacking on a single thin line.
+- Updated base bars, spawn trails, magic effects, and the minimap to match the wider battlefield structure.
+- Saved the layout smoke screenshot to `docs/layout-space-structure-smoke.png`.
+- Removed SPECIAL from the visible Decision Zone slot row and reordered the decision slots to 金币 / 法术 / 出兵 / 升级 so 出兵 sits in the middle of the row.
 
 ## Known Issues
 
-- The first-pass gate bounce is intentionally simple: it uses a visible continuous gate plus velocity redirect instead of rebuilding exact Matter collision geometry every frame.
+- The high-tier blocker now has a Matter collision body, but still keeps a deliberate safety redirect while balls are in the blocker lane so the prototype cannot trap a ball indefinitely.
 
 ## Deviations from Spec
 

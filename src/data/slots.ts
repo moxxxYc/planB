@@ -8,6 +8,13 @@ export const slotDefs: Array<Pick<SlotState, 'id' | 'label' | 'color'>> = [
   { id: 'special', label: '特殊', color: 0xfb7185 },
 ];
 
+export const decisionSlotDefs = [
+  slotDefs.find((slot) => slot.id === 'gold'),
+  slotDefs.find((slot) => slot.id === 'magic'),
+  slotDefs.find((slot) => slot.id === 'spawn'),
+  slotDefs.find((slot) => slot.id === 'upgrade'),
+].filter((slot): slot is Pick<SlotState, 'id' | 'label' | 'color'> => Boolean(slot));
+
 export function createSlotState(): Record<SlotId, SlotState> {
   return Object.fromEntries(
     slotDefs.map((slot) => [
