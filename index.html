@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>球机出兵自动战斗原型</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="hit-controls" aria-label="隐藏点击热区">
+        <button id="hit-drop" aria-label="投球" onclick="window.planBAction?.('drop')"></button>
+        <button id="hit-decision" aria-label="进抉择" onclick="window.planBAction?.('decision')"></button>
+        <button id="hit-spawn" aria-label="进出兵" onclick="window.planBAction?.('spawn')"></button>
+        <button id="hit-race" aria-label="切种族" onclick="window.planBAction?.('race')"></button>
+        <button id="hit-start" aria-label="继续阶段" onclick="window.planBAction?.('start')"></button>
+        <button id="hit-skip" aria-label="跳过阶段" onclick="window.planBAction?.('skip')"></button>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

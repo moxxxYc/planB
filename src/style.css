@@ -1,0 +1,88 @@
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #101827;
+}
+
+body {
+  display: grid;
+  place-items: center;
+}
+
+#app {
+  position: relative;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  overflow: hidden;
+  background: #101827;
+}
+
+canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#hit-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+#hit-controls button {
+  position: absolute;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+#hit-drop {
+  left: 1.72%;
+  top: 94.72%;
+  width: 6.88%;
+  height: 3.61%;
+}
+
+#hit-decision {
+  left: 9.22%;
+  top: 94.72%;
+  width: 7.66%;
+  height: 3.61%;
+}
+
+#hit-spawn {
+  left: 17.5%;
+  top: 94.72%;
+  width: 7.66%;
+  height: 3.61%;
+}
+
+#hit-race {
+  left: 25.78%;
+  top: 94.72%;
+  width: 6.88%;
+  height: 3.61%;
+}
+
+#hit-start {
+  left: 33.28%;
+  top: 94.72%;
+  width: 8.44%;
+  height: 3.61%;
+}
+
+#hit-skip {
+  left: 42.34%;
+  top: 94.72%;
+  width: 8.44%;
+  height: 3.61%;
+}

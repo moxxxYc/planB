@@ -1,0 +1,71 @@
+import { raceDefs } from '../data/races';
+import { createSlotState } from '../data/slots';
+import { createPhaseStats } from './StatsSystem';
+import type { GameState, RaceId } from '../types/game';
+
+export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameState {
+  const unitLevels: Record<string, number> = {};
+  for (const unitId of [...raceDefs.hive.unitPool, ...raceDefs.mech.unitPool]) {
+    unitLevels[unitId] = 1;
+  }
+  const unitSlotProgress: Record<string, number> = {};
+  for (const unitId of [...raceDefs.hive.unitPool, ...raceDefs.mech.unitPool]) {
+    unitSlotProgress[unitId] = 0;
+  }
+
+  return {
+    seed,
+    currentRaceId: raceId,
+    phaseIndex: 0,
+    phaseActive: false,
+    isBuildPause: false,
+    gold: 0,
+    pendingSpawnLevelBonus: 0,
+    upTriggerCountTowardElite: 0,
+    nextSpawnCreatesElite: false,
+    nextUnitId: 1,
+    nextBallId: 1,
+    nextQueueId: 1,
+    phaseElapsedMs: 0,
+    playerStandardUnitSoftCap: 50,
+    eliteUnitCap: 8,
+    spawnQueue: [],
+    machineUpgrades: [],
+    slotUpgrades: [],
+    buildings: [],
+    relics: [],
+    selectedRewards: [],
+    slots: createSlotState(),
+    battle: {
+      units: [],
+      bases: {
+        player: { side: 'player', hp: 500, maxHp: 500, x: 70, laneOffset: 40 },
+        enemy: { side: 'enemy', hp: 500, maxHp: 500, x: 710, laneOffset: -50 },
+      },
+      elapsedMs: 0,
+      projectiles: [],
+      transientEffects: [],
+    },
+    stats: {
+      currentPhase: createPhaseStats(),
+    },
+    modifiers: {
+      ballCount: 1,
+      goldMultiplier: 1,
+      spawnExtraCount: 0,
+      magicSpawnCopyBonus: 0,
+      pendingSpawnCopies: 0,
+      magicDamageMultiplier: 1,
+      mechUpgradeEfficiency: 0,
+      hiveExtraGrubCount: 0,
+      nextPhaseSpawnLevelBonus: 0,
+      queueReleaseSpeedBonus: 0,
+      eliteExtraVeterancy: 0,
+      basicUnitHpBonus: 0,
+      basicUnitDamageBonus: 0,
+    },
+    unitLevels,
+    unitSlotProgress,
+    recentFloatingTexts: [],
+  };
+}
