@@ -1,16 +1,24 @@
 import { unitDefs } from '../data/units';
 import { randomInt } from '../utils/random';
-import type { BattleUnit, GameState, LaneName, Side, UnitLifetime } from '../types/game';
+import type { BattleLaneId, BattleLaneWeights, BattleUnit, GameState, Side, UnitLifetime } from '../types/game';
 
-const LANE_OFFSETS = {
-  front: 42,
-  mid: 0,
-  back: -46,
+const BATTLE_LANE_OFFSETS: Record<BattleLaneId, number> = {
+  top: -74,
+  middle: 0,
+  bottom: 74,
 };
 const BASE_EXIT_OFFSET = 72;
 
-export function getBattleLaneOffset(lane: LaneName, jitter: number): number {
-  return LANE_OFFSETS[lane] + jitter;
+export function pickBattleLane(seed: number, weights: BattleLaneWeights): { lane: BattleLaneId; seed: number } {
+  const total = Math.max(1, weights.top + weights.middle + weights.bottom);
+  const pick = randomInt(seed, 1, total);
+  if (pick.value <= weights.top) return { lane: 'top', seed: pick.seed };
+  if (pick.value <= weights.top + weights.middle) return { lane: 'middle', seed: pick.seed };
+  return { lane: 'bottom', seed: pick.seed };
+}
+
+export function getBattleLaneOffset(lane: BattleLaneId, jitter: number): number {
+  return BATTLE_LANE_OFFSETS[lane] + jitter;
 }
 
 export function spawnBattleUnit(
@@ -23,7 +31,8 @@ export function spawnBattleUnit(
 ): BattleUnit {
   const def = unitDefs[defId];
   const jitter = randomInt(state.seed, -12, 12);
-  state.seed = jitter.seed;
+  const lanePick = pickBattleLane(jitter.seed, def.laneWeights);
+  state.seed = lanePick.seed;
   const base = state.battle.bases[side];
   const spawnX = side === 'player' ? base.x + BASE_EXIT_OFFSET + jitter.value * 0.1 : base.x - BASE_EXIT_OFFSET + jitter.value * 0.1;
   const tags = options.tags ?? [];
@@ -42,7 +51,8 @@ export function spawnBattleUnit(
     maxHp,
     damage,
     x: spawnX,
-    laneOffset: getBattleLaneOffset(def.lane, jitter.value),
+    battleLane: lanePick.lane,
+    laneOffset: getBattleLaneOffset(lanePick.lane, jitter.value),
     attackTimerMs: 0,
     level,
     lifetime,

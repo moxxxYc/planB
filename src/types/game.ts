@@ -3,6 +3,7 @@ export type Side = 'player' | 'enemy';
 export type SlotId = 'spawn' | 'gold' | 'magic' | 'upgrade' | 'special';
 export type UnitRole = 'frontline' | 'melee' | 'ranged' | 'caster' | 'siege' | 'giant';
 export type LaneName = 'front' | 'mid' | 'back';
+export type BattleLaneId = 'top' | 'middle' | 'bottom';
 export type UnitLifetime = 'standard' | 'elite' | 'temporary' | 'summon';
 export type PhaseObjectiveType = 'destroy_gate' | 'survive_pressure' | 'mini_boss' | 'destroy_core';
 export type PhaseCompleteReason = 'objective' | 'timer' | 'boss_defeated' | 'debug_skip';
@@ -27,6 +28,12 @@ export interface UnitGateState {
   openUnitIndex: number;
 }
 
+export interface BattleLaneWeights {
+  top: number;
+  middle: number;
+  bottom: number;
+}
+
 export interface RaceDef {
   id: RaceId;
   name: string;
@@ -43,6 +50,7 @@ export interface UnitDef {
   role: UnitRole;
   maxHp: number;
   damage: number;
+  aggroRange: number;
   attackRange: number;
   attackCooldownMs: number;
   moveSpeed: number;
@@ -51,6 +59,7 @@ export interface UnitDef {
   costTier: 1 | 2 | 3;
   assetKey: string;
   lane: LaneName;
+  laneWeights: BattleLaneWeights;
 }
 
 export interface SlotState {
@@ -71,6 +80,7 @@ export interface BattleUnit {
   maxHp: number;
   damage: number;
   x: number;
+  battleLane: BattleLaneId;
   laneOffset: number;
   targetId?: string;
   attackTimerMs: number;

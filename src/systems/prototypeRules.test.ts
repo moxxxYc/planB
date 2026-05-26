@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { raceDefs } from '../data/races';
 import { rewardDefs } from '../data/rewards';
 import { decisionSlotDefs, slotDefs } from '../data/slots';
+import { unitDefs } from '../data/units';
 import { createInitialGameState } from './GameState';
 import { triggerSlot } from './SlotTriggerSystem';
 import { getBattleFrontlineRatio, getBattleLaneOffset, spawnBattleUnit, updateBattle } from './BattleSystem';
@@ -72,6 +73,7 @@ describe('slot trigger rules', () => {
       maxHp: 38,
       damage: 5,
       x: 640,
+      battleLane: 'middle',
       laneOffset: 0,
       attackTimerMs: 0,
       level: 1,
@@ -239,12 +241,36 @@ describe('unit spawn progress rules', () => {
 });
 
 describe('battle simulation', () => {
+  it('defines lane weights and aggro ranges for every battle unit', () => {
+    for (const unit of Object.values(unitDefs)) {
+      expect(unit.aggroRange).toBeGreaterThanOrEqual(unit.attackRange);
+      expect(unit.laneWeights.top + unit.laneWeights.middle + unit.laneWeights.bottom).toBeGreaterThan(0);
+    }
+    expect(unitDefs.hive_grub.laneWeights.middle).toBeGreaterThan(0);
+    expect(unitDefs.hive_behemoth.laneWeights.middle).toBeGreaterThan(unitDefs.hive_behemoth.laneWeights.top);
+    expect(unitDefs.mech_gunner.aggroRange).toBeGreaterThan(unitDefs.mech_gunner.attackRange);
+  });
+
+  it('assigns a deterministic soft battle lane when units spawn', () => {
+    const first = createInitialGameState('hive', 101);
+    const second = createInitialGameState('hive', 101);
+
+    const firstUnits = Array.from({ length: 8 }, () => spawnBattleUnit(first, 'player', 'hive_grub').battleLane);
+    const secondUnits = Array.from({ length: 8 }, () => spawnBattleUnit(second, 'player', 'hive_grub').battleLane);
+
+    expect(firstUnits).toEqual(secondUnits);
+    expect(new Set(firstUnits).size).toBeGreaterThan(1);
+
+    const behemoth = spawnBattleUnit(createInitialGameState('hive', 12), 'player', 'hive_behemoth');
+    expect(['top', 'middle', 'bottom']).toContain(behemoth.battleLane);
+  });
+
   it('uses broad deterministic lane offsets for the central 3/4 battlefield', () => {
-    expect(getBattleLaneOffset('front', 0)).toBe(42);
-    expect(getBattleLaneOffset('mid', 0)).toBe(0);
-    expect(getBattleLaneOffset('back', 0)).toBe(-46);
-    expect(getBattleLaneOffset('front', -12)).toBe(30);
-    expect(getBattleLaneOffset('back', 12)).toBe(-34);
+    expect(getBattleLaneOffset('top', 0)).toBe(-74);
+    expect(getBattleLaneOffset('middle', 0)).toBe(0);
+    expect(getBattleLaneOffset('bottom', 0)).toBe(74);
+    expect(getBattleLaneOffset('top', -12)).toBe(-86);
+    expect(getBattleLaneOffset('bottom', 12)).toBe(86);
   });
 
   it('reports a deterministic frontline ratio from opposing lane pressure', () => {
@@ -302,6 +328,7 @@ describe('battle simulation', () => {
       maxHp: 18,
       damage: 5,
       x: 665,
+      battleLane: 'middle',
       laneOffset: 0,
       attackTimerMs: 0,
       level: 1,
