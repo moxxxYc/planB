@@ -23,6 +23,13 @@ import {
   getUnlockedUnitSlotCount,
   resolveUnitBallToSlot,
 } from './UnitSpawnProgressSystem';
+import {
+  buildBattleHeatBands,
+  clampBattleCameraCenter,
+  getBattleCameraViewport,
+  getBattleHotspotRatio,
+  projectBattlePoint,
+} from './BattlefieldViewSystem';
 
 describe('slot trigger rules', () => {
   it('does not expose a charge slot or charge rewards', () => {
@@ -280,13 +287,13 @@ describe('battle simulation', () => {
     player.x = 360;
     enemy.x = 520;
 
-    expect(getBattleFrontlineRatio(state)).toBeCloseTo(0.578125, 5);
+    expect(getBattleFrontlineRatio(state)).toBeCloseTo(0.23125, 5);
 
     player.x = 600;
-    expect(getBattleFrontlineRatio(state)).toBeGreaterThan(0.7);
+    expect(getBattleFrontlineRatio(state)).toBeGreaterThan(0.3);
 
     state.battle.units = state.battle.units.filter((unit) => unit.side === 'player');
-    expect(getBattleFrontlineRatio(state)).toBeGreaterThan(0.7);
+    expect(getBattleFrontlineRatio(state)).toBeGreaterThan(0.3);
   });
 
   it('emits readable combat feedback events for attacks and deaths', () => {
@@ -343,6 +350,10 @@ describe('battle simulation', () => {
     triggerSlot(state, 'spawn');
     resolveUnitBallToSlot(state, 0, 1, { elapsedMs: 0, durationMs: 60000 });
     updateSpawnQueue(state, 1000);
+    const playerUnit = state.battle.units.find((unit) => unit.side === 'player');
+    if (!playerUnit) throw new Error('Expected queued player unit to deploy');
+    playerUnit.battleLane = 'middle';
+    playerUnit.laneOffset = 0;
     state.battle.units.push({
       id: 'enemy-target',
       defId: 'enemy_raider',
@@ -375,6 +386,76 @@ describe('battle simulation', () => {
 
     expect(state.stats.currentPhase.damageDealt).toBeGreaterThan(0);
     expect(state.stats.currentPhase.kills + state.stats.currentPhase.enemyBaseDamage).toBeGreaterThan(0);
+  });
+});
+
+describe('battlefield view rules', () => {
+  it('clamps camera viewport inside the long battle axis', () => {
+    expect(clampBattleCameraCenter(0, 70, 1670, 640)).toBe(390);
+    expect(clampBattleCameraCenter(1700, 70, 1670, 640)).toBe(1350);
+    expect(getBattleCameraViewport(710, 70, 1670, 640)).toEqual({ startX: 390, endX: 1030, width: 640 });
+  });
+
+  it('projects world points relative to camera center', () => {
+    const center = projectBattlePoint({
+      worldX: 710,
+      laneOffset: 0,
+      cameraCenterX: 710,
+      playerBaseX: 70,
+      enemyBaseX: 1670,
+      screenStart: { x: 170, y: 620 },
+      screenEnd: { x: 1110, y: 260 },
+      viewportWorldWidth: 640,
+    });
+    const right = projectBattlePoint({
+      worldX: 1030,
+      laneOffset: 0,
+      cameraCenterX: 710,
+      playerBaseX: 70,
+      enemyBaseX: 1670,
+      screenStart: { x: 170, y: 620 },
+      screenEnd: { x: 1110, y: 260 },
+      viewportWorldWidth: 640,
+    });
+
+    expect(center.x).toBeCloseTo(640, 0);
+    expect(right.x).toBeGreaterThan(center.x);
+  });
+
+  it('marks points outside the camera viewport by visible ratio', () => {
+    const left = projectBattlePoint({
+      worldX: 200,
+      laneOffset: 0,
+      cameraCenterX: 710,
+      playerBaseX: 70,
+      enemyBaseX: 1670,
+      screenStart: { x: 170, y: 620 },
+      screenEnd: { x: 1110, y: 260 },
+      viewportWorldWidth: 640,
+    });
+
+    expect(left.visibleRatio).toBeLessThan(0);
+  });
+
+  it('builds minimap heat bands and hotspot ratio from live units', () => {
+    const state = createInitialGameState('hive', 303);
+    const player = spawnBattleUnit(state, 'player', 'hive_grub');
+    const enemy = spawnBattleUnit(state, 'enemy', 'enemy_raider');
+    player.x = 700;
+    enemy.x = 730;
+
+    const bands = buildBattleHeatBands(state.battle.units, state.battle.bases.player.x, state.battle.bases.enemy.x, 12);
+    expect(bands.some((band) => band.player > 0)).toBe(true);
+    expect(bands.some((band) => band.enemy > 0)).toBe(true);
+    expect(getBattleHotspotRatio(state)).toBeGreaterThan(0);
+  });
+
+  it('keeps heat bands stable when there are no units', () => {
+    const state = createInitialGameState('mech', 404);
+    const bands = buildBattleHeatBands(state.battle.units, state.battle.bases.player.x, state.battle.bases.enemy.x, 16);
+
+    expect(bands).toHaveLength(16);
+    expect(bands.every((band) => band.player === 0 && band.enemy === 0)).toBe(true);
   });
 });
 

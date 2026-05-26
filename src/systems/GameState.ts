@@ -40,7 +40,12 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
       units: [],
       bases: {
         player: { side: 'player', hp: 500, maxHp: 500, x: 70, laneOffset: 0, lastHitAtMs: -9999 },
-        enemy: { side: 'enemy', hp: 500, maxHp: 500, x: 710, laneOffset: 0, lastHitAtMs: -9999 },
+        enemy: { side: 'enemy', hp: 500, maxHp: 500, x: 1670, laneOffset: 0, lastHitAtMs: -9999 },
+      },
+      camera: {
+        centerX: 710,
+        viewportWorldWidth: 640,
+        manualUntilMs: 0,
       },
       elapsedMs: 0,
       nextFeedbackId: 1,

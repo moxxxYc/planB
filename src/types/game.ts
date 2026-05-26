@@ -137,9 +137,16 @@ export interface BattleEffect {
   expiresAtMs: number;
 }
 
+export interface BattleCameraState {
+  centerX: number;
+  viewportWorldWidth: number;
+  manualUntilMs: number;
+}
+
 export interface BattleState {
   units: BattleUnit[];
   bases: Record<Side, BaseState>;
+  camera: BattleCameraState;
   elapsedMs: number;
   nextFeedbackId: number;
   projectiles: BattleProjectile[];
