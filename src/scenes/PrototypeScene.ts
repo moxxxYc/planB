@@ -5,6 +5,13 @@ import { decisionSlotDefs } from '../data/slots';
 import { unitDefs } from '../data/units';
 import { getEliteSummary } from '../systems/EliteSystem';
 import { getBattleFrontlineRatio, updateBattle } from '../systems/BattleSystem';
+import {
+  buildBattleHeatBands,
+  clampBattleCameraCenter,
+  getBattleCameraViewport,
+  getBattleHotspotRatio,
+  projectBattlePoint,
+} from '../systems/BattlefieldViewSystem';
 import { createInitialGameState } from '../systems/GameState';
 import { completePhase, isFinalPhaseComplete, resumeNextPhase, shouldCompletePhase, startPhase, updatePhaseEnemySpawns } from '../systems/PhaseSystem';
 import {
@@ -78,14 +85,8 @@ const DECISION_X = LAUNCH_X + LAUNCH_W + 10;
 const DECISION_W = 350;
 const UNIT_X = DECISION_X + DECISION_W + 10;
 const UNIT_W = GAME_W - UNIT_X - 14;
-const PLAYER_BASE_X = 330;
-const PLAYER_BASE_Y = BATTLE_Y + BATTLE_H - 86;
-const ENEMY_BASE_X = 1024;
-const ENEMY_BASE_Y = BATTLE_Y + 118;
-const PLAYER_GATE_X = 292;
-const PLAYER_GATE_Y = BATTLE_Y + BATTLE_H - 100;
-const ENEMY_GATE_X = 978;
-const ENEMY_GATE_Y = BATTLE_Y + 128;
+const BATTLE_SCREEN_START = { x: 300, y: BATTLE_Y + BATTLE_H - 88 };
+const BATTLE_SCREEN_END = { x: 1110, y: BATTLE_Y + 44 };
 
 const BALL_LABEL_PREFIX = 'ball:';
 const SENSOR_LABEL_PREFIX = 'sensor:';
@@ -115,8 +116,11 @@ export class PrototypeScene extends Phaser.Scene {
   private unitGateBody?: MatterJS.BodyType;
   private unitGateBodyWidth = 1;
   private unitGateBodyHeight = UNIT_GATE_HEIGHT;
+  private battlefieldTerrain!: Phaser.GameObjects.Graphics;
   private battlefieldDynamic!: Phaser.GameObjects.Graphics;
+  private battlefieldMask?: Phaser.Display.Masks.GeometryMask;
   private minimapDynamic!: Phaser.GameObjects.Graphics;
+  private baseVisuals: Phaser.GameObjects.GameObject[] = [];
   private launcherTurret!: Phaser.GameObjects.Graphics;
   private lastBallDropMs = 0;
   private slotFlashUntil = new Map<string, number>();
@@ -155,11 +159,13 @@ export class PrototypeScene extends Phaser.Scene {
       updateBattle(this.state, delta);
       updateSpawnQueue(this.state, delta);
       updatePhaseEnemySpawns(this.state, previousPhaseElapsed);
+      this.updateBattleCamera(delta);
       if (shouldCompletePhase(this.state)) {
         this.endPhase();
       }
     }
 
+    this.drawBattlefieldBackdrop();
     this.nudgeBalls();
     this.cleanupLostBalls();
     this.syncLauncherTurret();
@@ -179,14 +185,23 @@ export class PrototypeScene extends Phaser.Scene {
     this.add.rectangle(0, 0, GAME_W, TOP_Y + TOP_H + 4, 0x0f172a).setOrigin(0);
     this.add.rectangle(0, HUD_TOP, GAME_W, HUD_H, 0x0b1120).setOrigin(0);
 
+    this.battlefieldTerrain = this.add.graphics().setDepth(100);
+    const battlefieldMaskShape = this.make.graphics({ x: 0, y: 0 }, false);
+    battlefieldMaskShape.fillStyle(0xffffff, 1);
+    battlefieldMaskShape.fillRect(0, BATTLE_Y, GAME_W, BATTLE_H);
+    this.battlefieldMask = battlefieldMaskShape.createGeometryMask();
+    this.battlefieldTerrain.setMask(this.battlefieldMask);
     this.drawBattlefieldBackdrop();
     this.battlefieldDynamic = this.add.graphics().setDepth(4600);
+    this.battlefieldDynamic.setMask(this.battlefieldMask);
     this.add.text(28, BATTLE_Y + 14, '伪 2D 3/4 自动战场', this.textStyle(20, '#f8fafc')).setDepth(950);
     this.drawMiniMap();
   }
 
   private drawBattlefieldBackdrop() {
-    const g = this.add.graphics();
+    const g = this.battlefieldTerrain;
+    g.clear();
+    this.clearBaseVisuals();
     g.fillStyle(0x07111c, 1);
     g.fillRect(0, BATTLE_Y, GAME_W, BATTLE_H);
 
@@ -211,8 +226,10 @@ export class PrototypeScene extends Phaser.Scene {
 
     this.drawRoad(g);
     this.drawCliffsAndForest(g);
-    this.drawBaseDistrict('player', PLAYER_BASE_X, PLAYER_BASE_Y);
-    this.drawBaseDistrict('enemy', ENEMY_BASE_X, ENEMY_BASE_Y);
+    const playerBase = this.projectBattle(this.state.battle.bases.player.x, 0);
+    const enemyBase = this.projectBattle(this.state.battle.bases.enemy.x, 0);
+    if (this.isProjectionVisible(playerBase, 0.24)) this.drawBaseDistrict('player', playerBase.x, playerBase.y - 20);
+    if (this.isProjectionVisible(enemyBase, 0.24)) this.drawBaseDistrict('enemy', enemyBase.x, enemyBase.y - 20);
   }
 
   private drawRoad(g: Phaser.GameObjects.Graphics) {
@@ -226,8 +243,8 @@ export class PrototypeScene extends Phaser.Scene {
       for (let i = 0; i < 16; i += 1) {
         const t0 = i / 16 + 0.012;
         const t1 = Math.min(1, t0 + 0.04);
-        const p0 = this.getRoadPoint(t0);
-        const p1 = this.getRoadPoint(t1);
+        const p0 = this.getRoadPoint(this.getVisibleWorldX(t0));
+        const p1 = this.getRoadPoint(this.getVisibleWorldX(t1));
         const n0 = this.getRoadNormal(p0, p1);
         const centerBias = 1 + Math.sin(t0 * Math.PI) * 0.5;
         const offset = lane * Phaser.Math.Linear(106, 86, t0) * centerBias;
@@ -237,8 +254,8 @@ export class PrototypeScene extends Phaser.Scene {
 
     for (let i = 0; i < 18; i += 1) {
       const t = (i + 0.5) / 18;
-      const p = this.getRoadPoint(t);
-      const next = this.getRoadPoint(Math.min(1, t + 0.03));
+      const p = this.getRoadPoint(this.getVisibleWorldX(t));
+      const next = this.getRoadPoint(this.getVisibleWorldX(Math.min(1, t + 0.03)));
       const n = this.getRoadNormal(p, next);
       const tangent = this.getRoadTangent(p, next);
       const offset = (i % 2 === 0 ? -1 : 1) * Phaser.Math.Linear(152, 124, t);
@@ -261,8 +278,10 @@ export class PrototypeScene extends Phaser.Scene {
     ];
     for (const [x, y, s] of edgeRubble) this.drawRock(g, x, y, s);
 
-    this.drawSpawnGate(g, 'player', PLAYER_GATE_X, PLAYER_GATE_Y);
-    this.drawSpawnGate(g, 'enemy', ENEMY_GATE_X, ENEMY_GATE_Y);
+    const playerGate = this.projectBattle(this.state.battle.bases.player.x + 72, 0);
+    const enemyGate = this.projectBattle(this.state.battle.bases.enemy.x - 72, 0);
+    if (this.isProjectionVisible(playerGate, 0.16)) this.drawSpawnGate(g, 'player', playerGate.x, playerGate.y);
+    if (this.isProjectionVisible(enemyGate, 0.16)) this.drawSpawnGate(g, 'enemy', enemyGate.x, enemyGate.y);
   }
 
   private drawRoadBand(
@@ -279,8 +298,8 @@ export class PrototypeScene extends Phaser.Scene {
     const right: Array<[number, number]> = [];
     for (let i = 0; i <= 28; i += 1) {
       const t = i / 28;
-      const p = this.getRoadPoint(t);
-      const next = this.getRoadPoint(Math.min(1, t + 0.03));
+      const p = this.getRoadPoint(this.getVisibleWorldX(t));
+      const next = this.getRoadPoint(this.getVisibleWorldX(Math.min(1, t + 0.03)));
       const n = this.getRoadNormal(p, next);
       const halfWidth = Phaser.Math.Linear(width * 0.54, width * 0.46, t);
       left.push([p.x + n.x * halfWidth + offsetX, p.y + n.y * halfWidth + offsetY]);
@@ -300,11 +319,9 @@ export class PrototypeScene extends Phaser.Scene {
     g.fillEllipse(x, y + 2, 58, 14);
   }
 
-  private getRoadPoint(t: number) {
-    return {
-      x: Phaser.Math.Linear(PLAYER_GATE_X, ENEMY_GATE_X, t),
-      y: Phaser.Math.Linear(PLAYER_GATE_Y, ENEMY_GATE_Y, t) - Math.sin(t * Math.PI) * 8,
-    };
+  private getRoadPoint(worldX: number) {
+    const projection = this.projectBattle(worldX, 0);
+    return { x: projection.x, y: projection.y };
   }
 
   private getRoadNormal(a: { x: number; y: number }, b: { x: number; y: number }) {
@@ -348,6 +365,8 @@ export class PrototypeScene extends Phaser.Scene {
     const stone = 0x263345;
     const trim = isPlayer ? 0xfbbf24 : 0xf97316;
     const g = this.add.graphics().setDepth(y - 28);
+    if (this.battlefieldMask) g.setMask(this.battlefieldMask);
+    this.baseVisuals.push(g);
 
     g.fillStyle(0x020617, 0.46);
     g.fillEllipse(x, y + 56, 256, 54);
@@ -383,10 +402,12 @@ export class PrototypeScene extends Phaser.Scene {
     g.fillTriangle(x - 78, y + 38, x - 64, y + 20, x - 50, y + 40);
     g.fillTriangle(x + 82, y + 36, x + 68, y + 20, x + 54, y + 40);
 
-    this.add.image(x + (isPlayer ? -8 : 8), y + 2, isPlayer ? 'base_player' : 'base_enemy')
+    const image = this.add.image(x + (isPlayer ? -8 : 8), y + 2, isPlayer ? 'base_player' : 'base_enemy')
       .setScale(0.44)
       .setAlpha(0.86)
       .setDepth(y + 18);
+    if (this.battlefieldMask) image.setMask(this.battlefieldMask);
+    this.baseVisuals.push(image);
   }
 
   private drawStaticBattleSquads() {
@@ -411,24 +432,24 @@ export class PrototypeScene extends Phaser.Scene {
     const w = MINIMAP_W;
     const h = MINIMAP_H;
     const panel = this.add.graphics().setDepth(4700);
-    panel.fillStyle(0x0b1118, 0.9);
-    panel.fillRect(x, y, w, h);
+    panel.fillStyle(0x0b1118, 0.92);
+    panel.fillRoundedRect(x, y, w, h, 6);
     panel.lineStyle(2, 0x9ca3af, 0.55);
-    panel.strokeRect(x, y, w, h);
-    panel.fillStyle(0x17231f, 1);
-    panel.fillRect(x + 10, y + 28, w - 20, h - 40);
-    this.drawPolygon(panel, [
-      [x + 30, y + 92], [x + 92, y + 70], [x + 174, y + 30],
-      [x + 190, y + 42], [x + 126, y + 70], [x + 48, y + 96],
-    ], 0x5f6f54, 0.58, 0xa8b990, 0.22);
-    panel.lineStyle(3, 0xd4dfba, 0.34);
-    panel.lineBetween(x + 36, y + 90, x + 186, y + 34);
+    panel.strokeRoundedRect(x, y, w, h, 6);
+    panel.fillStyle(0x263a2c, 1);
+    panel.fillRoundedRect(x + 18, y + 48, w - 36, 28, 14);
     panel.fillStyle(0x60a5fa, 0.95);
-    panel.fillCircle(x + 34, y + 88, 6);
+    panel.fillCircle(x + 18, y + 62, 6);
     panel.fillStyle(0xf87171, 0.95);
-    panel.fillCircle(x + 188, y + 28, 6);
-    this.add.text(x + 10, y + 8, '小地图', this.textStyle(15, '#f8fafc')).setDepth(4701);
+    panel.fillCircle(x + w - 18, y + 62, 6);
+    this.add.text(x + 10, y + 8, '战线', this.textStyle(15, '#f8fafc')).setDepth(4701);
     this.minimapDynamic = this.add.graphics().setDepth(4702);
+    const hit = this.add.rectangle(x + w / 2, y + 62, w - 20, 70, 0x000000, 0.001)
+      .setDepth(4703)
+      .setInteractive({ draggable: true, useHandCursor: true });
+    this.input.setDraggable(hit);
+    hit.on('pointerdown', (pointer: Phaser.Input.Pointer) => this.setCameraFromMiniMap(pointer.x));
+    hit.on('drag', (pointer: Phaser.Input.Pointer) => this.setCameraFromMiniMap(pointer.x));
   }
 
   private drawRock(g: Phaser.GameObjects.Graphics, x: number, y: number, size: number) {
@@ -978,6 +999,14 @@ export class PrototypeScene extends Phaser.Scene {
         this.unitVisuals.set(unit.id, visual);
       }
       const pos = this.projectBattle(unit.x, unit.laneOffset);
+      const visible = this.isProjectionVisible(pos, 0.18);
+      visual.outline.setVisible(visible);
+      visual.sprite.setVisible(visible);
+      visual.sideRing.setVisible(visible);
+      visual.shadow.setVisible(visible);
+      visual.hpBack.setVisible(visible);
+      visual.hpFill.setVisible(visible);
+      if (!visible) continue;
       const scale = this.getUnitSpriteScale(unit);
       const bob = Math.sin((this.time.now + unit.x) / 180) * 2;
       const hitFlash = stateTimeSince(this.state.battle.elapsedMs, unit.lastHitAtMs) < 140;
@@ -1025,8 +1054,11 @@ export class PrototypeScene extends Phaser.Scene {
 
   private drawFrontlineMarker(g: Phaser.GameObjects.Graphics) {
     const ratio = getBattleFrontlineRatio(this.state);
-    const p = this.getRoadPoint(ratio);
-    const next = this.getRoadPoint(Math.min(1, ratio + 0.03));
+    const worldX = Phaser.Math.Linear(this.state.battle.bases.player.x, this.state.battle.bases.enemy.x, ratio);
+    const p = this.getRoadPoint(worldX);
+    const next = this.getRoadPoint(worldX + this.state.battle.camera.viewportWorldWidth * 0.03);
+    const projected = this.projectBattle(worldX, 0);
+    if (!this.isProjectionVisible(projected, 0.12)) return;
     const n = this.getRoadNormal(p, next);
     const pulse = 0.55 + Math.sin(this.time.now / 180) * 0.16;
     g.lineStyle(5, 0xf8fafc, 0.16);
@@ -1043,16 +1075,18 @@ export class PrototypeScene extends Phaser.Scene {
 
   private drawBaseHitFlashes(g: Phaser.GameObjects.Graphics) {
     const basePoints = [
-      ['player', PLAYER_BASE_X, PLAYER_BASE_Y, 0x60a5fa],
-      ['enemy', ENEMY_BASE_X, ENEMY_BASE_Y, 0xf87171],
+      ['player', this.state.battle.bases.player.x, 0x60a5fa],
+      ['enemy', this.state.battle.bases.enemy.x, 0xf87171],
     ] as const;
-    for (const [side, x, y, color] of basePoints) {
+    for (const [side, worldX, color] of basePoints) {
       const base = this.state.battle.bases[side];
       const age = this.state.battle.elapsedMs - base.lastHitAtMs;
       if (age > 260) continue;
+      const pos = this.projectBattle(worldX, 0);
+      if (!this.isProjectionVisible(pos, 0.18)) continue;
       const alpha = 1 - age / 260;
       g.lineStyle(5, color, alpha * 0.72);
-      g.strokeEllipse(x, y + 26, 242 + age * 0.18, 66 + age * 0.05);
+      g.strokeEllipse(pos.x, pos.y + 6, 242 + age * 0.18, 66 + age * 0.05);
     }
   }
 
@@ -1062,6 +1096,7 @@ export class PrototypeScene extends Phaser.Scene {
       const ratio = Phaser.Math.Clamp((this.state.battle.elapsedMs - projectile.createdAtMs) / duration, 0, 1);
       const from = this.projectBattle(projectile.fromX, projectile.fromLaneOffset);
       const to = this.projectBattle(projectile.toX, projectile.toLaneOffset);
+      if (!this.isProjectionVisible(from, 0.2) && !this.isProjectionVisible(to, 0.2)) continue;
       const headX = Phaser.Math.Linear(from.x, to.x, ratio);
       const headY = Phaser.Math.Linear(from.y - 18, to.y - 20, ratio);
       const tailRatio = Math.max(0, ratio - 0.16);
@@ -1086,10 +1121,14 @@ export class PrototypeScene extends Phaser.Scene {
       if (this.renderedEffectIds.has(effect.id)) continue;
       this.renderedEffectIds.add(effect.id);
       const pos = this.projectBattle(effect.x, effect.laneOffset);
+      if (!this.isProjectionVisible(pos, 0.2)) continue;
       if (effect.type === 'spawn') {
         this.spawnSpawnEffect(pos.x, pos.y, effect.side);
         if (effect.side === 'player') {
-          this.drawTransferTrail(UNIT_X + UNIT_W * 0.32, TOP_Y + TOP_H - 26, PLAYER_GATE_X, PLAYER_GATE_Y, 0x60a5fa);
+          const gate = this.projectBattle(this.state.battle.bases.player.x + 72, 0);
+          if (this.isProjectionVisible(gate, 0.18)) {
+            this.drawTransferTrail(UNIT_X + UNIT_W * 0.32, TOP_Y + TOP_H - 26, gate.x, gate.y, 0x60a5fa);
+          }
         }
       } else if (effect.type === 'hit') {
         this.spawnHitEffect(pos.x, pos.y, effect.side);
@@ -1126,27 +1165,52 @@ export class PrototypeScene extends Phaser.Scene {
   private syncMiniMap() {
     this.minimapDynamic.clear();
     const g = this.minimapDynamic;
-    const frontline = this.projectMiniMap(getBattleFrontlineRatio(this.state), 0);
-    g.fillStyle(0xfacc15, 0.7);
-    g.fillRect(frontline.x - 2, frontline.y - 13, 4, 26);
-    g.lineStyle(1, 0xf8fafc, 0.32);
-    g.lineBetween(frontline.x - 10, frontline.y + 5, frontline.x + 10, frontline.y - 5);
-
-    for (const unit of this.state.battle.units) {
-      const ratio = this.worldXToFrontlineRatio(unit.x);
-      const pos = this.projectMiniMap(ratio, unit.laneOffset);
-      g.fillStyle(unit.side === 'player' ? 0x60a5fa : 0xf87171, 0.75);
-      g.fillCircle(pos.x, pos.y, unit.isElite ? 4 : 3);
+    const stripX = MINIMAP_X + 18;
+    const stripY = MINIMAP_Y + 48;
+    const stripW = MINIMAP_W - 36;
+    const stripH = 28;
+    const bands = buildBattleHeatBands(this.state.battle.units, this.state.battle.bases.player.x, this.state.battle.bases.enemy.x, 24);
+    for (const band of bands) {
+      const bx = stripX + band.ratioStart * stripW;
+      const bw = Math.max(2, (band.ratioEnd - band.ratioStart) * stripW);
+      if (band.player > 0) {
+        g.fillStyle(0x60a5fa, Math.min(0.82, 0.22 + band.player * 0.16));
+        g.fillRect(bx, stripY + 4, bw, 8);
+      }
+      if (band.enemy > 0) {
+        g.fillStyle(0xf87171, Math.min(0.82, 0.22 + band.enemy * 0.16));
+        g.fillRect(bx, stripY + 16, bw, 8);
+      }
+      if (band.player > 0 && band.enemy > 0) {
+        g.fillStyle(0xfacc15, 0.34);
+        g.fillRoundedRect(bx, stripY - 5, bw, stripH + 10, 4);
+      }
     }
+    const hotspot = getBattleHotspotRatio(this.state);
+    g.fillStyle(0xfacc15, 0.72);
+    g.fillRect(stripX + hotspot * stripW - 2, stripY - 8, 4, stripH + 16);
+    const viewport = this.getCurrentBattleViewport();
+    const fullWidth = this.state.battle.bases.enemy.x - this.state.battle.bases.player.x;
+    const viewStartRatio = (viewport.startX - this.state.battle.bases.player.x) / fullWidth;
+    const viewWidthRatio = viewport.width / fullWidth;
+    g.lineStyle(3, 0xf8fafc, 0.9);
+    g.strokeRoundedRect(stripX + viewStartRatio * stripW, stripY - 9, viewWidthRatio * stripW, stripH + 18, 5);
   }
 
-  private projectMiniMap(ratio: number, laneOffset: number) {
-    const t = Phaser.Math.Clamp(ratio, 0, 1);
-    const spread = 1 + Math.sin(t * Math.PI) * 0.5;
-    return {
-      x: MINIMAP_X + 34 + t * 154,
-      y: MINIMAP_Y + 88 - t * 60 + laneOffset * 0.12 * spread,
-    };
+  private setCameraFromMiniMap(pointerX: number) {
+    const stripX = MINIMAP_X + 18;
+    const stripW = MINIMAP_W - 36;
+    const ratio = Phaser.Math.Clamp((pointerX - stripX) / stripW, 0, 1);
+    const playerBaseX = this.state.battle.bases.player.x;
+    const enemyBaseX = this.state.battle.bases.enemy.x;
+    this.state.battle.camera.centerX = clampBattleCameraCenter(
+      Phaser.Math.Linear(playerBaseX, enemyBaseX, ratio),
+      playerBaseX,
+      enemyBaseX,
+      this.state.battle.camera.viewportWorldWidth,
+    );
+    this.state.battle.camera.manualUntilMs = this.time.now + 4200;
+    this.drawBattlefieldBackdrop();
   }
 
   private worldXToFrontlineRatio(worldX: number) {
@@ -1155,15 +1219,60 @@ export class PrototypeScene extends Phaser.Scene {
     return (worldX - playerBaseX) / Math.max(1, enemyBaseX - playerBaseX);
   }
 
+  private getCurrentBattleViewport() {
+    return getBattleCameraViewport(
+      this.state.battle.camera.centerX,
+      this.state.battle.bases.player.x,
+      this.state.battle.bases.enemy.x,
+      this.state.battle.camera.viewportWorldWidth,
+    );
+  }
+
+  private getVisibleWorldX(ratio: number) {
+    const viewport = this.getCurrentBattleViewport();
+    return Phaser.Math.Linear(viewport.startX, viewport.endX, ratio);
+  }
+
+  private isProjectionVisible(pos: { visibleRatio: number }, pad = 0) {
+    return pos.visibleRatio >= -pad && pos.visibleRatio <= 1 + pad;
+  }
+
+  private clearBaseVisuals() {
+    for (const visual of this.baseVisuals) visual.destroy();
+    this.baseVisuals = [];
+  }
+
+  private updateBattleCamera(delta: number) {
+    const camera = this.state.battle.camera;
+    if (this.time.now < camera.manualUntilMs) return;
+    const playerBaseX = this.state.battle.bases.player.x;
+    const enemyBaseX = this.state.battle.bases.enemy.x;
+    const targetX = Phaser.Math.Linear(playerBaseX, enemyBaseX, getBattleHotspotRatio(this.state));
+    camera.centerX = clampBattleCameraCenter(
+      Phaser.Math.Linear(camera.centerX, targetX, Math.min(1, delta / 900)),
+      playerBaseX,
+      enemyBaseX,
+      camera.viewportWorldWidth,
+    );
+  }
+
   private syncBases() {
     const playerRatio = this.state.battle.bases.player.hp / this.state.battle.bases.player.maxHp;
     const enemyRatio = this.state.battle.bases.enemy.hp / this.state.battle.bases.enemy.maxHp;
-    this.drawBaseBar(PLAYER_BASE_X, PLAYER_BASE_Y + 58, playerRatio, 0x3b82f6, '我方');
-    this.drawBaseBar(ENEMY_BASE_X, ENEMY_BASE_Y + 80, enemyRatio, 0xef4444, '敌方');
+    this.children.getByName('bar-我方')?.destroy();
+    this.children.getByName('bar-敌方')?.destroy();
+    const playerPos = this.projectBattle(this.state.battle.bases.player.x, 0);
+    const enemyPos = this.projectBattle(this.state.battle.bases.enemy.x, 0);
+    if (this.isProjectionVisible(playerPos, 0.1)) {
+      this.drawBaseBar(playerPos.x, playerPos.y + 56, playerRatio, 0x3b82f6, '我方');
+    }
+    if (this.isProjectionVisible(enemyPos, 0.1)) {
+      this.drawBaseBar(enemyPos.x, enemyPos.y + 68, enemyRatio, 0xef4444, '敌方');
+    }
   }
 
   private drawBaseBar(x: number, y: number, ratio: number, color: number, label: string) {
-    const key = `bar-${x}-${y}`;
+    const key = `bar-${label}`;
     const existing = this.children.getByName(key);
     existing?.destroy();
     const safeRatio = Phaser.Math.Clamp(ratio, 0, 1);
@@ -1178,15 +1287,16 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private projectBattle(worldX: number, laneOffset: number) {
-    const ratio = this.worldXToFrontlineRatio(worldX);
-    const t = Phaser.Math.Clamp(ratio, 0, 1);
-    const p = this.getRoadPoint(t);
-    const next = this.getRoadPoint(Math.min(1, t + 0.03));
-    const n = this.getRoadNormal(p, next);
-    const spread = 0.82 + Math.sin(t * Math.PI) * 0.62;
-    const x = p.x + n.x * laneOffset * spread;
-    const y = p.y + n.y * laneOffset * spread * 0.94;
-    return { x, y, depth: y };
+    return projectBattlePoint({
+      worldX,
+      laneOffset,
+      cameraCenterX: this.state.battle.camera.centerX,
+      playerBaseX: this.state.battle.bases.player.x,
+      enemyBaseX: this.state.battle.bases.enemy.x,
+      screenStart: BATTLE_SCREEN_START,
+      screenEnd: BATTLE_SCREEN_END,
+      viewportWorldWidth: this.state.battle.camera.viewportWorldWidth,
+    });
   }
 
   private cleanupLostBalls() {
@@ -1320,8 +1430,9 @@ export class PrototypeScene extends Phaser.Scene {
 
   private drawMagicFx() {
     const fx = this.add.graphics().setDepth(4500);
-    const center = this.getRoadPoint(0.58);
-    const next = this.getRoadPoint(0.64);
+    const centerWorldX = Phaser.Math.Linear(this.state.battle.bases.player.x, this.state.battle.bases.enemy.x, 0.58);
+    const center = this.getRoadPoint(centerWorldX);
+    const next = this.getRoadPoint(centerWorldX + this.state.battle.camera.viewportWorldWidth * 0.06);
     const n = this.getRoadNormal(center, next);
     fx.lineStyle(5, 0xd8b4fe, 0.95);
     fx.beginPath();
