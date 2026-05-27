@@ -214,6 +214,8 @@ export class PrototypeScene extends Phaser.Scene {
     g.fillStyle(0x111827, 0.22);
     g.fillRect(0, BATTLE_Y + BATTLE_H - 98, GAME_W, 98);
 
+    this.drawBattlefieldSurroundings(g);
+
     this.drawPolygon(g, [
       [0, BATTLE_Y + 42], [250, BATTLE_Y + 24], [344, BATTLE_Y + 112], [168, BATTLE_Y + 184],
       [0, BATTLE_Y + 150],
@@ -234,6 +236,69 @@ export class PrototypeScene extends Phaser.Scene {
     const enemyBase = this.projectBattle(this.state.battle.bases.enemy.x, 0);
     if (this.isProjectionVisible(playerBase, 0.24)) this.drawBaseDistrict('player', playerBase.x, playerBase.y - 20);
     if (this.isProjectionVisible(enemyBase, 0.24)) this.drawBaseDistrict('enemy', enemyBase.x, enemyBase.y - 20);
+  }
+
+  private drawBattlefieldSurroundings(g: Phaser.GameObjects.Graphics) {
+    const top = BATTLE_Y;
+    const bottom = BATTLE_Y + BATTLE_H;
+    const wastelandPatches = [
+      [[0, top + 18], [210, top + 22], [342, top + 88], [214, top + 170], [0, top + 132], [0, top + 18], 0x10261f, 0.7],
+      [[28, top + 202], [248, top + 154], [424, top + 206], [346, top + 332], [118, top + 356], [0, top + 284], 0x172d2a, 0.5],
+      [[934, top + 44], [1280, top + 18], [1280, top + 170], [1044, top + 188], [910, top + 122], [934, top + 44], 0x182833, 0.62],
+      [[960, top + 246], [1280, top + 176], [1280, bottom - 18], [1088, bottom - 8], [1012, bottom - 130], [960, top + 246], 0x182d26, 0.58],
+      [[0, bottom - 116], [196, bottom - 190], [392, bottom - 126], [252, bottom - 28], [0, bottom - 18], [0, bottom - 116], 0x1f2a2f, 0.54],
+    ] as const;
+
+    for (const patch of wastelandPatches) {
+      const points = patch.slice(0, -2) as Array<[number, number]>;
+      const fill = patch[patch.length - 2] as number;
+      const alpha = patch[patch.length - 1] as number;
+      this.drawPolygon(g, points, fill, alpha, 0x6b7c63, 0.08);
+    }
+
+    const contourLines = [
+      [[22, top + 78], [160, top + 58], [278, top + 96], [368, top + 140]],
+      [[28, top + 238], [190, top + 204], [360, top + 238], [476, top + 294]],
+      [[818, top + 84], [986, top + 62], [1178, top + 84], [1270, top + 126]],
+      [[890, bottom - 58], [1038, bottom - 116], [1198, bottom - 92], [1260, bottom - 46]],
+      [[20, bottom - 58], [156, bottom - 96], [312, bottom - 72], [438, bottom - 114]],
+    ] as const;
+    for (const line of contourLines) {
+      g.lineStyle(3, 0x4b6154, 0.16);
+      g.beginPath();
+      g.moveTo(line[0][0], line[0][1]);
+      for (let i = 1; i < line.length; i += 1) g.lineTo(line[i][0], line[i][1]);
+      g.strokePath();
+      g.lineStyle(1, 0xa3ad8d, 0.08);
+      g.strokePath();
+    }
+
+    const serviceRoads = [
+      [44, top + 338, 342, top + 232],
+      [878, top + 96, 1218, top + 44],
+      [878, bottom - 72, 1218, bottom - 146],
+      [76, top + 44, 272, top + 94],
+    ] as const;
+    for (const [x1, y1, x2, y2] of serviceRoads) {
+      g.lineStyle(8, 0x394437, 0.18);
+      g.lineBetween(x1, y1, x2, y2);
+      g.lineStyle(2, 0xc3c9a7, 0.12);
+      g.lineBetween(x1, y1, x2, y2);
+    }
+
+    const ruins = [
+      [102, top + 118, 0.9, 0x334155], [190, top + 78, 0.72, 0x273542],
+      [1108, top + 136, 0.82, 0x3a3f3a], [1198, top + 322, 0.96, 0x273542],
+      [972, bottom - 54, 0.78, 0x334155], [286, bottom - 68, 0.82, 0x3a3f3a],
+    ] as const;
+    for (const [x, y, scale, color] of ruins) this.drawDistantRuin(g, x, y, scale, color);
+
+    const hazeBands = [
+      [218, top + 108, 310, 42], [1060, top + 238, 380, 48],
+      [650, bottom - 74, 520, 34], [118, bottom - 176, 250, 38],
+    ] as const;
+    g.fillStyle(0xb6c2aa, 0.035);
+    for (const [x, y, w, h] of hazeBands) g.fillEllipse(x, y, w, h);
   }
 
   private drawRoad(g: Phaser.GameObjects.Graphics) {
@@ -480,6 +545,19 @@ export class PrototypeScene extends Phaser.Scene {
     g.fillTriangle(x, y - 14 * scale, x - 24 * scale, y + 28 * scale, x + 24 * scale, y + 28 * scale);
     g.lineStyle(1, 0x5b7d57, 0.28);
     g.lineBetween(x, y - 24 * scale, x + 14 * scale, y + 12 * scale);
+  }
+
+  private drawDistantRuin(g: Phaser.GameObjects.Graphics, x: number, y: number, scale: number, color: number) {
+    g.fillStyle(0x020617, 0.18);
+    g.fillEllipse(x + 8 * scale, y + 24 * scale, 74 * scale, 18 * scale);
+    g.fillStyle(color, 0.48);
+    g.fillRect(x - 30 * scale, y - 4 * scale, 20 * scale, 34 * scale);
+    g.fillRect(x + 10 * scale, y - 24 * scale, 18 * scale, 54 * scale);
+    g.fillRect(x - 8 * scale, y + 4 * scale, 52 * scale, 12 * scale);
+    g.lineStyle(2, 0x94a3b8, 0.12);
+    g.lineBetween(x - 28 * scale, y - 4 * scale, x + 38 * scale, y + 18 * scale);
+    g.fillStyle(0xfacc15, 0.28);
+    g.fillRect(x + 16 * scale, y - 12 * scale, 5 * scale, 6 * scale);
   }
 
   private drawPolygon(
