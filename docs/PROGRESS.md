@@ -66,6 +66,7 @@
 - Saved the long battlefield browser smoke screenshot to `docs/long-battlefield-smoke.jpg`.
 - Added a minimap "frontline" button: dragging the battle-line strip disables auto-follow, and pressing the button snaps back to the current frontline hotspot and resumes auto-follow.
 - Added low-contrast surrounding battlefield background art so non-playable areas read as distant wasteland, service roads, ruins, and haze instead of flat black space.
+- Made camera controls more explicit: added a visible battlefield "back to frontline" button and allowed dragging the main battlefield view to enter manual camera mode.
 
 ## Known Issues
 

@@ -30,6 +30,7 @@ import {
   getBattleHotspotCameraCenter,
   getBattleHotspotRatio,
   getNextBattleCameraCenter,
+  getPannedBattleCameraCenter,
   projectBattlePoint,
 } from './BattlefieldViewSystem';
 
@@ -421,6 +422,19 @@ describe('battlefield view rules', () => {
     });
 
     expect(nextCenter).toBe(1350);
+  });
+
+  it('pans the camera when the player drags the battlefield view', () => {
+    const nextCenter = getPannedBattleCameraCenter({
+      startCenterX: 710,
+      pointerDeltaX: -120,
+      screenPixelWidth: 810,
+      playerBaseX: 70,
+      enemyBaseX: 1670,
+      viewportWorldWidth: 640,
+    });
+
+    expect(nextCenter).toBeGreaterThan(710);
   });
 
   it('projects world points relative to camera center', () => {

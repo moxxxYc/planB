@@ -12,6 +12,7 @@ import {
   getBattleHotspotCameraCenter,
   getBattleHotspotRatio,
   getNextBattleCameraCenter,
+  getPannedBattleCameraCenter,
   projectBattlePoint,
 } from '../systems/BattlefieldViewSystem';
 import { createInitialGameState } from '../systems/GameState';
@@ -124,8 +125,12 @@ export class PrototypeScene extends Phaser.Scene {
   private minimapDynamic!: Phaser.GameObjects.Graphics;
   private frontlineButton?: Phaser.GameObjects.Rectangle;
   private frontlineButtonText?: Phaser.GameObjects.Text;
+  private cameraFollowButton?: Phaser.GameObjects.Rectangle;
+  private cameraFollowButtonText?: Phaser.GameObjects.Text;
   private baseVisuals: Phaser.GameObjects.GameObject[] = [];
   private launcherTurret!: Phaser.GameObjects.Graphics;
+  private battlePanStartPointerX = 0;
+  private battlePanStartCenterX = 0;
   private lastBallDropMs = 0;
   private slotFlashUntil = new Map<string, number>();
   private lastRecentTextIndex = 0;
@@ -199,7 +204,36 @@ export class PrototypeScene extends Phaser.Scene {
     this.battlefieldDynamic = this.add.graphics().setDepth(4600);
     this.battlefieldDynamic.setMask(this.battlefieldMask);
     this.add.text(28, BATTLE_Y + 14, '伪 2D 3/4 自动战场', this.textStyle(20, '#f8fafc')).setDepth(950);
+    this.createBattlefieldPanInput();
+    this.createBattlefieldCameraControls();
     this.drawMiniMap();
+  }
+
+  private createBattlefieldPanInput() {
+    const hit = this.add.rectangle(GAME_W / 2, BATTLE_Y + BATTLE_H / 2, GAME_W, BATTLE_H, 0x000000, 0.001)
+      .setDepth(900)
+      .setInteractive({ draggable: true, useHandCursor: true });
+    this.input.setDraggable(hit);
+    const startDrag = (pointer: Phaser.Input.Pointer) => {
+      this.battlePanStartPointerX = pointer.x;
+      this.battlePanStartCenterX = this.state.battle.camera.centerX;
+    };
+    hit.on('pointerdown', startDrag);
+    hit.on('dragstart', startDrag);
+    hit.on('drag', (pointer: Phaser.Input.Pointer) => this.panBattlefieldCamera(pointer.x - this.battlePanStartPointerX));
+  }
+
+  private createBattlefieldCameraControls() {
+    const x = 274;
+    const y = BATTLE_Y + 26;
+    this.cameraFollowButton = this.add.rectangle(x, y, 88, 26, 0x12322b, 0.9)
+      .setDepth(4705)
+      .setStrokeStyle(1, 0x86efac, 0.76)
+      .setInteractive({ useHandCursor: true });
+    this.cameraFollowButtonText = this.add.text(x, y, '回前线', this.textStyle(13, '#dcfce7'))
+      .setOrigin(0.5)
+      .setDepth(4706);
+    this.cameraFollowButton.on('pointerdown', () => this.restoreBattleCameraFollow());
   }
 
   private drawBattlefieldBackdrop() {
@@ -512,11 +546,11 @@ export class PrototypeScene extends Phaser.Scene {
     panel.fillStyle(0xf87171, 0.95);
     panel.fillCircle(x + w - 18, y + 62, 6);
     this.add.text(x + 10, y + 8, '战线', this.textStyle(15, '#f8fafc')).setDepth(4701);
-    this.frontlineButton = this.add.rectangle(x + w - 43, y + 19, 58, 22, 0x172554, 0.88)
+    this.frontlineButton = this.add.rectangle(x + w - 45, y + 19, 74, 22, 0x172554, 0.88)
       .setDepth(4703)
       .setStrokeStyle(1, 0x93c5fd, 0.72)
       .setInteractive({ useHandCursor: true });
-    this.frontlineButtonText = this.add.text(x + w - 43, y + 19, '前线', this.textStyle(12, '#f8fafc'))
+    this.frontlineButtonText = this.add.text(x + w - 45, y + 19, '回前线', this.textStyle(11, '#f8fafc'))
       .setOrigin(0.5)
       .setDepth(4704);
     this.frontlineButton.on('pointerdown', () => this.restoreBattleCameraFollow());
@@ -1294,15 +1328,33 @@ export class PrototypeScene extends Phaser.Scene {
     const ratio = Phaser.Math.Clamp((pointerX - stripX) / stripW, 0, 1);
     const playerBaseX = this.state.battle.bases.player.x;
     const enemyBaseX = this.state.battle.bases.enemy.x;
-    this.state.battle.camera.centerX = clampBattleCameraCenter(
+    this.setManualBattleCamera(clampBattleCameraCenter(
       Phaser.Math.Linear(playerBaseX, enemyBaseX, ratio),
       playerBaseX,
       enemyBaseX,
       this.state.battle.camera.viewportWorldWidth,
-    );
-    this.state.battle.camera.manualOverride = true;
-    this.state.battle.camera.manualUntilMs = Number.POSITIVE_INFINITY;
+    ));
+  }
+
+  private panBattlefieldCamera(pointerDeltaX: number) {
+    const camera = this.state.battle.camera;
+    this.setManualBattleCamera(getPannedBattleCameraCenter({
+      startCenterX: this.battlePanStartCenterX,
+      pointerDeltaX,
+      screenPixelWidth: Math.abs(BATTLE_SCREEN_END.x - BATTLE_SCREEN_START.x),
+      playerBaseX: this.state.battle.bases.player.x,
+      enemyBaseX: this.state.battle.bases.enemy.x,
+      viewportWorldWidth: camera.viewportWorldWidth,
+    }));
+  }
+
+  private setManualBattleCamera(centerX: number) {
+    const camera = this.state.battle.camera;
+    camera.centerX = centerX;
+    camera.manualOverride = true;
+    camera.manualUntilMs = Number.POSITIVE_INFINITY;
     this.drawBattlefieldBackdrop();
+    this.syncMiniMap();
   }
 
   private restoreBattleCameraFollow() {
@@ -1320,13 +1372,17 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private syncFrontlineButton() {
-    if (!this.frontlineButton || !this.frontlineButtonText) return;
+    if (!this.frontlineButton || !this.frontlineButtonText || !this.cameraFollowButton || !this.cameraFollowButtonText) return;
     if (this.state.battle.camera.manualOverride) {
       this.frontlineButton.setFillStyle(0x78350f, 0.92).setStrokeStyle(1, 0xfacc15, 0.9);
-      this.frontlineButtonText.setText('前线').setColor('#fef3c7');
+      this.frontlineButtonText.setText('回前线').setColor('#fef3c7');
+      this.cameraFollowButton.setFillStyle(0x78350f, 0.94).setStrokeStyle(1, 0xfacc15, 0.96);
+      this.cameraFollowButtonText.setText('回前线').setColor('#fef3c7');
     } else {
       this.frontlineButton.setFillStyle(0x12322b, 0.88).setStrokeStyle(1, 0x86efac, 0.68);
-      this.frontlineButtonText.setText('跟随').setColor('#dcfce7');
+      this.frontlineButtonText.setText('回前线').setColor('#dcfce7');
+      this.cameraFollowButton.setFillStyle(0x12322b, 0.9).setStrokeStyle(1, 0x86efac, 0.76);
+      this.cameraFollowButtonText.setText('回前线').setColor('#dcfce7');
     }
   }
 

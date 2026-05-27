@@ -48,6 +48,15 @@ export type BattleCameraHotspotInput = {
   viewportWorldWidth: number;
 };
 
+export type BattleCameraPanInput = {
+  startCenterX: number;
+  pointerDeltaX: number;
+  screenPixelWidth: number;
+  playerBaseX: number;
+  enemyBaseX: number;
+  viewportWorldWidth: number;
+};
+
 export function clampBattleCameraCenter(centerX: number, playerBaseX: number, enemyBaseX: number, viewportWorldWidth: number): number {
   const half = viewportWorldWidth / 2;
   const min = playerBaseX + half;
@@ -68,6 +77,16 @@ export function getBattleCameraViewport(centerX: number, playerBaseX: number, en
 export function getBattleHotspotCameraCenter(input: BattleCameraHotspotInput): number {
   return clampBattleCameraCenter(
     input.playerBaseX + (input.enemyBaseX - input.playerBaseX) * input.hotspotRatio,
+    input.playerBaseX,
+    input.enemyBaseX,
+    input.viewportWorldWidth,
+  );
+}
+
+export function getPannedBattleCameraCenter(input: BattleCameraPanInput): number {
+  const worldPerPixel = input.viewportWorldWidth / Math.max(1, input.screenPixelWidth);
+  return clampBattleCameraCenter(
+    input.startCenterX - input.pointerDeltaX * worldPerPixel,
     input.playerBaseX,
     input.enemyBaseX,
     input.viewportWorldWidth,
