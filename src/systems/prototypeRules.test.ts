@@ -27,6 +27,7 @@ import {
   buildBattleHeatBands,
   clampBattleCameraCenter,
   getBattleCameraViewport,
+  getBattleHotspotCameraCenter,
   getBattleHotspotRatio,
   getNextBattleCameraCenter,
   projectBattlePoint,
@@ -409,6 +410,17 @@ describe('battlefield view rules', () => {
     });
 
     expect(nextCenter).toBe(390);
+  });
+
+  it('snaps the camera back to the frontline hotspot when follow is restored', () => {
+    const nextCenter = getBattleHotspotCameraCenter({
+      hotspotRatio: 0.8,
+      playerBaseX: 70,
+      enemyBaseX: 1670,
+      viewportWorldWidth: 640,
+    });
+
+    expect(nextCenter).toBe(1350);
   });
 
   it('projects world points relative to camera center', () => {

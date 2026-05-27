@@ -64,6 +64,7 @@
 - Removed SPECIAL from the visible Decision Zone slot row and reordered the decision slots to 金币 / 法术 / 出兵 / 升级 so 出兵 sits in the middle of the row.
 - Added a long battlefield camera pass: the battle world is much deeper than the screen viewport, units spawn into deterministic soft top/middle/bottom lanes, aggro/attack targeting accounts for lane distance, and the minimap is now a horizontal battle-line strip with blue/red unit heat, yellow conflict hotspots, and a draggable white viewport frame.
 - Saved the long battlefield browser smoke screenshot to `docs/long-battlefield-smoke.jpg`.
+- Added a minimap "frontline" button: dragging the battle-line strip disables auto-follow, and pressing the button snaps back to the current frontline hotspot and resumes auto-follow.
 
 ## Known Issues
 

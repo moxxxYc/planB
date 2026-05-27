@@ -41,6 +41,13 @@ export type BattleCameraFollowInput = {
   nowMs?: number;
 };
 
+export type BattleCameraHotspotInput = {
+  hotspotRatio: number;
+  playerBaseX: number;
+  enemyBaseX: number;
+  viewportWorldWidth: number;
+};
+
 export function clampBattleCameraCenter(centerX: number, playerBaseX: number, enemyBaseX: number, viewportWorldWidth: number): number {
   const half = viewportWorldWidth / 2;
   const min = playerBaseX + half;
@@ -58,6 +65,15 @@ export function getBattleCameraViewport(centerX: number, playerBaseX: number, en
   };
 }
 
+export function getBattleHotspotCameraCenter(input: BattleCameraHotspotInput): number {
+  return clampBattleCameraCenter(
+    input.playerBaseX + (input.enemyBaseX - input.playerBaseX) * input.hotspotRatio,
+    input.playerBaseX,
+    input.enemyBaseX,
+    input.viewportWorldWidth,
+  );
+}
+
 export function getNextBattleCameraCenter(input: BattleCameraFollowInput): number {
   const currentCenter = clampBattleCameraCenter(
     input.currentCenterX,
@@ -70,7 +86,7 @@ export function getNextBattleCameraCenter(input: BattleCameraFollowInput): numbe
     && input.nowMs < input.manualUntilMs;
   if (input.manualOverride || hasTimedManualLock) return currentCenter;
 
-  const targetX = input.playerBaseX + (input.enemyBaseX - input.playerBaseX) * input.hotspotRatio;
+  const targetX = getBattleHotspotCameraCenter(input);
   const followT = Math.max(0, Math.min(1, input.deltaMs / 900));
   return clampBattleCameraCenter(
     currentCenter + (targetX - currentCenter) * followT,

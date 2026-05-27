@@ -9,6 +9,7 @@ import {
   buildBattleHeatBands,
   clampBattleCameraCenter,
   getBattleCameraViewport,
+  getBattleHotspotCameraCenter,
   getBattleHotspotRatio,
   getNextBattleCameraCenter,
   projectBattlePoint,
@@ -121,6 +122,8 @@ export class PrototypeScene extends Phaser.Scene {
   private battlefieldDynamic!: Phaser.GameObjects.Graphics;
   private battlefieldMask?: Phaser.Display.Masks.GeometryMask;
   private minimapDynamic!: Phaser.GameObjects.Graphics;
+  private frontlineButton?: Phaser.GameObjects.Rectangle;
+  private frontlineButtonText?: Phaser.GameObjects.Text;
   private baseVisuals: Phaser.GameObjects.GameObject[] = [];
   private launcherTurret!: Phaser.GameObjects.Graphics;
   private lastBallDropMs = 0;
@@ -444,8 +447,16 @@ export class PrototypeScene extends Phaser.Scene {
     panel.fillStyle(0xf87171, 0.95);
     panel.fillCircle(x + w - 18, y + 62, 6);
     this.add.text(x + 10, y + 8, '战线', this.textStyle(15, '#f8fafc')).setDepth(4701);
+    this.frontlineButton = this.add.rectangle(x + w - 43, y + 19, 58, 22, 0x172554, 0.88)
+      .setDepth(4703)
+      .setStrokeStyle(1, 0x93c5fd, 0.72)
+      .setInteractive({ useHandCursor: true });
+    this.frontlineButtonText = this.add.text(x + w - 43, y + 19, '前线', this.textStyle(12, '#f8fafc'))
+      .setOrigin(0.5)
+      .setDepth(4704);
+    this.frontlineButton.on('pointerdown', () => this.restoreBattleCameraFollow());
     this.minimapDynamic = this.add.graphics().setDepth(4702);
-    const hit = this.add.rectangle(x + w / 2, y + 62, w - 20, 70, 0x000000, 0.001)
+    const hit = this.add.rectangle(x + w / 2, y + 66, w - 20, 56, 0x000000, 0.001)
       .setDepth(4703)
       .setInteractive({ draggable: true, useHandCursor: true });
     this.input.setDraggable(hit);
@@ -1196,6 +1207,7 @@ export class PrototypeScene extends Phaser.Scene {
     const viewWidthRatio = viewport.width / fullWidth;
     g.lineStyle(3, 0xf8fafc, 0.9);
     g.strokeRoundedRect(stripX + viewStartRatio * stripW, stripY - 9, viewWidthRatio * stripW, stripH + 18, 5);
+    this.syncFrontlineButton();
   }
 
   private setCameraFromMiniMap(pointerX: number) {
@@ -1213,6 +1225,31 @@ export class PrototypeScene extends Phaser.Scene {
     this.state.battle.camera.manualOverride = true;
     this.state.battle.camera.manualUntilMs = Number.POSITIVE_INFINITY;
     this.drawBattlefieldBackdrop();
+  }
+
+  private restoreBattleCameraFollow() {
+    const camera = this.state.battle.camera;
+    camera.manualOverride = false;
+    camera.manualUntilMs = 0;
+    camera.centerX = getBattleHotspotCameraCenter({
+      hotspotRatio: getBattleHotspotRatio(this.state),
+      playerBaseX: this.state.battle.bases.player.x,
+      enemyBaseX: this.state.battle.bases.enemy.x,
+      viewportWorldWidth: camera.viewportWorldWidth,
+    });
+    this.drawBattlefieldBackdrop();
+    this.syncMiniMap();
+  }
+
+  private syncFrontlineButton() {
+    if (!this.frontlineButton || !this.frontlineButtonText) return;
+    if (this.state.battle.camera.manualOverride) {
+      this.frontlineButton.setFillStyle(0x78350f, 0.92).setStrokeStyle(1, 0xfacc15, 0.9);
+      this.frontlineButtonText.setText('前线').setColor('#fef3c7');
+    } else {
+      this.frontlineButton.setFillStyle(0x12322b, 0.88).setStrokeStyle(1, 0x86efac, 0.68);
+      this.frontlineButtonText.setText('跟随').setColor('#dcfce7');
+    }
   }
 
   private worldXToFrontlineRatio(worldX: number) {
