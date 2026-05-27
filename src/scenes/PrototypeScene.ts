@@ -10,6 +10,7 @@ import {
   clampBattleCameraCenter,
   getBattleCameraViewport,
   getBattleHotspotRatio,
+  getNextBattleCameraCenter,
   projectBattlePoint,
 } from '../systems/BattlefieldViewSystem';
 import { createInitialGameState } from '../systems/GameState';
@@ -1209,7 +1210,8 @@ export class PrototypeScene extends Phaser.Scene {
       enemyBaseX,
       this.state.battle.camera.viewportWorldWidth,
     );
-    this.state.battle.camera.manualUntilMs = this.time.now + 4200;
+    this.state.battle.camera.manualOverride = true;
+    this.state.battle.camera.manualUntilMs = Number.POSITIVE_INFINITY;
     this.drawBattlefieldBackdrop();
   }
 
@@ -1244,16 +1246,19 @@ export class PrototypeScene extends Phaser.Scene {
 
   private updateBattleCamera(delta: number) {
     const camera = this.state.battle.camera;
-    if (this.time.now < camera.manualUntilMs) return;
     const playerBaseX = this.state.battle.bases.player.x;
     const enemyBaseX = this.state.battle.bases.enemy.x;
-    const targetX = Phaser.Math.Linear(playerBaseX, enemyBaseX, getBattleHotspotRatio(this.state));
-    camera.centerX = clampBattleCameraCenter(
-      Phaser.Math.Linear(camera.centerX, targetX, Math.min(1, delta / 900)),
+    camera.centerX = getNextBattleCameraCenter({
+      currentCenterX: camera.centerX,
+      hotspotRatio: getBattleHotspotRatio(this.state),
       playerBaseX,
       enemyBaseX,
-      camera.viewportWorldWidth,
-    );
+      viewportWorldWidth: camera.viewportWorldWidth,
+      deltaMs: delta,
+      manualOverride: camera.manualOverride,
+      manualUntilMs: camera.manualUntilMs,
+      nowMs: this.time.now,
+    });
   }
 
   private syncBases() {

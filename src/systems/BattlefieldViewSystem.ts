@@ -29,6 +29,18 @@ export type HeatBand = {
   enemy: number;
 };
 
+export type BattleCameraFollowInput = {
+  currentCenterX: number;
+  hotspotRatio: number;
+  playerBaseX: number;
+  enemyBaseX: number;
+  viewportWorldWidth: number;
+  deltaMs: number;
+  manualOverride?: boolean;
+  manualUntilMs?: number;
+  nowMs?: number;
+};
+
 export function clampBattleCameraCenter(centerX: number, playerBaseX: number, enemyBaseX: number, viewportWorldWidth: number): number {
   const half = viewportWorldWidth / 2;
   const min = playerBaseX + half;
@@ -44,6 +56,28 @@ export function getBattleCameraViewport(centerX: number, playerBaseX: number, en
     endX: safeCenter + viewportWorldWidth / 2,
     width: viewportWorldWidth,
   };
+}
+
+export function getNextBattleCameraCenter(input: BattleCameraFollowInput): number {
+  const currentCenter = clampBattleCameraCenter(
+    input.currentCenterX,
+    input.playerBaseX,
+    input.enemyBaseX,
+    input.viewportWorldWidth,
+  );
+  const hasTimedManualLock = input.nowMs !== undefined
+    && input.manualUntilMs !== undefined
+    && input.nowMs < input.manualUntilMs;
+  if (input.manualOverride || hasTimedManualLock) return currentCenter;
+
+  const targetX = input.playerBaseX + (input.enemyBaseX - input.playerBaseX) * input.hotspotRatio;
+  const followT = Math.max(0, Math.min(1, input.deltaMs / 900));
+  return clampBattleCameraCenter(
+    currentCenter + (targetX - currentCenter) * followT,
+    input.playerBaseX,
+    input.enemyBaseX,
+    input.viewportWorldWidth,
+  );
 }
 
 export function projectBattlePoint(input: BattleProjectionInput): BattleProjection {

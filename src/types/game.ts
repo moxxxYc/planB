@@ -141,6 +141,7 @@ export interface BattleCameraState {
   centerX: number;
   viewportWorldWidth: number;
   manualUntilMs: number;
+  manualOverride: boolean;
 }
 
 export interface BattleState {

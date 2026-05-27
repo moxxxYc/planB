@@ -46,6 +46,7 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
         centerX: 710,
         viewportWorldWidth: 640,
         manualUntilMs: 0,
+        manualOverride: false,
       },
       elapsedMs: 0,
       nextFeedbackId: 1,

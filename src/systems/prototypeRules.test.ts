@@ -28,6 +28,7 @@ import {
   clampBattleCameraCenter,
   getBattleCameraViewport,
   getBattleHotspotRatio,
+  getNextBattleCameraCenter,
   projectBattlePoint,
 } from './BattlefieldViewSystem';
 
@@ -394,6 +395,20 @@ describe('battlefield view rules', () => {
     expect(clampBattleCameraCenter(0, 70, 1670, 640)).toBe(390);
     expect(clampBattleCameraCenter(1700, 70, 1670, 640)).toBe(1350);
     expect(getBattleCameraViewport(710, 70, 1670, 640)).toEqual({ startX: 390, endX: 1030, width: 640 });
+  });
+
+  it('does not auto-follow the frontline after the player takes manual camera control', () => {
+    const nextCenter = getNextBattleCameraCenter({
+      currentCenterX: 390,
+      hotspotRatio: 0.8,
+      playerBaseX: 70,
+      enemyBaseX: 1670,
+      viewportWorldWidth: 640,
+      deltaMs: 16000,
+      manualOverride: true,
+    });
+
+    expect(nextCenter).toBe(390);
   });
 
   it('projects world points relative to camera center', () => {
