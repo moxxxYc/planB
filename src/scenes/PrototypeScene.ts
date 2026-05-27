@@ -836,6 +836,7 @@ export class PrototypeScene extends Phaser.Scene {
       if (action === 'race') this.toggleRace();
       if (action === 'start') this.startPhaseFromDebug();
       if (action === 'skip') this.skipPhase();
+      if (action === 'frontline') this.restoreBattleCameraFollow();
     };
   }
 
@@ -1384,6 +1385,17 @@ export class PrototypeScene extends Phaser.Scene {
       this.cameraFollowButton.setFillStyle(0x12322b, 0.9).setStrokeStyle(1, 0x86efac, 0.76);
       this.cameraFollowButtonText.setText('回前线').setColor('#dcfce7');
     }
+    this.syncDomCameraControls();
+  }
+
+  private syncDomCameraControls() {
+    const controls = document.getElementById('camera-controls');
+    const mode = document.getElementById('camera-mode');
+    const follow = document.getElementById('camera-follow');
+    if (!controls || !mode || !follow) return;
+    controls.classList.toggle('manual', this.state.battle.camera.manualOverride);
+    mode.textContent = this.state.battle.camera.manualOverride ? '手动镜头' : '自动跟随';
+    follow.textContent = '回前线';
   }
 
   private worldXToFrontlineRatio(worldX: number) {
