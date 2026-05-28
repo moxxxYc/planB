@@ -4,7 +4,7 @@
 
 - Build status: `npm run build` passes
 - Dev server status: verified on `http://localhost:5175/`
-- Last checkpoint completed: long battlefield camera, soft three-lane spawning, and battle-line minimap pass
+- Last checkpoint completed: P0 author-testability pass for weighted decision slots, first spawn loop assist, reward reroll, and spawn visibility
 
 ## Implemented
 
@@ -67,6 +67,22 @@
 - Added a minimap "frontline" button: dragging the battle-line strip disables auto-follow, and pressing the button snaps back to the current frontline hotspot and resumes auto-follow.
 - Added low-contrast surrounding battlefield background art so non-playable areas read as distant wasteland, service roads, ruins, and haze instead of flat black space.
 - Made camera controls more explicit: added a visible DOM "back to frontline" control, kept the minimap control, and allowed dragging the main battlefield view to enter manual camera mode.
+- Made Decision Zone slot layout use live `widthWeight` values so reward changes resize both Matter sensors and visible plates.
+- Added a one-time first-spawn-loop assist for author testing: early Decision balls are forced to SPAWN and the first Unit ball is resolved through unit slot 1 until a player unit deploys.
+- Added a one-use reward reroll button to the reward screen that costs 10 gold, refreshes the three choices, and disables after use or when gold is insufficient.
+- Added HUD visibility for `下次出兵 Lv+X`, a compact reserve preview, unit-slot levels, and level/elite labels in queued/deployed floating text.
+- Saved browser smoke screenshots to `docs/p0-first-spawn-loop-smoke.png` and `docs/p0-reward-reroll-smoke.png`.
+- Fixed battle unit visuals leaking into the top pinball row by clamping unit projections to battlefield bounds and masking unit sprites, rings, shadows, and health bars to the battlefield area.
+- Saved the battlefield unit-boundary smoke screenshot to `docs/battlefield-unit-bounds-smoke.png`.
+- Changed the yellow battle marker from an always-on camera hotspot into a real contact marker that only appears when opposing units enter attack contact range.
+- Saved the pre-contact marker smoke screenshot to `docs/contact-marker-hidden-smoke.png`.
+- Added a mouse toggle for enabling/disabling MAGIC. When disabled, MAGIC slot landings are consumed normally but skip spell damage, spell-copy effects, and magic trigger stats.
+- Added per-unit HP text above health bars and damage-number popups from combat hit effects, with unit HP clamped at zero on lethal hits.
+- Saved the magic-toggle and HP-label smoke screenshot to `docs/magic-toggle-hp-smoke.png`.
+- Changed ranged/caster/siege attacks so their damage is applied when the projectile impacts instead of when the projectile is fired; melee attacks still resolve immediately.
+- Saved the projectile-impact damage smoke screenshot to `docs/projectile-impact-damage-smoke.png`.
+- Added current-race debug unit spawn buttons for all five unit slots, with labels updating when the race changes and clicks spawning the matching player unit directly onto the battlefield.
+- Added low-damage base defense shots for both bases so nearby enemy units can be pushed back instead of freely stealing the base.
 
 ## Known Issues
 

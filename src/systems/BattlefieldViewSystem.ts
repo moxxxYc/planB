@@ -21,6 +21,16 @@ export type BattleProjection = {
   visibleRatio: number;
 };
 
+export type BattleProjectionBounds = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  topPadding?: number;
+  bottomPadding?: number;
+  horizontalPadding?: number;
+};
+
 export type HeatBand = {
   index: number;
   ratioStart: number;
@@ -129,6 +139,15 @@ export function projectBattlePoint(input: BattleProjectionInput): BattleProjecti
   const x = axisX + normalX * input.laneOffset * spread;
   const y = axisY + normalY * input.laneOffset * spread * 0.94;
   return { x, y, depth: y, visibleRatio };
+}
+
+export function clampBattleProjectionToBounds(projection: BattleProjection, bounds: BattleProjectionBounds): BattleProjection {
+  const horizontalPadding = bounds.horizontalPadding ?? 0;
+  const topPadding = bounds.topPadding ?? 0;
+  const bottomPadding = bounds.bottomPadding ?? 0;
+  const x = Math.max(bounds.left + horizontalPadding, Math.min(bounds.right - horizontalPadding, projection.x));
+  const y = Math.max(bounds.top + topPadding, Math.min(bounds.bottom - bottomPadding, projection.y));
+  return { ...projection, x, y, depth: y };
 }
 
 export function buildBattleHeatBands(units: BattleUnit[], playerBaseX: number, enemyBaseX: number, bandCount: number): HeatBand[] {

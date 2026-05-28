@@ -5,7 +5,17 @@ import { dealMagicDamage } from './BattleSystem';
 import { recordSlot } from './StatsSystem';
 import type { GameState, SlotId } from '../types/game';
 
-export function triggerSlot(state: GameState, slotId: SlotId) {
+export type SlotTriggerResult = {
+  status: 'triggered' | 'disabled';
+  slotId: SlotId;
+};
+
+export function triggerSlot(state: GameState, slotId: SlotId): SlotTriggerResult {
+  if (slotId === 'magic' && !state.settings.magicEnabled) {
+    state.recentFloatingTexts.push({ label: '法术已关闭', color: 0x94a3b8 });
+    return { status: 'disabled', slotId };
+  }
+
   const slot = state.slots[slotId];
   slot.triggerCount += 1;
   slot.lastTriggeredAtMs = state.battle.elapsedMs;
@@ -16,6 +26,7 @@ export function triggerSlot(state: GameState, slotId: SlotId) {
   if (slotId === 'gold') triggerGold(state);
   if (slotId === 'magic') triggerMagic(state);
   if (slotId === 'special') triggerSpecial(state);
+  return { status: 'triggered', slotId };
 }
 
 export function triggerSpawn(state: GameState) {
@@ -51,6 +62,10 @@ function triggerGold(state: GameState) {
 }
 
 function triggerMagic(state: GameState) {
+  if (!state.settings.magicEnabled) {
+    state.recentFloatingTexts.push({ label: '法术已关闭', color: 0x94a3b8 });
+    return;
+  }
   dealMagicDamage(state, 26 + state.phaseIndex * 4);
   state.modifiers.pendingSpawnCopies += state.modifiers.magicSpawnCopyBonus;
   state.recentFloatingTexts.push({ label: '电弧法术', color: 0xc084fc });

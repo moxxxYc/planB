@@ -5,9 +5,11 @@ import { decisionSlotDefs, slotDefs } from '../data/slots';
 import { unitDefs } from '../data/units';
 import { createInitialGameState } from './GameState';
 import { triggerSlot } from './SlotTriggerSystem';
-import { getBattleFrontlineRatio, getBattleLaneOffset, spawnBattleUnit, updateBattle } from './BattleSystem';
-import { applyReward, buildRewardChoices } from './RewardSystem';
+import { getBattleContactRatio, getBattleFrontlineRatio, getBattleLaneOffset, spawnBattleUnit, spawnDebugRaceUnit, updateBattle } from './BattleSystem';
+import { applyReward, buildRewardChoices, rerollRewardChoices } from './RewardSystem';
 import { completePhase, resumeNextPhase, startPhase, updatePhaseEnemySpawns } from './PhaseSystem';
+import { buildWeightedSlotLayouts } from './DecisionSlotLayoutSystem';
+import { getFirstSpawnAssistPlan, markFirstSpawnLoopSeen } from './FirstSpawnLoopAssistSystem';
 import {
   buildLaunchSplitRelaunchPlan,
   getControlledGateBounceVelocity,
@@ -26,6 +28,7 @@ import {
 import {
   buildBattleHeatBands,
   clampBattleCameraCenter,
+  clampBattleProjectionToBounds,
   getBattleCameraViewport,
   getBattleHotspotCameraCenter,
   getBattleHotspotRatio,
@@ -105,6 +108,46 @@ describe('slot trigger rules', () => {
     const damagedEnemy = state.battle.units.find((unit) => unit.id === 'enemy-test');
     expect(damagedEnemy?.hp).toBeLessThan(38);
     expect(state.spawnQueue).toHaveLength(0);
+  });
+
+  it('skips MAGIC effects when magic is disabled without changing other slot behavior', () => {
+    const state = createInitialGameState('hive', 5);
+    state.settings.magicEnabled = false;
+    state.battle.units.push({
+      id: 'enemy-test',
+      defId: 'enemy_raider',
+      side: 'enemy',
+      hp: 38,
+      maxHp: 38,
+      damage: 5,
+      x: 640,
+      battleLane: 'middle',
+      laneOffset: 0,
+      attackTimerMs: 0,
+      level: 1,
+      lifetime: 'standard',
+      isElite: false,
+      veterancyXp: 0,
+      veterancyLevel: 0,
+      phaseSpawned: 0,
+      tags: [],
+      damageDone: 0,
+      kills: 0,
+      burstUntilMs: 0,
+      spawnedAtMs: 0,
+      lastAttackAtMs: -9999,
+      lastHitAtMs: -9999,
+    });
+
+    const result = triggerSlot(state, 'magic');
+
+    expect(result).toEqual({ status: 'disabled', slotId: 'magic' });
+    expect(state.battle.units.find((unit) => unit.id === 'enemy-test')?.hp).toBe(38);
+    expect(state.stats.currentPhase.slotTriggers.magic).toBe(0);
+    expect(state.recentFloatingTexts.at(-1)?.label).toBe('法术已关闭');
+
+    triggerSlot(state, 'gold');
+    expect(state.gold).toBeGreaterThan(0);
   });
 });
 
@@ -275,6 +318,23 @@ describe('battle simulation', () => {
     expect(['top', 'middle', 'bottom']).toContain(behemoth.battleLane);
   });
 
+  it('debug-spawns the requested current-race unit slot for author testing', () => {
+    const state = createInitialGameState('mech', 104);
+    state.unitLevels.mech_titan = 3;
+
+    const unit = spawnDebugRaceUnit(state, 4);
+
+    expect(unit).toMatchObject({
+      defId: 'mech_titan',
+      side: 'player',
+      level: 3,
+      lifetime: 'standard',
+    });
+    expect(state.battle.units.at(-1)?.id).toBe(unit.id);
+    expect(state.stats.currentPhase.unitsSpawned).toBe(1);
+    expect(state.recentFloatingTexts.at(-1)?.label).toBe('调试生成 Lv3 泰坦');
+  });
+
   it('uses broad deterministic lane offsets for the central 3/4 battlefield', () => {
     expect(getBattleLaneOffset('top', 0)).toBe(-74);
     expect(getBattleLaneOffset('middle', 0)).toBe(0);
@@ -299,7 +359,25 @@ describe('battle simulation', () => {
     expect(getBattleFrontlineRatio(state)).toBeGreaterThan(0.3);
   });
 
-  it('emits readable combat feedback events for attacks and deaths', () => {
+  it('does not report a visible battle contact marker before opposing units meet', () => {
+    const state = createInitialGameState('hive', 102);
+    const player = spawnBattleUnit(state, 'player', 'hive_grub');
+    const enemy = spawnBattleUnit(state, 'enemy', 'enemy_raider');
+    player.x = 420;
+    player.battleLane = 'middle';
+    player.laneOffset = 0;
+    enemy.x = 760;
+    enemy.battleLane = 'middle';
+    enemy.laneOffset = 0;
+
+    expect(getBattleContactRatio(state)).toBeUndefined();
+
+    enemy.x = 445;
+
+    expect(getBattleContactRatio(state)).toBeCloseTo(0.2265625, 5);
+  });
+
+  it('applies ranged attack damage when the projectile impacts', () => {
     const state = createInitialGameState('hive', 14);
     const attacker = spawnBattleUnit(state, 'player', 'hive_spitter');
     const target = spawnBattleUnit(state, 'enemy', 'enemy_raider');
@@ -314,14 +392,65 @@ describe('battle simulation', () => {
       side: 'player',
       fromUnitId: attacker.id,
       toUnitId: target.id,
+      damage: 8,
       color: 0x60a5fa,
     });
+    expect(target.hp).toBe(6);
+    expect(state.stats.currentPhase.damageDealt).toBe(0);
+    expect(state.battle.transientEffects.some((effect) => effect.type === 'hit' && effect.unitId === target.id)).toBe(false);
+
+    updateBattle(state, 259);
+
+    expect(target.hp).toBe(6);
+
+    updateBattle(state, 1);
+
     expect(state.battle.transientEffects).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'hit', side: 'player', unitId: target.id }),
+      expect.objectContaining({ type: 'hit', side: 'player', unitId: target.id, damage: 8 }),
       expect.objectContaining({ type: 'death', side: 'enemy', unitId: target.id }),
     ]));
+    expect(target.hp).toBe(0);
     expect(target.lastHitAtMs).toBe(state.battle.elapsedMs);
-    expect(attacker.lastAttackAtMs).toBe(state.battle.elapsedMs);
+    expect(attacker.lastAttackAtMs).toBe(120);
+  });
+
+  it('lets both bases fire low-damage defense shots at nearby enemy units', () => {
+    const state = createInitialGameState('hive', 55);
+    const enemyNearPlayerBase = spawnBattleUnit(state, 'enemy', 'enemy_raider');
+    const playerNearEnemyBase = spawnBattleUnit(state, 'player', 'hive_grub');
+    enemyNearPlayerBase.x = state.battle.bases.player.x + 86;
+    enemyNearPlayerBase.battleLane = 'middle';
+    enemyNearPlayerBase.laneOffset = 0;
+    enemyNearPlayerBase.hp = 34;
+    playerNearEnemyBase.x = state.battle.bases.enemy.x - 86;
+    playerNearEnemyBase.battleLane = 'middle';
+    playerNearEnemyBase.laneOffset = 0;
+    playerNearEnemyBase.hp = 35;
+
+    updateBattle(state, 100);
+
+    expect(state.battle.projectiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        side: 'player',
+        fromBaseSide: 'player',
+        toUnitId: enemyNearPlayerBase.id,
+        damage: 6,
+      }),
+      expect.objectContaining({
+        side: 'enemy',
+        fromBaseSide: 'enemy',
+        toUnitId: playerNearEnemyBase.id,
+        damage: 6,
+      }),
+    ]));
+    expect(enemyNearPlayerBase.hp).toBe(34);
+    expect(playerNearEnemyBase.hp).toBe(35);
+
+    updateBattle(state, 240);
+
+    expect(enemyNearPlayerBase.hp).toBe(28);
+    expect(playerNearEnemyBase.hp).toBe(29);
+    expect(state.stats.currentPhase.damageDealt).toBe(6);
   });
 
   it('uses aggro range and lane distance when choosing targets', () => {
@@ -342,6 +471,12 @@ describe('battle simulation', () => {
     nearOtherLane.hp = 30;
 
     updateBattle(state, 100);
+
+    expect(state.battle.projectiles[0]).toMatchObject({
+      fromUnitId: attacker.id,
+      toUnitId: sameLane.id,
+    });
+    updateBattle(state, 260);
 
     expect(sameLane.hp).toBeLessThan(30);
     expect(nearOtherLane.hp).toBe(30);
@@ -478,6 +613,32 @@ describe('battlefield view rules', () => {
     expect(left.visibleRatio).toBeLessThan(0);
   });
 
+  it('keeps upper-lane unit projections inside the battlefield visual bounds', () => {
+    const raw = projectBattlePoint({
+      worldX: 1030,
+      laneOffset: -86,
+      cameraCenterX: 710,
+      playerBaseX: 70,
+      enemyBaseX: 1670,
+      screenStart: { x: 300, y: 552 },
+      screenEnd: { x: 1110, y: 260 },
+      viewportWorldWidth: 640,
+    });
+
+    expect(raw.y).toBeLessThan(216);
+    expect(clampBattleProjectionToBounds(raw, {
+      left: 0,
+      right: 1280,
+      top: 216,
+      bottom: 640,
+      topPadding: 52,
+      bottomPadding: 32,
+    })).toMatchObject({
+      y: 268,
+      depth: 268,
+    });
+  });
+
   it('builds minimap heat bands and hotspot ratio from live units', () => {
     const state = createInitialGameState('hive', 303);
     const player = spawnBattleUnit(state, 'player', 'hive_grub');
@@ -510,6 +671,76 @@ describe('reward rules', () => {
     applyReward(state, 'wide_spawn');
 
     expect(state.slots.spawn.widthWeight).toBeGreaterThan(1);
+  });
+
+  it('lays out decision slots from live width weights instead of equal columns', () => {
+    const state = createInitialGameState('hive', 19);
+    state.slots.spawn.widthWeight = 1.2;
+    state.slots.gold.widthWeight = 1.3;
+
+    const layouts = buildWeightedSlotLayouts(
+      decisionSlotDefs.map((slot) => state.slots[slot.id]),
+      240,
+      360,
+      9,
+      4,
+    );
+    const spawn = layouts.find((slot) => slot.id === 'spawn');
+    const magic = layouts.find((slot) => slot.id === 'magic');
+    const gold = layouts.find((slot) => slot.id === 'gold');
+
+    expect(layouts).toHaveLength(4);
+    expect(spawn?.sensorWidth).toBeGreaterThan(magic?.sensorWidth ?? 0);
+    expect(gold?.plateWidth).toBeGreaterThan(spawn?.plateWidth ?? 0);
+    expect(layouts[0].left).toBeCloseTo(249);
+    expect(layouts.at(-1)?.right).toBeCloseTo(591);
+  });
+
+  it('rerolls a reward offer once by spending gold and avoids the same full offer', () => {
+    const state = createInitialGameState('hive', 88);
+    state.gold = 10;
+    const first = buildRewardChoices(state);
+    const rerolled = rerollRewardChoices(state, first, { cost: 10 });
+
+    expect(rerolled.status).toBe('rerolled');
+    if (rerolled.status !== 'rerolled') throw new Error('Expected a rerolled reward offer');
+    expect(state.gold).toBe(0);
+    expect(rerolled.choices).toHaveLength(3);
+    expect(rerolled.choices.map((reward) => reward.id)).not.toEqual(first.map((reward) => reward.id));
+    expect(rerollRewardChoices(state, rerolled.choices, { cost: 10 }).status).toBe('insufficient_gold');
+  });
+});
+
+describe('first spawn loop assist rules', () => {
+  it('requests one forced spawn loop in the first ten seconds until a player unit appears', () => {
+    const state = createInitialGameState('hive', 91);
+    startPhase(state);
+
+    expect(getFirstSpawnAssistPlan(state, 2000)).toEqual({
+      forceDecisionSpawn: true,
+      forceUnitSlotIndex: 0,
+    });
+
+    markFirstSpawnLoopSeen(state);
+
+    expect(getFirstSpawnAssistPlan(state, 3000)).toEqual({
+      forceDecisionSpawn: false,
+      forceUnitSlotIndex: undefined,
+    });
+  });
+});
+
+describe('queue visibility rules', () => {
+  it('names queued and deployed units with levels in floating feedback', () => {
+    const state = createInitialGameState('hive', 92);
+    startPhase(state);
+    triggerSlot(state, 'upgrade');
+
+    resolveUnitBallToSlot(state, 0, 1, { elapsedMs: 0, durationMs: 60000 });
+    expect(state.recentFloatingTexts.some((text) => text.label.includes('Lv2 幼虫兵 入队'))).toBe(true);
+
+    updateSpawnQueue(state, 1000);
+    expect(state.recentFloatingTexts.some((text) => text.label.includes('Lv2 幼虫兵 部署'))).toBe(true);
   });
 });
 

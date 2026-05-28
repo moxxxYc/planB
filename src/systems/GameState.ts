@@ -21,6 +21,10 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
     isBuildPause: false,
     gold: 0,
     pendingSpawnLevelBonus: 0,
+    hasSeenFirstSpawnLoop: false,
+    firstLoopAssistActive: true,
+    firstSpawnOutcomeForced: false,
+    firstUnitSlotForced: false,
     upTriggerCountTowardElite: 0,
     nextSpawnCreatesElite: false,
     nextUnitId: 1,
@@ -39,8 +43,8 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
     battle: {
       units: [],
       bases: {
-        player: { side: 'player', hp: 500, maxHp: 500, x: 70, laneOffset: 0, lastHitAtMs: -9999 },
-        enemy: { side: 'enemy', hp: 500, maxHp: 500, x: 1670, laneOffset: 0, lastHitAtMs: -9999 },
+        player: { side: 'player', hp: 500, maxHp: 500, x: 70, laneOffset: 0, attackTimerMs: 0, lastAttackAtMs: -9999, lastHitAtMs: -9999 },
+        enemy: { side: 'enemy', hp: 500, maxHp: 500, x: 1670, laneOffset: 0, attackTimerMs: 0, lastAttackAtMs: -9999, lastHitAtMs: -9999 },
       },
       camera: {
         centerX: 710,
@@ -73,6 +77,9 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
     },
     unitLevels,
     unitSlotStates,
+    settings: {
+      magicEnabled: true,
+    },
     recentFloatingTexts: [],
   };
 }

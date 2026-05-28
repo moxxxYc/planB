@@ -13,6 +13,29 @@ export function buildRewardChoices(state: GameState): RewardDef[] {
   return choices;
 }
 
+export type RewardRerollResult =
+  | { status: 'rerolled'; choices: RewardDef[] }
+  | { status: 'insufficient_gold'; choices: RewardDef[] };
+
+export function rerollRewardChoices(
+  state: GameState,
+  previousChoices: RewardDef[],
+  options: { cost: number },
+): RewardRerollResult {
+  if (state.gold < options.cost) {
+    return { status: 'insufficient_gold', choices: previousChoices };
+  }
+
+  state.gold -= options.cost;
+  const previousIds = previousChoices.map((reward) => reward.id).join('|');
+  let choices = buildRewardChoices(state);
+  for (let attempt = 0; attempt < 5 && choices.map((reward) => reward.id).join('|') === previousIds; attempt += 1) {
+    choices = buildRewardChoices(state);
+  }
+
+  return { status: 'rerolled', choices };
+}
+
 export function applyReward(state: GameState, rewardId: string) {
   if (rewardId === 'wide_spawn') state.slots.spawn.widthWeight *= 1.2;
   if (rewardId === 'spawn_slot_widen') state.slots.spawn.widthWeight *= 1.1;

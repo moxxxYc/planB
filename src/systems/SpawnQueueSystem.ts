@@ -1,4 +1,5 @@
 import { spawnBattleUnit } from './BattleSystem';
+import { unitDefs } from '../data/units';
 import type { GameState, LaneName, Side, SpawnQueueItem, UnitLifetime } from '../types/game';
 
 const DEFAULT_RELEASE_INTERVAL_MS = 650;
@@ -43,8 +44,10 @@ export function addToSpawnQueue(state: GameState, input: SpawnQueueInput) {
   }
 
   if (item.side === 'player') {
+    const unit = unitDefs[item.unitId];
     state.stats.currentPhase.unitsQueued += item.count;
-    state.recentFloatingTexts.push({ label: `预备队 +${item.count}`, color: item.isElite ? 0xfacc15 : 0x4ade80 });
+    const eliteText = item.isElite ? ' 精英' : '';
+    state.recentFloatingTexts.push({ label: `Lv${item.level} ${unit.name}${eliteText} 入队 x${item.count}`, color: item.isElite ? 0xfacc15 : 0x4ade80 });
   }
 }
 
@@ -64,7 +67,9 @@ export function updateSpawnQueue(state: GameState, deltaMs: number) {
     item.count -= 1;
     item.nextReleaseInMs = item.releaseIntervalMs;
     if (item.side === 'player') {
-      state.recentFloatingTexts.push({ label: '增援释放', color: item.isElite ? 0xfacc15 : 0x86efac });
+      const unit = unitDefs[item.unitId];
+      const eliteText = item.isElite ? ' 精英' : '';
+      state.recentFloatingTexts.push({ label: `Lv${item.level} ${unit.name}${eliteText} 部署`, color: item.isElite ? 0xfacc15 : 0x86efac });
     }
   }
 

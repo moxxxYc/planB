@@ -1,3 +1,4 @@
+import { raceDefs } from '../data/races';
 import { unitDefs } from '../data/units';
 import { randomInt } from '../utils/random';
 import type { BattleLaneId, BattleLaneWeights, BattleUnit, GameState, Side, UnitLifetime } from '../types/game';
@@ -8,6 +9,10 @@ const BATTLE_LANE_OFFSETS: Record<BattleLaneId, number> = {
   bottom: 74,
 };
 const BASE_EXIT_OFFSET = 72;
+const BASE_DEFENSE_RANGE = 150;
+const BASE_DEFENSE_DAMAGE = 6;
+const BASE_DEFENSE_COOLDOWN_MS = 1300;
+const BASE_DEFENSE_IMPACT_MS = 240;
 
 export function pickBattleLane(seed: number, weights: BattleLaneWeights): { lane: BattleLaneId; seed: number } {
   const total = Math.max(1, weights.top + weights.middle + weights.bottom);
@@ -76,6 +81,15 @@ export function spawnBattleUnit(
   return unit;
 }
 
+export function spawnDebugRaceUnit(state: GameState, slotIndex: number): BattleUnit {
+  const slots = raceDefs[state.currentRaceId].unitSlots;
+  const slot = slots[Math.max(0, Math.min(slots.length - 1, slotIndex))];
+  const level = state.unitLevels[slot.unitId] ?? 1;
+  const unit = spawnBattleUnit(state, 'player', slot.unitId, level, false, { lifetime: 'standard', tags: ['debug'] });
+  state.recentFloatingTexts.push({ label: `调试生成 Lv${level} ${unitDefs[slot.unitId].name}`, color: raceDefs[state.currentRaceId].color });
+  return unit;
+}
+
 export function dealMagicDamage(state: GameState, baseDamage: number) {
   const enemies = state.battle.units
     .filter((unit) => unit.side === 'enemy')
@@ -84,8 +98,13 @@ export function dealMagicDamage(state: GameState, baseDamage: number) {
 
   for (const enemy of enemies) {
     const damage = Math.round(baseDamage * state.modifiers.magicDamageMultiplier);
-    enemy.hp -= damage;
+    enemy.hp = Math.max(0, enemy.hp - damage);
+    enemy.lastHitAtMs = state.battle.elapsedMs;
     state.stats.currentPhase.damageDealt += damage;
+    addEffect(state, 'hit', 'player', enemy.id, enemy.x, enemy.laneOffset, 260, undefined, damage);
+    if (enemy.hp <= 0) {
+      addEffect(state, 'death', enemy.side, enemy.id, enemy.x, enemy.laneOffset, 520);
+    }
   }
   removeDeadUnits(state);
 }
@@ -93,7 +112,9 @@ export function dealMagicDamage(state: GameState, baseDamage: number) {
 export function updateBattle(state: GameState, deltaMs: number) {
   state.battle.elapsedMs += deltaMs;
   state.phaseElapsedMs += deltaMs;
+  resolveProjectileImpacts(state);
   cleanupFeedback(state);
+  updateBaseDefense(state, deltaMs);
   const units = [...state.battle.units];
 
   for (const unit of units) {
@@ -150,23 +171,13 @@ function attackUnit(state: GameState, attacker: BattleUnit, target: BattleUnit) 
   const targetDef = unitDefs[target.defId];
   const burstBonus = attacker.burstUntilMs > state.battle.elapsedMs ? 1.35 : 1;
   const damage = Math.max(1, Math.round(attacker.damage * burstBonus - targetDef.armor));
-  target.hp -= damage;
-  attacker.damageDone += damage;
   attacker.attackTimerMs = def.attackCooldownMs;
   attacker.lastAttackAtMs = state.battle.elapsedMs;
-  target.lastHitAtMs = state.battle.elapsedMs;
-  addProjectile(state, attacker, target);
-  addEffect(state, 'hit', attacker.side, target.id, target.x, target.laneOffset, 260);
-  if (attacker.side === 'player') {
-    state.stats.currentPhase.damageDealt += damage;
+  if (usesProjectile(def.role)) {
+    addProjectile(state, attacker, target, damage);
+    return;
   }
-  if (target.hp <= 0) {
-    attacker.kills += 1;
-    addEffect(state, 'death', target.side, target.id, target.x, target.laneOffset, 520);
-    if (attacker.side === 'player') {
-      state.stats.currentPhase.kills += 1;
-    }
-  }
+  applyUnitDamage(state, attacker, target, damage);
 }
 
 function attackBase(state: GameState, attacker: BattleUnit, side: Side) {
@@ -174,23 +185,43 @@ function attackBase(state: GameState, attacker: BattleUnit, side: Side) {
   if (attacker.attackTimerMs > 0) return;
   const burstBonus = attacker.burstUntilMs > state.battle.elapsedMs ? 1.35 : 1;
   const damage = Math.max(1, Math.round(attacker.damage * burstBonus));
-  state.battle.bases[side].hp = Math.max(0, state.battle.bases[side].hp - damage);
-  attacker.damageDone += damage;
   attacker.attackTimerMs = def.attackCooldownMs;
   attacker.lastAttackAtMs = state.battle.elapsedMs;
-  state.battle.bases[side].lastHitAtMs = state.battle.elapsedMs;
-  addBaseProjectile(state, attacker, side);
-  addEffect(state, 'base_hit', attacker.side, undefined, state.battle.bases[side].x, state.battle.bases[side].laneOffset, 300, side);
-  if (attacker.side === 'player') {
-    state.stats.currentPhase.enemyBaseDamage += damage;
-    state.stats.currentPhase.damageDealt += damage;
-  } else {
-    state.stats.currentPhase.playerBaseDamage += damage;
+  if (usesProjectile(def.role)) {
+    addBaseProjectile(state, attacker, side, damage);
+    return;
   }
+  applyBaseDamage(state, attacker, side, damage);
 }
 
 function removeDeadUnits(state: GameState) {
   state.battle.units = state.battle.units.filter((unit) => unit.hp > 0);
+}
+
+function updateBaseDefense(state: GameState, deltaMs: number) {
+  for (const side of ['player', 'enemy'] as const) {
+    const base = state.battle.bases[side];
+    if (base.hp <= 0) continue;
+    base.attackTimerMs = Math.max(0, base.attackTimerMs - deltaMs);
+    if (base.attackTimerMs > 0) continue;
+    const target = findBaseDefenseTarget(state, side);
+    if (!target) continue;
+    addBaseDefenseProjectile(state, side, target, BASE_DEFENSE_DAMAGE);
+    base.attackTimerMs = BASE_DEFENSE_COOLDOWN_MS;
+    base.lastAttackAtMs = state.battle.elapsedMs;
+  }
+}
+
+function findBaseDefenseTarget(state: GameState, side: Side): BattleUnit | undefined {
+  const base = state.battle.bases[side];
+  const enemySide: Side = side === 'player' ? 'enemy' : 'player';
+  return state.battle.units
+    .filter((unit) => unit.side === enemySide && unit.hp > 0 && getBaseDefenseDistance(base.x, base.laneOffset, unit) <= BASE_DEFENSE_RANGE)
+    .sort((a, b) => getBaseDefenseDistance(base.x, base.laneOffset, a) - getBaseDefenseDistance(base.x, base.laneOffset, b))[0];
+}
+
+function getBaseDefenseDistance(baseX: number, baseLaneOffset: number, unit: BattleUnit): number {
+  return Math.abs(unit.x - baseX) + Math.abs(unit.laneOffset - baseLaneOffset) * 0.5;
 }
 
 export function getBattleFrontlineRatio(state: GameState): number {
@@ -216,14 +247,78 @@ export function getBattleFrontlineRatio(state: GameState): number {
   return Math.max(0, Math.min(1, (frontlineX - playerBaseX) / span));
 }
 
-function addProjectile(state: GameState, attacker: BattleUnit, target: BattleUnit) {
-  const def = unitDefs[attacker.defId];
-  if (!['ranged', 'caster', 'siege'].includes(def.role)) return;
+export function getBattleContactRatio(state: GameState): number | undefined {
+  const playerBaseX = state.battle.bases.player.x;
+  const enemyBaseX = state.battle.bases.enemy.x;
+  const span = Math.max(1, enemyBaseX - playerBaseX);
+  const playerUnits = state.battle.units.filter((unit) => unit.side === 'player' && unit.hp > 0);
+  const enemyUnits = state.battle.units.filter((unit) => unit.side === 'enemy' && unit.hp > 0);
+  let closestContact: { distance: number; midpointX: number } | undefined;
+
+  for (const player of playerUnits) {
+    for (const enemy of enemyUnits) {
+      const distance = getTargetDistance(player, enemy);
+      const playerRange = unitDefs[player.defId].attackRange;
+      const enemyRange = unitDefs[enemy.defId].attackRange;
+      const contactRange = Math.max(playerRange, enemyRange) + 12;
+      if (distance > contactRange) continue;
+      if (!closestContact || distance < closestContact.distance) {
+        closestContact = {
+          distance,
+          midpointX: (player.x + enemy.x) / 2,
+        };
+      }
+    }
+  }
+
+  if (!closestContact) return undefined;
+  return Math.max(0, Math.min(1, (closestContact.midpointX - playerBaseX) / span));
+}
+
+function usesProjectile(role: string): boolean {
+  return ['ranged', 'caster', 'siege'].includes(role);
+}
+
+function applyUnitDamage(state: GameState, attacker: BattleUnit | undefined, target: BattleUnit, damage: number) {
+  const sourceSide = attacker?.side ?? (target.side === 'player' ? 'enemy' : 'player');
+  target.hp = Math.max(0, target.hp - damage);
+  if (attacker) attacker.damageDone += damage;
+  target.lastHitAtMs = state.battle.elapsedMs;
+  addEffect(state, 'hit', sourceSide, target.id, target.x, target.laneOffset, 260, undefined, damage);
+  if (sourceSide === 'player') {
+    state.stats.currentPhase.damageDealt += damage;
+  }
+  if (target.hp <= 0) {
+    if (attacker) attacker.kills += 1;
+    addEffect(state, 'death', target.side, target.id, target.x, target.laneOffset, 520);
+    if (sourceSide === 'player') {
+      state.stats.currentPhase.kills += 1;
+    }
+  }
+}
+
+function applyBaseDamage(state: GameState, attacker: BattleUnit | undefined, side: Side, damage: number) {
+  const base = state.battle.bases[side];
+  base.hp = Math.max(0, base.hp - damage);
+  if (attacker) attacker.damageDone += damage;
+  base.lastHitAtMs = state.battle.elapsedMs;
+  addEffect(state, 'base_hit', attacker?.side ?? (side === 'player' ? 'enemy' : 'player'), undefined, base.x, base.laneOffset, 300, side);
+  if (attacker?.side === 'player') {
+    state.stats.currentPhase.enemyBaseDamage += damage;
+    state.stats.currentPhase.damageDealt += damage;
+  } else if (attacker?.side === 'enemy') {
+    state.stats.currentPhase.playerBaseDamage += damage;
+  }
+}
+
+function addProjectile(state: GameState, attacker: BattleUnit, target: BattleUnit, damage: number) {
   state.battle.projectiles.push({
     id: `projectile-${state.battle.nextFeedbackId++}`,
     side: attacker.side,
     fromUnitId: attacker.id,
     toUnitId: target.id,
+    damage,
+    applied: false,
     fromX: attacker.x,
     toX: target.x,
     fromLaneOffset: attacker.laneOffset,
@@ -234,15 +329,15 @@ function addProjectile(state: GameState, attacker: BattleUnit, target: BattleUni
   });
 }
 
-function addBaseProjectile(state: GameState, attacker: BattleUnit, side: Side) {
-  const def = unitDefs[attacker.defId];
-  if (!['ranged', 'caster', 'siege'].includes(def.role)) return;
+function addBaseProjectile(state: GameState, attacker: BattleUnit, side: Side, damage: number) {
   const base = state.battle.bases[side];
   state.battle.projectiles.push({
     id: `projectile-${state.battle.nextFeedbackId++}`,
     side: attacker.side,
     fromUnitId: attacker.id,
     toBaseSide: side,
+    damage,
+    applied: false,
     fromX: attacker.x,
     toX: base.x,
     fromLaneOffset: attacker.laneOffset,
@@ -251,6 +346,43 @@ function addBaseProjectile(state: GameState, attacker: BattleUnit, side: Side) {
     impactAtMs: state.battle.elapsedMs + 300,
     color: attacker.side === 'player' ? 0x60a5fa : 0xfb923c,
   });
+}
+
+function addBaseDefenseProjectile(state: GameState, side: Side, target: BattleUnit, damage: number) {
+  const base = state.battle.bases[side];
+  state.battle.projectiles.push({
+    id: `projectile-${state.battle.nextFeedbackId++}`,
+    side,
+    fromBaseSide: side,
+    toUnitId: target.id,
+    damage,
+    applied: false,
+    fromX: base.x,
+    toX: target.x,
+    fromLaneOffset: base.laneOffset,
+    toLaneOffset: target.laneOffset,
+    createdAtMs: state.battle.elapsedMs,
+    impactAtMs: state.battle.elapsedMs + BASE_DEFENSE_IMPACT_MS,
+    color: side === 'player' ? 0x93c5fd : 0xfca5a5,
+  });
+}
+
+function resolveProjectileImpacts(state: GameState) {
+  for (const projectile of state.battle.projectiles) {
+    if (projectile.applied || state.battle.elapsedMs < projectile.impactAtMs) continue;
+    projectile.applied = true;
+    const attacker = projectile.fromUnitId
+      ? state.battle.units.find((unit) => unit.id === projectile.fromUnitId && unit.hp > 0)
+      : undefined;
+    if (projectile.toUnitId) {
+      const target = state.battle.units.find((unit) => unit.id === projectile.toUnitId && unit.hp > 0);
+      if (!target) continue;
+      applyUnitDamage(state, attacker, target, projectile.damage);
+    } else if (projectile.toBaseSide) {
+      applyBaseDamage(state, attacker, projectile.toBaseSide, projectile.damage);
+    }
+  }
+  removeDeadUnits(state);
 }
 
 function addEffect(
@@ -262,6 +394,7 @@ function addEffect(
   laneOffset: number,
   durationMs: number,
   baseSide?: Side,
+  damage?: number,
 ) {
   state.battle.transientEffects.push({
     id: `effect-${state.battle.nextFeedbackId++}`,
@@ -269,6 +402,7 @@ function addEffect(
     side,
     unitId,
     baseSide,
+    damage,
     x,
     laneOffset,
     createdAtMs: state.battle.elapsedMs,

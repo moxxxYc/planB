@@ -105,15 +105,20 @@ export interface BaseState {
   maxHp: number;
   x: number;
   laneOffset: number;
+  attackTimerMs: number;
+  lastAttackAtMs: number;
   lastHitAtMs: number;
 }
 
 export interface BattleProjectile {
   id: string;
   side: Side;
-  fromUnitId: string;
+  fromUnitId?: string;
+  fromBaseSide?: Side;
   toUnitId?: string;
   toBaseSide?: Side;
+  damage: number;
+  applied: boolean;
   fromX: number;
   toX: number;
   fromLaneOffset: number;
@@ -131,6 +136,7 @@ export interface BattleEffect {
   side: Side;
   unitId?: string;
   baseSide?: Side;
+  damage?: number;
   x: number;
   laneOffset: number;
   createdAtMs: number;
@@ -204,6 +210,10 @@ export interface PersistentRunItem {
   id: string;
 }
 
+export interface GameSettings {
+  magicEnabled: boolean;
+}
+
 export interface GameState {
   seed: number;
   currentRaceId: RaceId;
@@ -212,6 +222,10 @@ export interface GameState {
   isBuildPause: boolean;
   gold: number;
   pendingSpawnLevelBonus: number;
+  hasSeenFirstSpawnLoop: boolean;
+  firstLoopAssistActive: boolean;
+  firstSpawnOutcomeForced: boolean;
+  firstUnitSlotForced: boolean;
   upTriggerCountTowardElite: number;
   nextSpawnCreatesElite: boolean;
   nextUnitId: number;
@@ -232,6 +246,7 @@ export interface GameState {
   modifiers: GameModifiers;
   unitLevels: Record<string, number>;
   unitSlotStates: Record<RaceId, UnitSlotState[]>;
+  settings: GameSettings;
   recentFloatingTexts: Array<{ label: string; color: number }>;
 }
 
