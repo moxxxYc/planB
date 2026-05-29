@@ -1,5 +1,6 @@
 import { spawnBattleUnit } from './BattleSystem';
 import { unitDefs } from '../data/units';
+import { recordAdvancedUnitQueued, recordUnitQueued } from './StatsSystem';
 import type { GameState, LaneName, Side, SpawnQueueItem, UnitLifetime } from '../types/game';
 
 const DEFAULT_RELEASE_INTERVAL_MS = 650;
@@ -46,6 +47,8 @@ export function addToSpawnQueue(state: GameState, input: SpawnQueueInput) {
   if (item.side === 'player') {
     const unit = unitDefs[item.unitId];
     state.stats.currentPhase.unitsQueued += item.count;
+    recordUnitQueued(state.stats.currentPhase, item.unitId, item.count);
+    if (unit.costTier > 1) recordAdvancedUnitQueued(state.stats.currentPhase, item.count);
     const eliteText = item.isElite ? ' 精英' : '';
     state.recentFloatingTexts.push({ label: `Lv${item.level} ${unit.name}${eliteText} 入队 x${item.count}`, color: item.isElite ? 0xfacc15 : 0x4ade80 });
   }

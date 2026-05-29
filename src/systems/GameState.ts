@@ -1,7 +1,8 @@
 import { raceDefs } from '../data/races';
+import { buildPhaseToolStock } from '../data/phaseTools';
 import { createSlotState } from '../data/slots';
 import { createPhaseStats } from './StatsSystem';
-import type { GameState, RaceId, UnitSlotState } from '../types/game';
+import type { BallTagId, BuildingInstance, GameState, PersistentRunItem, RaceId, UnitSlotState } from '../types/game';
 
 export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameState {
   const unitLevels: Record<string, number> = {};
@@ -12,6 +13,11 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
     hive: raceDefs.hive.unitSlots.map((slot) => ({ ...slot, progress: 0 })),
     mech: raceDefs.mech.unitSlots.map((slot) => ({ ...slot, progress: 0 })),
   };
+  const ballTags: BallTagId[] = [];
+  const buildings: BuildingInstance[] = [];
+  const unitStructures: BuildingInstance[] = [];
+  const launchRelics: PersistentRunItem[] = [];
+  const decisionTechs: PersistentRunItem[] = [];
 
   return {
     seed,
@@ -27,6 +33,22 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
     firstUnitSlotForced: false,
     upTriggerCountTowardElite: 0,
     nextSpawnCreatesElite: false,
+    pendingSpawnMarks: 0,
+    pendingLaunchBallTags: ballTags,
+    ballTags,
+    buildingEvents: {
+      coinPressGoldHits: 0,
+    },
+    relicEvents: {
+      entropyCharges: 0,
+    },
+    doctrineEvents: {
+      conversionHits: 0,
+      launchLosses: 0,
+      researchReturnProgress: 0,
+      nonSpawnStreak: 0,
+    },
+    researchPoints: 0,
     nextUnitId: 1,
     nextBallId: 1,
     nextQueueId: 1,
@@ -36,9 +58,17 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
     spawnQueue: [],
     machineUpgrades: [],
     slotUpgrades: [],
-    buildings: [],
-    relics: [],
+    buildings,
+    relics: launchRelics,
+    doctrineTechs: decisionTechs,
+    launchRelics,
+    decisionTechs,
+    unitStructures,
+    phaseToolStock: buildPhaseToolStock(seed, 0),
+    usedPhaseTools: [],
     selectedRewards: [],
+    chainHistory: [],
+    buildArchetypeHint: '混合构筑',
     slots: createSlotState(),
     battle: {
       units: [],

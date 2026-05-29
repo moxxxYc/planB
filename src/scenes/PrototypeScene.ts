@@ -1,10 +1,23 @@
 import Phaser from 'phaser';
 import { phaseDefs } from '../data/phases';
+import { activePacingPreset } from '../data/pacing';
+import { getPhaseToolDef } from '../data/phaseTools';
 import { raceDefs } from '../data/races';
 import { decisionSlotDefs } from '../data/slots';
 import { unitDefs } from '../data/units';
+import { debugBuildPresets } from '../data/debugPresets';
 import { getEliteSummary } from '../systems/EliteSystem';
 import { getBattleContactRatio, getBattleFrontlineRatio, spawnDebugRaceUnit, updateBattle } from '../systems/BattleSystem';
+import {
+  consumeSpawnMarkBonus,
+  buyUnitStructureWithGold,
+  getAvailableUnitStructureDefs,
+  getBuildingDef,
+  getEffectiveUnitGateState,
+  getExtraSplitBallCount,
+  getUnitStructureGoldCost,
+  recordLaunchMiss,
+} from '../systems/BuildingSystem';
 import {
   buildBattleHeatBands,
   clampBattleProjectionToBounds,
@@ -18,8 +31,8 @@ import {
 } from '../systems/BattlefieldViewSystem';
 import { createInitialGameState } from '../systems/GameState';
 import { completePhase, isFinalPhaseComplete, resumeNextPhase, shouldCompletePhase, startPhase, updatePhaseEnemySpawns } from '../systems/PhaseSystem';
+import { buyPhaseTool, getPhaseToolWindowState } from '../systems/PhaseToolSystem';
 import {
-  buildLaunchSplitRelaunchPlan,
   getControlledGateBounceVelocity,
   getLauncherVelocity,
   getSweepingLauncherAngle,
@@ -28,23 +41,35 @@ import { buildRewardChoices, rerollRewardChoices } from '../systems/RewardSystem
 import { countQueuedUnits, updateSpawnQueue } from '../systems/SpawnQueueSystem';
 import { triggerSlot } from '../systems/SlotTriggerSystem';
 import { buildWeightedSlotLayouts } from '../systems/DecisionSlotLayoutSystem';
+import { recordLaunchOutcome } from '../systems/StatsSystem';
 import {
   getFirstSpawnAssistPlan,
   markFirstSpawnLoopSeen,
   markFirstSpawnOutcomeForced,
   markFirstUnitSlotForced,
 } from '../systems/FirstSpawnLoopAssistSystem';
+import { applyDebugBuildPreset } from '../systems/DebugPresetSystem';
+import { buildChamberPanelSummaries, buildIdentityVisualSummary, buildPhaseTelemetrySummary, buildSurfaceHudSummaries } from '../systems/BuildTelemetrySystem';
+import { runAllBuildProbes } from '../systems/BuildProbeSystem';
+import { buyDoctrineTechWithResearch, getAvailableDoctrineTechRewardDefs, recordDoctrineLaunchMiss } from '../systems/DoctrineSystem';
+import { recordRelicLaunchMiss, setBallTags } from '../systems/RelicSystem';
+import {
+  applyDecisionSpawnTags,
+  applyTaggedLaunchMiss,
+  buildTaggedSplitRelaunchPlan,
+  normalizeBallTags,
+} from '../systems/BallTagSystem';
 import {
   getCurrentRaceUnitSlotStates,
-  getUnitGateState,
   resolveUnitBallToSlot,
 } from '../systems/UnitSpawnProgressSystem';
-import type { BallStage, BattleUnit, GameState, RaceId, RewardDef, SlotId, UnitSlotState } from '../types/game';
+import type { BallStage, BallTagId, BattleUnit, BuildingChamber, DebugBuildPresetId, DoctrineTechDef, GameState, LaunchOutcomeId, PhaseToolId, RaceId, RewardDef, SlotId, UnitSlotState } from '../types/game';
 
 type PinballBall = {
   image: Phaser.Physics.Matter.Image;
   stage: BallStage;
   value: number;
+  tags: BallTagId[];
   blockedGateHits: number;
   createdAt: number;
   lastGateBounceAt: number;
@@ -83,7 +108,7 @@ const GAME_W = 1280;
 const GAME_H = 720;
 const TOP_Y = 12;
 const TOP_H = 196;
-const HUD_H = 72;
+const HUD_H = 104;
 const BATTLE_Y = TOP_Y + TOP_H + 8;
 const BATTLE_H = GAME_H - BATTLE_Y - HUD_H - 8;
 const HUD_TOP = GAME_H - HUD_H;
@@ -122,6 +147,7 @@ export class PrototypeScene extends Phaser.Scene {
   private unitVisuals = new Map<string, UnitVisual>();
   private renderedEffectIds = new Set<string>();
   private hudTexts: Phaser.GameObjects.Text[] = [];
+  private buildSurfaceHudTexts: Phaser.GameObjects.Text[] = [];
   private decisionVisuals: OutcomeVisual[] = [];
   private unitSlotVisuals: UnitSlotVisual[] = [];
   private floatingGroup!: Phaser.GameObjects.Group;
@@ -145,6 +171,24 @@ export class PrototypeScene extends Phaser.Scene {
   private magicToggleButton?: Phaser.GameObjects.Rectangle;
   private magicToggleText?: Phaser.GameObjects.Text;
   private debugUnitButtons: Array<{ plate: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; slotIndex: number }> = [];
+  private phaseToolButtons: Array<{ plate: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; id: PhaseToolId }> = [];
+  private researchTechButtons: Array<{ plate: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; id: string }> = [];
+  private unitStructureButtons: Array<{ plate: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; id: string }> = [];
+  private buildIdentityGraphics?: Phaser.GameObjects.Graphics;
+  private buildIdentityBadge?: Phaser.GameObjects.Text;
+  private buildIdentityChamberVisuals: Array<{
+    chamber: BuildingChamber;
+    icon: Phaser.GameObjects.Image;
+    label: Phaser.GameObjects.Text;
+    detail: Phaser.GameObjects.Text;
+    structureIcons: Phaser.GameObjects.Image[];
+    structureLabel: Phaser.GameObjects.Text;
+  }> = [];
+  private buildingSummaryTexts: Record<BuildingChamber, Phaser.GameObjects.Text | undefined> = {
+    launch: undefined,
+    decision: undefined,
+    unit: undefined,
+  };
   private baseVisuals: Phaser.GameObjects.GameObject[] = [];
   private launcherTurret!: Phaser.GameObjects.Graphics;
   private battlePanStartPointerX = 0;
@@ -177,9 +221,9 @@ export class PrototypeScene extends Phaser.Scene {
     if (!this.state || this.gameOver) return;
     if (this.state.phaseActive) {
       const previousPhaseElapsed = this.state.phaseElapsedMs;
-      if (time - this.lastBallDropMs > 1300) {
+      if (time - this.lastBallDropMs > activePacingPreset.autoLaunchIntervalMs) {
         for (let index = 0; index < this.state.modifiers.ballCount; index += 1) {
-          this.time.delayedCall(index * 140, () => this.spawnLaunchBall());
+          this.time.delayedCall(index * activePacingPreset.multiBallDelayMs, () => this.spawnLaunchBall());
         }
         this.lastBallDropMs = time;
       }
@@ -204,6 +248,7 @@ export class PrototypeScene extends Phaser.Scene {
     this.syncMiniMap();
     this.syncBases();
     this.syncSlotFeedback(time);
+    this.syncBuildingSummaryTexts();
     this.flushFloatingTexts();
     this.updateHud();
   }
@@ -659,6 +704,8 @@ export class PrototypeScene extends Phaser.Scene {
     ]);
 
     this.createPipelineArrows();
+    this.createBuildingSummaryTexts();
+    this.createBuildIdentityVisuals();
     this.createLauncherTurret();
     this.createLaunchSlots();
     this.createDecisionSlots();
@@ -669,6 +716,51 @@ export class PrototypeScene extends Phaser.Scene {
     this.add.rectangle(x, y, w, h, color, 0.92).setOrigin(0).setStrokeStyle(3, 0x94a3b8, 0.42);
     this.add.text(x + 12, y + 9, title, this.textStyle(17, '#f8fafc'));
     this.add.text(x + 12, y + 31, subtitle, this.textStyle(11, '#b6c2d2'));
+  }
+
+  private createBuildingSummaryTexts() {
+    this.buildingSummaryTexts.launch = this.add.text(LAUNCH_X + 12, TOP_Y + 52, '', this.textStyle(10, '#dbeafe'))
+      .setWordWrapWidth(LAUNCH_W - 24)
+      .setDepth(75);
+    this.buildingSummaryTexts.decision = this.add.text(DECISION_X + 12, TOP_Y + 52, '', this.textStyle(10, '#dbeafe'))
+      .setWordWrapWidth(DECISION_W - 24)
+      .setDepth(75);
+    this.buildingSummaryTexts.unit = this.add.text(UNIT_X + 12, TOP_Y + 52, '', this.textStyle(10, '#dbeafe'))
+      .setWordWrapWidth(UNIT_W - 24)
+      .setDepth(75);
+    this.syncBuildingSummaryTexts();
+  }
+
+  private createBuildIdentityVisuals() {
+    this.buildIdentityGraphics = this.add.graphics().setDepth(74);
+    this.buildIdentityBadge = this.add.text(DECISION_X + DECISION_W - 4, TOP_Y + 34, '', this.textStyle(11, '#f8fafc'))
+      .setOrigin(1, 0)
+      .setDepth(77);
+    this.buildIdentityChamberVisuals = ([
+      ['launch', LAUNCH_X, LAUNCH_W],
+      ['decision', DECISION_X, DECISION_W],
+      ['unit', UNIT_X, UNIT_W],
+    ] as const).map(([chamber, x, w]) => {
+      const structureIcons = Array.from({ length: 3 }, (_, index) => this.add.image(x + 25 + index * 34, TOP_Y + 130, 'structure_swarm')
+        .setScale(0.22)
+        .setDepth(76)
+        .setAlpha(0));
+      return {
+        chamber,
+        icon: this.add.image(x + 18, TOP_Y + 92, 'icon_spawn').setScale(0.2).setDepth(77),
+        label: this.add.text(x + 34, TOP_Y + 82, '', this.textStyle(11, '#f8fafc'))
+          .setDepth(77)
+          .setWordWrapWidth(Math.max(80, w - 44)),
+        detail: this.add.text(x + 34, TOP_Y + 96, '', this.textStyle(9, '#bfdbfe'))
+          .setDepth(77)
+          .setWordWrapWidth(Math.max(80, w - 44)),
+        structureIcons,
+        structureLabel: this.add.text(x + 14, TOP_Y + 147, '', this.textStyle(8, '#dbeafe'))
+          .setDepth(77)
+          .setWordWrapWidth(Math.max(90, w - 28)),
+      };
+    });
+    this.syncBuildIdentityVisuals();
   }
 
   private createZoneBounds(x: number, y: number, w: number, h: number) {
@@ -850,10 +942,17 @@ export class PrototypeScene extends Phaser.Scene {
       this.add.text(x, HUD_TOP + 10, labels[index], this.textStyle(11, '#94a3b8'));
       this.hudTexts.push(this.add.text(x, HUD_TOP + 28, '', this.textStyle(index >= 6 ? 12 : 14, '#f8fafc')));
     }
+
+    const surfaceLabels = ['当前遗物', '科技节点', '工事摘要'];
+    surfaceLabels.forEach((label, index) => {
+      const x = 22 + index * 408;
+      this.add.text(x, HUD_TOP + 52, label, this.textStyle(10, '#93c5fd'));
+      this.buildSurfaceHudTexts.push(this.add.text(x + 66, HUD_TOP + 51, '', this.textStyle(11, '#e0f2fe')));
+    });
   }
 
   private createDebugControls() {
-    const y = HUD_TOP + 54;
+    const y = HUD_TOP + 88;
     this.createButton(22, y, 88, '投球', () => this.spawnLaunchBall());
     this.createButton(118, y, 98, '进抉择', () => this.spawnDecisionBall());
     this.createButton(224, y, 98, '进出兵', () => this.spawnUnitBall());
@@ -862,6 +961,10 @@ export class PrototypeScene extends Phaser.Scene {
     this.createButton(542, y, 108, '跳过阶段', () => this.skipPhase());
     this.createMagicToggle(658, y);
     this.createDebugUnitButtons(792, y);
+    this.createDebugPresetButtons();
+    this.createPhaseToolButtons();
+    this.createResearchTechButtons();
+    this.createUnitStructureButtons();
   }
 
   private createButton(x: number, y: number, width: number, label: string, onClick: () => void) {
@@ -870,6 +973,7 @@ export class PrototypeScene extends Phaser.Scene {
     for (const item of [plate, text]) {
       item.setDepth(7999).setInteractive({ useHandCursor: true }).on('pointerdown', onClick);
     }
+    return { plate, text };
   }
 
   private createMagicToggle(x: number, y: number) {
@@ -897,8 +1001,100 @@ export class PrototypeScene extends Phaser.Scene {
     this.syncDebugUnitButtons();
   }
 
+  private createDebugPresetButtons() {
+    const buttonW = 54;
+    const gap = 6;
+    const startX = GAME_W - 20 - debugBuildPresets.length * buttonW - (debugBuildPresets.length - 1) * gap;
+    const y = BATTLE_Y + 26;
+    this.createButton(startX - 66, y, 56, '探针', () => this.runDebugBuildProbes());
+    debugBuildPresets.forEach((preset, index) => {
+      this.createButton(startX + index * (buttonW + gap), y, buttonW, preset.shortLabel, () => this.applyDebugPreset(preset.id));
+    });
+  }
+
+  private createPhaseToolButtons() {
+    for (const button of this.phaseToolButtons) {
+      button.plate.destroy();
+      button.text.destroy();
+    }
+    this.phaseToolButtons = [];
+
+    const buttonW = 68;
+    const gap = 6;
+    const startX = GAME_W - 20 - this.state.phaseToolStock.length * buttonW - Math.max(0, this.state.phaseToolStock.length - 1) * gap;
+    const y = BATTLE_Y + 58;
+    this.state.phaseToolStock.forEach((toolId, index) => {
+      const def = getPhaseToolDef(toolId);
+      const label = def ? `${def.shortLabel} ${def.cost}` : toolId;
+      const buy = () => this.buyPhaseToolFromUi(toolId);
+      const { plate, text } = this.createButton(startX + index * (buttonW + gap), y, buttonW, label, buy);
+      this.phaseToolButtons.push({ plate, text, id: toolId });
+    });
+    this.syncPhaseToolButtons();
+  }
+
+  private createResearchTechButtons() {
+    for (const button of this.researchTechButtons) {
+      button.plate.destroy();
+      button.text.destroy();
+    }
+    this.researchTechButtons = [];
+
+    const choices = getAvailableDoctrineTechRewardDefs(this.state).slice(0, 3);
+    const buttonW = 82;
+    const gap = 6;
+    const startX = GAME_W - 20 - choices.length * buttonW - Math.max(0, choices.length - 1) * gap;
+    const y = BATTLE_Y + 90;
+    choices.forEach((tech, index) => {
+      const buy = () => this.buyResearchTechFromUi(tech);
+      const { plate, text } = this.createButton(startX + index * (buttonW + gap), y, buttonW, tech.name, buy);
+      this.researchTechButtons.push({ plate, text, id: tech.id });
+    });
+    this.syncResearchTechButtons();
+  }
+
+  private createUnitStructureButtons() {
+    for (const button of this.unitStructureButtons) {
+      button.plate.destroy();
+      button.text.destroy();
+    }
+    this.unitStructureButtons = [];
+
+    const choices = getAvailableUnitStructureDefs(this.state).slice(0, 3);
+    const buttonW = 82;
+    const gap = 6;
+    const startX = GAME_W - 20 - choices.length * buttonW - Math.max(0, choices.length - 1) * gap;
+    const y = BATTLE_Y + 122;
+    choices.forEach((structure, index) => {
+      const buy = () => this.buyUnitStructureFromUi(structure.id);
+      const { plate, text } = this.createButton(startX + index * (buttonW + gap), y, buttonW, structure.name, buy);
+      this.unitStructureButtons.push({ plate, text, id: structure.id });
+    });
+    this.syncUnitStructureButtons();
+  }
+
   private bindDomControls() {
     (window as Window & { planBAction?: (action: string) => void }).planBAction = (action: string) => {
+      if (action.startsWith('preset-')) {
+        this.applyDebugPreset(action.slice(7) as DebugBuildPresetId);
+        return;
+      }
+      if (action === 'probe') {
+        this.runDebugBuildProbes();
+        return;
+      }
+      if (action.startsWith('tool-')) {
+        this.buyPhaseToolFromUi(action.slice(5) as PhaseToolId);
+        return;
+      }
+      if (action.startsWith('tech-')) {
+        this.buyResearchTechFromUi(action.slice(5));
+        return;
+      }
+      if (action.startsWith('structure-')) {
+        this.buyUnitStructureFromUi(action.slice(10));
+        return;
+      }
       if (this.rewardContainer) return;
       if (action === 'drop') this.spawnLaunchBall();
       if (action === 'decision') this.spawnDecisionBall();
@@ -912,23 +1108,134 @@ export class PrototypeScene extends Phaser.Scene {
     };
   }
 
-  private spawnLaunchBall(value = 1) {
+  private applyDebugPreset(id: DebugBuildPresetId) {
+    const result = applyDebugBuildPreset(this.state, id);
+    if (result.status !== 'applied') return;
+    this.rewardContainer?.destroy(true);
+    this.rewardContainer = undefined;
+    this.summaryContainer?.destroy(true);
+    this.summaryContainer = undefined;
+    this.createUnitSlots();
+    this.createDecisionSlots();
+    this.syncDebugUnitButtons();
+    this.syncMagicToggle();
+    this.syncBuildingSummaryTexts();
+    this.createResearchTechButtons();
+    this.spawnFloatingText(1060, BATTLE_Y + 62, this.state.recentFloatingTexts.at(-1)?.label ?? '调试预设已应用', 0xf8fafc);
+  }
+
+  private runDebugBuildProbes() {
+    const results = runAllBuildProbes(this.state.seed);
+    const rows = results.map((result) => ({
+      preset: result.presetName,
+      archetype: result.archetype,
+      queued: result.metrics.unitsQueued,
+      deployed: result.metrics.unitsDeployed,
+      copies: result.metrics.spawnCopiesCreated,
+      marks: `${result.metrics.spawnMarksCreated}/${result.metrics.spawnMarksConsumed}`,
+      warnings: result.warnings.join(', '),
+    }));
+    console.table(rows);
+
+    const warningCount = results.reduce((sum, result) => sum + result.warnings.length, 0);
+    const title = warningCount === 0 ? `构筑探针通过 ${results.length}/${results.length}` : `构筑探针警告 ${warningCount}`;
+    this.spawnFloatingText(1015, BATTLE_Y + 62, title, warningCount === 0 ? 0x86efac : 0xfacc15);
+    results.forEach((result, index) => {
+      this.spawnFloatingText(
+        1015,
+        BATTLE_Y + 90 + index * 22,
+        `${result.presetName}: 入${result.metrics.unitsQueued} 部${result.metrics.unitsDeployed}`,
+        result.warnings.length === 0 ? 0xf8fafc : 0xfacc15,
+      );
+    });
+  }
+
+  private buyPhaseToolFromUi(id: PhaseToolId) {
+    if (this.rewardContainer || this.gameOver) return;
+    const result = buyPhaseTool(this.state, id);
+    const def = getPhaseToolDef(id);
+    if (result.status === 'purchased') {
+      this.spawnFloatingText(1000, BATTLE_Y + 88, this.state.recentFloatingTexts.at(-1)?.label ?? `${def?.name ?? id} 已购买`, 0x86efac);
+      this.createPhaseToolButtons();
+      return;
+    }
+
+    const label = result.status === 'insufficient_gold'
+      ? `金币不足：${def?.cost ?? 0}`
+      : result.status === 'already_used'
+        ? '本阶段已用'
+        : result.status === 'window_closed'
+          ? '工具窗口尚未开启'
+          : result.status === 'window_used'
+            ? '本阶段工具已选择'
+            : '工具不可用';
+    this.spawnFloatingText(1000, BATTLE_Y + 88, label, 0xfacc15);
+    this.syncPhaseToolButtons();
+  }
+
+  private buyResearchTechFromUi(techOrId: DoctrineTechDef | string) {
+    if (this.rewardContainer || this.gameOver) return;
+    const id = typeof techOrId === 'string' ? techOrId : techOrId.id;
+    const result = buyDoctrineTechWithResearch(this.state, id);
+    if (result.status === 'unlocked') {
+      this.spawnFloatingText(1000, BATTLE_Y + 120, this.state.recentFloatingTexts.at(-1)?.label ?? `${id} 已研究`, 0x93c5fd);
+      this.createResearchTechButtons();
+      return;
+    }
+
+    const label = result.status === 'insufficient_research'
+      ? `研究不足：${result.researchPoints}/${result.cost}`
+      : result.status === 'already_unlocked'
+        ? '科技已研究'
+        : '科技不可用';
+    this.spawnFloatingText(1000, BATTLE_Y + 120, label, 0xfacc15);
+    this.syncResearchTechButtons();
+  }
+
+  private buyUnitStructureFromUi(id: string) {
+    if (this.rewardContainer || this.gameOver) return;
+    const result = buyUnitStructureWithGold(this.state, id);
+    const def = getBuildingDef(id);
+    if (result.status === 'purchased' || result.status === 'upgraded') {
+      this.spawnFloatingText(1000, BATTLE_Y + 152, this.state.recentFloatingTexts.at(-1)?.label ?? `${def?.name ?? id} 已建造`, 0x86efac);
+      this.createUnitStructureButtons();
+      return;
+    }
+
+    const label = result.status === 'insufficient_gold'
+      ? `金币不足：${result.gold}/${result.cost}`
+      : result.status === 'max_level'
+        ? '工事已满级'
+        : result.status === 'chamber_full'
+          ? '出兵区工事位已满'
+          : '工事不可用';
+    this.spawnFloatingText(1000, BATTLE_Y + 152, label, 0xfacc15);
+    this.syncUnitStructureButtons();
+  }
+
+  private spawnLaunchBall(value = 1, tags = this.consumePendingLaunchBallTags()) {
     const origin = this.getLauncherMuzzlePoint();
     const velocity = getLauncherVelocity(this.time.now, LAUNCHER_SWEEP_CYCLE_MS, LAUNCHER_SPEED);
-    this.spawnBall('launch', origin.x, origin.y, value, velocity.vx, velocity.vy);
+    this.spawnBall('launch', origin.x, origin.y, value, velocity.vx, velocity.vy, tags);
     this.lastBallDropMs = this.time.now;
   }
 
-  private spawnLiftedLaunchBall(value = 1, point = this.getTopBandDropPoint(LAUNCH_X, LAUNCH_W)) {
-    this.spawnBall('launch', point.x, point.y, value, Phaser.Math.FloatBetween(-0.55, 0.55), 1.35);
+  private spawnLiftedLaunchBall(value = 1, point = this.getTopBandDropPoint(LAUNCH_X, LAUNCH_W), tags: BallTagId[] = []) {
+    this.spawnBall('launch', point.x, point.y, value, Phaser.Math.FloatBetween(-0.55, 0.55), 1.35, tags);
   }
 
-  private spawnDecisionBall(value = 1, point = this.getTopBandDropPoint(DECISION_X, DECISION_W)) {
-    this.spawnBall('decision', point.x, point.y, value, Phaser.Math.FloatBetween(-1.1, 1.1), 1.5);
+  private spawnDecisionBall(value = 1, point = this.getTopBandDropPoint(DECISION_X, DECISION_W), tags: BallTagId[] = []) {
+    this.spawnBall('decision', point.x, point.y, value, Phaser.Math.FloatBetween(-1.1, 1.1), 1.5, tags);
   }
 
-  private spawnUnitBall(value = 1, point = this.getTopBandDropPoint(UNIT_X, UNIT_W)) {
-    this.spawnBall('unit', point.x, point.y, value, Phaser.Math.FloatBetween(-1.2, 1.2), 1.6);
+  private spawnUnitBall(value = 1, point = this.getTopBandDropPoint(UNIT_X, UNIT_W), tags: BallTagId[] = []) {
+    this.spawnBall('unit', point.x, point.y, value, Phaser.Math.FloatBetween(-1.2, 1.2), 1.6, tags);
+  }
+
+  private consumePendingLaunchBallTags(): BallTagId[] {
+    const tags = normalizeBallTags(this.state.pendingLaunchBallTags);
+    setBallTags(this.state, []);
+    return tags;
   }
 
   private getLauncherMuzzlePoint() {
@@ -948,7 +1255,7 @@ export class PrototypeScene extends Phaser.Scene {
     };
   }
 
-  private spawnBall(stage: BallStage, x: number, y: number, value: number, vx: number, vy: number) {
+  private spawnBall(stage: BallStage, x: number, y: number, value: number, vx: number, vy: number, tags: BallTagId[] = []) {
     const label = `${BALL_LABEL_PREFIX}${this.state.nextBallId++}`;
     const ball = this.matter.add.image(x, y, 'machine_ball', undefined, {
       label,
@@ -958,11 +1265,17 @@ export class PrototypeScene extends Phaser.Scene {
     });
     ball.setCircle(PINBALL_BALL_RADIUS).setScale(PINBALL_BALL_SCALE).setBounce(0.75).setVelocity(vx, vy);
     ball.setAngularVelocity(Phaser.Math.FloatBetween(-0.08, 0.08));
+    const normalizedTags = normalizeBallTags(tags);
+    if (normalizedTags.length > 0) {
+      ball.setTint(0xc084fc);
+      ball.setScale(PINBALL_BALL_SCALE * 1.08);
+    }
     (ball.body as MatterJS.BodyType).label = label;
     this.balls.set(label, {
       image: ball,
       stage,
       value,
+      tags: normalizedTags,
       blockedGateHits: 0,
       createdAt: this.time.now,
       lastGateBounceAt: 0,
@@ -997,23 +1310,32 @@ export class PrototypeScene extends Phaser.Scene {
     const x = ball.image.x;
     const y = ball.image.y;
     this.destroyBall(label);
+    if (outcome === 'split' || outcome === 'fire' || outcome === 'miss') {
+      recordLaunchOutcome(this.state.stats.currentPhase, outcome as LaunchOutcomeId);
+    }
     if (outcome === 'split') {
-      this.spawnFloatingText(x, y - 26, '分裂 x2', 0x86efac);
-      const relaunches = buildLaunchSplitRelaunchPlan(ball.value).map((item) => ({
+      const extraSplitBalls = getExtraSplitBallCount(this.state);
+      const relaunches = buildTaggedSplitRelaunchPlan({ value: ball.value, tags: ball.tags }, extraSplitBalls).map((item) => ({
         ...item,
         point: this.getTopBandDropPoint(LAUNCH_X, LAUNCH_W),
       }));
+      this.spawnFloatingText(x, y - 26, `分裂 x${relaunches.length}`, 0x86efac);
       for (const [index, relaunch] of relaunches.entries()) {
         this.drawTransferTrail(x, y, relaunch.point.x, relaunch.point.y, 0x86efac);
-        this.time.delayedCall(80 + index * 100, () => this.spawnLiftedLaunchBall(relaunch.value, relaunch.point));
+        this.time.delayedCall(80 + index * 100, () => this.spawnLiftedLaunchBall(relaunch.value, relaunch.point, relaunch.tags));
       }
     } else if (outcome === 'fire') {
       this.spawnFloatingText(x, y - 26, '发射', 0x93c5fd);
       const drop = this.getTopBandDropPoint(DECISION_X, DECISION_W);
       this.drawTransferTrail(x, y, drop.x, drop.y, 0x93c5fd);
-      this.spawnDecisionBall(ball.value, drop);
+      this.spawnDecisionBall(ball.value, drop, ball.tags);
     } else {
+      const recovered = recordLaunchMiss(this.state)
+        + recordRelicLaunchMiss(this.state)
+        + recordDoctrineLaunchMiss(this.state)
+        + applyTaggedLaunchMiss(this.state, { value: ball.value, tags: ball.tags });
       this.spawnFloatingText(x, y - 26, '落空', 0xfca5a5);
+      if (recovered > 0) this.spawnFloatingText(x, y - 50, `出兵标记 +${recovered}`, 0x86efac);
     }
   }
 
@@ -1032,12 +1354,13 @@ export class PrototypeScene extends Phaser.Scene {
     }
     if (triggerResult.status === 'disabled') return;
     if (slotId === 'spawn') {
+      const taggedPayload = applyDecisionSpawnTags(this.state, { value: ball.value, tags: ball.tags });
       const unitAssist = getFirstSpawnAssistPlan(this.state);
       const drop = unitAssist.forceUnitSlotIndex === undefined
         ? this.getTopBandDropPoint(UNIT_X, UNIT_W)
         : this.getUnitSlotDropPoint(unitAssist.forceUnitSlotIndex);
       this.drawTransferTrail(visual?.plate.x ?? DECISION_X + DECISION_W / 2, visual?.plate.y ?? TOP_Y + TOP_H - 20, drop.x, drop.y, 0x4ade80);
-      this.spawnUnitBall(ball.value, drop);
+      this.spawnUnitBall(consumeSpawnMarkBonus(this.state, taggedPayload.value), drop, taggedPayload.tags);
     }
     if (slotId === 'magic') this.drawMagicFx();
   }
@@ -1190,15 +1513,17 @@ export class PrototypeScene extends Phaser.Scene {
   private showSummary(title: string) {
     this.summaryContainer?.destroy(true);
     const stats = this.state.stats.currentPhase;
-    const panel = this.add.container(810, 560).setDepth(5000);
-    panel.add(this.add.rectangle(0, 0, 380, 150, 0x0f172a, 0.94).setStrokeStyle(2, 0x94a3b8));
-    panel.add(this.add.text(-170, -62, title, this.textStyle(17, '#f8fafc')));
+    const buildSummary = buildPhaseTelemetrySummary(this.state, stats);
+    const panel = this.add.container(810, 530).setDepth(5000);
+    panel.add(this.add.rectangle(0, 0, 420, 250, 0x0f172a, 0.94).setStrokeStyle(2, 0x94a3b8));
+    panel.add(this.add.text(-190, -108, title, this.textStyle(17, '#f8fafc')));
     const lines = [
       `抉择 金币:${stats.slotTriggers.gold} 法术:${stats.slotTriggers.magic} 出兵:${stats.slotTriggers.spawn} 升级:${stats.slotTriggers.upgrade}`,
       `入队 ${stats.unitsQueued}  部署 ${stats.unitsSpawned}  老兵经验 ${stats.eliteXpGained}`,
       `伤害 ${stats.damageDealt}  击杀 ${stats.kills}  基地伤害 造成 ${stats.enemyBaseDamage}  承受 ${stats.playerBaseDamage}`,
+      ...buildSummary.lines,
     ];
-    lines.forEach((line, index) => panel.add(this.add.text(-170, -30 + index * 24, line, this.textStyle(13, '#cbd5e1'))));
+    lines.forEach((line, index) => panel.add(this.add.text(-190, -78 + index * 24, line, this.textStyle(13, index >= 3 ? '#dbeafe' : '#cbd5e1'))));
     this.summaryContainer = panel;
   }
 
@@ -1259,6 +1584,8 @@ export class PrototypeScene extends Phaser.Scene {
       this.summaryContainer = undefined;
       resumeNextPhase(this.state, reward.id);
       this.createDecisionSlots();
+      this.createPhaseToolButtons();
+      this.createResearchTechButtons();
       this.spawnLaunchBall();
     };
     for (const item of [card, icon, name, tag, desc]) {
@@ -1815,7 +2142,72 @@ export class PrototypeScene extends Phaser.Scene {
 
   private getCurrentUnitGateState() {
     const phase = phaseDefs[this.state.phaseIndex] ?? phaseDefs.at(-1);
-    return getUnitGateState(this.state.phaseElapsedMs, phase?.durationMs ?? 60000);
+    return getEffectiveUnitGateState(this.state, this.state.phaseElapsedMs, phase?.durationMs ?? 60000);
+  }
+
+  private syncBuildingSummaryTexts() {
+    const summaries = buildChamberPanelSummaries(this.state);
+    for (const chamber of Object.keys(this.buildingSummaryTexts) as BuildingChamber[]) {
+      const text = this.buildingSummaryTexts[chamber];
+      if (!text) continue;
+      text.setText(summaries[chamber].join('\n'));
+    }
+  }
+
+  private syncBuildIdentityVisuals() {
+    if (!this.buildIdentityGraphics || !this.buildIdentityBadge || this.buildIdentityChamberVisuals.length === 0) return;
+    const visual = buildIdentityVisualSummary(this.state);
+    const zones: Record<BuildingChamber, { x: number; w: number }> = {
+      launch: { x: LAUNCH_X, w: LAUNCH_W },
+      decision: { x: DECISION_X, w: DECISION_W },
+      unit: { x: UNIT_X, w: UNIT_W },
+    };
+
+    this.buildIdentityGraphics.clear();
+    this.buildIdentityGraphics.lineStyle(3, visual.accentColor, 0.8);
+    this.buildIdentityGraphics.strokeRoundedRect(DECISION_X + DECISION_W - 156, TOP_Y + 31, 152, 18, 6);
+    this.buildIdentityGraphics.fillStyle(0x020617, 0.35);
+    this.buildIdentityGraphics.fillRoundedRect(DECISION_X + DECISION_W - 156, TOP_Y + 31, 152, 18, 6);
+    this.buildIdentityBadge
+      .setText(visual.badgeText)
+      .setColor(Phaser.Display.Color.IntegerToColor(visual.accentColor).rgba);
+
+    for (const chamberVisual of this.buildIdentityChamberVisuals) {
+      const chamber = visual.chambers[chamberVisual.chamber];
+      const zone = zones[chamberVisual.chamber];
+      const emphasis = visual.zoneEmphasis[chamberVisual.chamber];
+      const alpha = 0.22 + emphasis * 0.14;
+      const lineY = TOP_Y + 76 + emphasis * 2;
+
+      this.buildIdentityGraphics.lineStyle(2 + emphasis, visual.accentColor, Math.min(0.88, alpha + 0.18));
+      this.buildIdentityGraphics.lineBetween(zone.x + 12, lineY, zone.x + zone.w - 12, lineY);
+      this.buildIdentityGraphics.fillStyle(visual.accentColor, alpha);
+      this.buildIdentityGraphics.fillCircle(zone.x + 18, TOP_Y + 92, 13 + emphasis);
+
+      chamberVisual.icon.setTexture(chamber.iconKey).setTint(visual.accentColor);
+      chamberVisual.label
+        .setText(chamber.label)
+        .setColor(Phaser.Display.Color.IntegerToColor(visual.accentColor).rgba);
+      chamberVisual.detail.setText(chamber.detail);
+
+      const structures = visual.structures[chamberVisual.chamber].slice(0, chamberVisual.structureIcons.length);
+      chamberVisual.structureIcons.forEach((icon, index) => {
+        const structure = structures[index];
+        if (!structure) {
+          icon.setAlpha(0);
+          return;
+        }
+        icon
+          .setTexture(structure.assetKey)
+          .setTint(visual.accentColor)
+          .setScale(0.16 + structure.intensity * 0.035)
+          .setAlpha(0.44 + structure.intensity * 0.16);
+      });
+      chamberVisual.structureLabel
+        .setText(structures.map((structure) => structure.label).join(' / '))
+        .setColor(Phaser.Display.Color.IntegerToColor(visual.accentColor).rgba)
+        .setAlpha(0.72);
+    }
   }
 
   private flushFloatingTexts() {
@@ -1896,8 +2288,70 @@ export class PrototypeScene extends Phaser.Scene {
     this.hudTexts[6].setText(this.state.pendingSpawnLevelBonus > 0 ? `下次出兵 Lv+${this.state.pendingSpawnLevelBonus}` : '下次出兵 Lv+0');
     this.hudTexts[7].setText(`${this.getReservePreview()} 精${eliteSummary.count} Lv${eliteSummary.maxLevel}`);
     this.hudTexts[8].setText(`金${this.state.stats.currentPhase.slotTriggers.gold} 法${this.state.stats.currentPhase.slotTriggers.magic} 出${this.state.stats.currentPhase.slotTriggers.spawn} 升${this.state.stats.currentPhase.slotTriggers.upgrade}`);
+    this.syncBuildIdentityVisuals();
+    this.syncBuildSurfaceHud();
     this.syncMagicToggle();
+    this.syncPhaseToolButtons();
+    this.syncResearchTechButtons();
+    this.syncUnitStructureButtons();
     if (!phase) this.hudTexts[1].setText('已完成');
+  }
+
+  private syncBuildSurfaceHud() {
+    if (this.buildSurfaceHudTexts.length < 3) return;
+    const summaries = buildSurfaceHudSummaries(this.state);
+    this.buildSurfaceHudTexts[0].setText(summaries.relics);
+    this.buildSurfaceHudTexts[1].setText(summaries.techs);
+    this.buildSurfaceHudTexts[2].setText(summaries.structures);
+  }
+
+  private syncPhaseToolButtons() {
+    const window = getPhaseToolWindowState(this.state);
+    const toolAlreadyChosen = this.state.stats.currentPhase.phaseToolsPurchased > 0;
+    for (const button of this.phaseToolButtons) {
+      const def = getPhaseToolDef(button.id);
+      const canBuy = Boolean(window.isOpen && !toolAlreadyChosen && def && this.state.gold >= def.cost && this.state.phaseToolStock.includes(button.id));
+      button.plate
+        .setFillStyle(canBuy ? 0x1e3a5f : 0x1f2937, 0.96)
+        .setStrokeStyle(2, canBuy ? 0x93c5fd : 0x64748b, 0.8);
+      const label = !def ? button.id : toolAlreadyChosen ? '已选' : window.isOpen ? `${def.shortLabel} ${def.cost}` : `中段 ${def.cost}`;
+      button.text
+        .setText(label)
+        .setColor(canBuy ? '#dbeafe' : '#94a3b8');
+    }
+  }
+
+  private syncResearchTechButtons() {
+    for (const button of this.researchTechButtons) {
+      const def = getAvailableDoctrineTechRewardDefs(this.state).find((tech) => tech.id === button.id);
+      if (!def) {
+        button.plate.setFillStyle(0x111827, 0.7).setStrokeStyle(2, 0x334155, 0.8);
+        button.text.setText('已研究').setColor('#64748b');
+        continue;
+      }
+
+      const canBuy = this.state.researchPoints >= def.researchCost;
+      button.plate
+        .setFillStyle(canBuy ? 0x1e3a5f : 0x1f2937, 0.96)
+        .setStrokeStyle(2, canBuy ? 0x93c5fd : 0x64748b, 0.8);
+      button.text
+        .setText(`${def.name.slice(0, 2)} ${def.researchCost}研`)
+        .setColor(canBuy ? '#dbeafe' : '#94a3b8');
+    }
+  }
+
+  private syncUnitStructureButtons() {
+    for (const button of this.unitStructureButtons) {
+      const def = getBuildingDef(button.id);
+      const cost = getUnitStructureGoldCost(this.state, button.id);
+      const canBuy = Boolean(def && this.state.gold >= cost);
+      button.plate
+        .setFillStyle(canBuy ? 0x14532d : 0x1f2937, 0.96)
+        .setStrokeStyle(2, canBuy ? 0x86efac : 0x64748b, 0.8);
+      button.text
+        .setText(def ? `${def.name.slice(0, 2)} ${cost}金` : button.id)
+        .setColor(canBuy ? '#dcfce7' : '#94a3b8');
+    }
   }
 
   private getReservePreview() {

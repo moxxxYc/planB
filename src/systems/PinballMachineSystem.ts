@@ -18,11 +18,8 @@ export function getLauncherVelocity(elapsedMs: number, cycleMs = 2400, speed = 3
   };
 }
 
-export function buildLaunchSplitRelaunchPlan(value: number) {
-  return [
-    { stage: 'launch' as const, value },
-    { stage: 'launch' as const, value },
-  ];
+export function buildLaunchSplitRelaunchPlan(value: number, extraBalls = 0) {
+  return Array.from({ length: 2 + Math.max(0, extraBalls) }, () => ({ stage: 'launch' as const, value }));
 }
 
 export function getControlledGateBounceVelocity(velocity: { vx: number; vy: number }) {

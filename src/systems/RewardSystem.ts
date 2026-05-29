@@ -1,14 +1,25 @@
 import { rewardDefs } from '../data/rewards';
 import { randomInt } from '../utils/random';
+import { installOrUpgradeBuilding, isBuildingReward } from './BuildingSystem';
+import { getAvailableRelicRewardDefs, installRelic, isRelicReward } from './RelicSystem';
+import { isDoctrineTechReward, unlockDoctrineTech } from './DoctrineSystem';
 import type { GameState, RewardDef } from '../types/game';
 
 export function buildRewardChoices(state: GameState): RewardDef[] {
-  const available = [...rewardDefs];
   const choices: RewardDef[] = [];
-  while (choices.length < 3 && available.length > 0) {
-    const pick = randomInt(state.seed, 0, available.length - 1);
+  const relicChoices = [...getAvailableRelicRewardDefs(state)];
+
+  while (choices.length < 3 && relicChoices.length > 0) {
+    const pick = randomInt(state.seed, 0, relicChoices.length - 1);
     state.seed = pick.seed;
-    choices.push(available.splice(pick.value, 1)[0]);
+    choices.push(relicChoices.splice(pick.value, 1)[0]);
+  }
+
+  const legacyChoices = [...rewardDefs];
+  while (choices.length < 3 && legacyChoices.length > 0) {
+    const pick = randomInt(state.seed, 0, legacyChoices.length - 1);
+    state.seed = pick.seed;
+    choices.push(legacyChoices.splice(pick.value, 1)[0]);
   }
   return choices;
 }
@@ -37,6 +48,19 @@ export function rerollRewardChoices(
 }
 
 export function applyReward(state: GameState, rewardId: string) {
+  if (isBuildingReward(rewardId)) {
+    installOrUpgradeBuilding(state, rewardId);
+    return;
+  }
+  if (isRelicReward(rewardId)) {
+    installRelic(state, rewardId);
+    return;
+  }
+  if (isDoctrineTechReward(rewardId)) {
+    unlockDoctrineTech(state, rewardId);
+    return;
+  }
+
   if (rewardId === 'wide_spawn') state.slots.spawn.widthWeight *= 1.2;
   if (rewardId === 'spawn_slot_widen') state.slots.spawn.widthWeight *= 1.1;
   if (rewardId === 'reinforcement_drums') state.modifiers.queueReleaseSpeedBonus += 0.25;

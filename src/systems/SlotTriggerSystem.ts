@@ -2,6 +2,14 @@ import { raceDefs } from '../data/races';
 import { unitDefs } from '../data/units';
 import { pickWeighted, randomInt } from '../utils/random';
 import { dealMagicDamage } from './BattleSystem';
+import { recordGoldHitForBuildings, recordMagicHitForBuildings } from './BuildingSystem';
+import {
+  recordBaselineNonSpawnDecision,
+  recordBaselineResearchHit,
+  recordDoctrineNonSpawnDecision,
+  resetBaselineNonSpawnStreak,
+} from './DoctrineSystem';
+import { recordRelicMagicHit } from './RelicSystem';
 import { recordSlot } from './StatsSystem';
 import type { GameState, SlotId } from '../types/game';
 
@@ -19,7 +27,7 @@ export function triggerSlot(state: GameState, slotId: SlotId): SlotTriggerResult
   const slot = state.slots[slotId];
   slot.triggerCount += 1;
   slot.lastTriggeredAtMs = state.battle.elapsedMs;
-  recordSlot(state.stats.currentPhase, slotId);
+  recordSlot(state.stats.currentPhase, slotId, state.phaseElapsedMs);
 
   if (slotId === 'spawn') triggerSpawn(state);
   if (slotId === 'upgrade') triggerUpgrade(state);
@@ -30,6 +38,7 @@ export function triggerSlot(state: GameState, slotId: SlotId): SlotTriggerResult
 }
 
 export function triggerSpawn(state: GameState) {
+  resetBaselineNonSpawnStreak(state);
   state.recentFloatingTexts.push({ label: '出兵球进入出兵区', color: 0x4ade80 });
 }
 
@@ -53,12 +62,18 @@ function triggerUpgrade(state: GameState) {
     state.recentFloatingTexts.push({ label: '下一次高级出兵：精英晋升', color: 0xfacc15 });
   }
   state.recentFloatingTexts.push({ label: `升级 +${bonus}`, color: 0x60a5fa });
+  recordBaselineNonSpawnDecision(state);
+  recordBaselineResearchHit(state, '升级');
+  recordDoctrineNonSpawnDecision(state);
 }
 
 function triggerGold(state: GameState) {
   const amount = Math.round((15 + state.phaseIndex * 2) * state.modifiers.goldMultiplier);
   state.gold += amount;
   state.recentFloatingTexts.push({ label: `金币 +${amount}`, color: 0xfacc15 });
+  recordBaselineNonSpawnDecision(state);
+  recordGoldHitForBuildings(state);
+  recordDoctrineNonSpawnDecision(state);
 }
 
 function triggerMagic(state: GameState) {
@@ -69,6 +84,11 @@ function triggerMagic(state: GameState) {
   dealMagicDamage(state, 26 + state.phaseIndex * 4);
   state.modifiers.pendingSpawnCopies += state.modifiers.magicSpawnCopyBonus;
   state.recentFloatingTexts.push({ label: '电弧法术', color: 0xc084fc });
+  recordBaselineNonSpawnDecision(state);
+  recordMagicHitForBuildings(state);
+  recordRelicMagicHit(state);
+  recordBaselineResearchHit(state, '法术');
+  recordDoctrineNonSpawnDecision(state);
 }
 
 function triggerSpecial(state: GameState) {

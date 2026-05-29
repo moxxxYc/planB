@@ -1,3 +1,4 @@
+import { activePacingPreset } from './pacing';
 import type { PhaseDef } from '../types/game';
 
 export const phaseDefs: PhaseDef[] = [
@@ -5,7 +6,7 @@ export const phaseDefs: PhaseDef[] = [
     id: 'phase_outer_gate',
     name: '阶段 1：外门',
     objectiveType: 'destroy_gate',
-    durationMs: 52000,
+    durationMs: activePacingPreset.phaseDurationsMs[0],
     enemyPressureLevel: 1,
     enemyObjectiveHp: 500,
     enemySpawns: [
@@ -18,7 +19,7 @@ export const phaseDefs: PhaseDef[] = [
     id: 'phase_reinforcements',
     name: '阶段 2：增援',
     objectiveType: 'survive_pressure',
-    durationMs: 56000,
+    durationMs: activePacingPreset.phaseDurationsMs[1],
     enemyPressureLevel: 2,
     enemyObjectiveHp: 650,
     enemySpawns: [
@@ -32,7 +33,7 @@ export const phaseDefs: PhaseDef[] = [
     id: 'phase_mini_boss',
     name: '阶段 3：小型 Boss',
     objectiveType: 'mini_boss',
-    durationMs: 60000,
+    durationMs: activePacingPreset.phaseDurationsMs[2],
     enemyPressureLevel: 3,
     enemyObjectiveHp: 900,
     enemySpawns: [
@@ -46,7 +47,7 @@ export const phaseDefs: PhaseDef[] = [
     id: 'phase_inner_gate',
     name: '阶段 4：内门',
     objectiveType: 'destroy_gate',
-    durationMs: 65000,
+    durationMs: activePacingPreset.phaseDurationsMs[3],
     enemyPressureLevel: 4,
     enemyObjectiveHp: 1200,
     enemySpawns: [
@@ -60,7 +61,7 @@ export const phaseDefs: PhaseDef[] = [
     id: 'phase_elite_guard',
     name: '阶段 5：精英守卫',
     objectiveType: 'survive_pressure',
-    durationMs: 72000,
+    durationMs: activePacingPreset.phaseDurationsMs[4],
     enemyPressureLevel: 5,
     enemyObjectiveHp: 1450,
     enemySpawns: [
@@ -75,7 +76,7 @@ export const phaseDefs: PhaseDef[] = [
     id: 'phase_core',
     name: '阶段 6：核心',
     objectiveType: 'destroy_core',
-    durationMs: 80000,
+    durationMs: activePacingPreset.phaseDurationsMs[5],
     enemyPressureLevel: 6,
     enemyObjectiveHp: 1800,
     enemySpawns: [

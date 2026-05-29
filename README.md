@@ -7,27 +7,40 @@ npm install
 npm run dev
 ```
 
-Open the local Vite URL, usually `http://localhost:5173/`.
+Open the local Vite URL, usually `http://localhost:5173/`. If that port is busy, Vite will print the next available local URL.
 
 ## Build
 
 ```bash
 npm run build
 npm run typecheck
+npm run probe
+npm run audit:v1.2
+npm run smoke:build-visuals
 ```
+
+`npm run probe` runs the v1.2 build-preset validation report for the five target identities and exits nonzero if a chain, combat-impact, recovery, or dead-effect guardrail fails.
+
+`npm run audit:v1.2` prints a requirement-by-requirement v1.2 readiness report with `proved`, `partial`, and `missing` evidence states.
+
+`npm run smoke:build-visuals` captures a headless Chrome screenshot for each debug build identity under `docs/build-identity-*-smoke.png`.
 
 ## Controls
 
 - Click reward cards after each phase.
-- Click `Toggle Race` or the `Race` debug button to switch Hive / Mech.
-- Use debug buttons to drop balls, trigger SPAWN, continue a paused phase, buy an extra ball, or skip a phase.
+- Use the bottom debug buttons to drop balls, send test balls to Decision or Unit Spawn, continue a paused phase, toggle race, or skip a phase.
+- Use the top-right phase-tool buttons during the once-per-phase mid-phase recovery window to spend gold on one tool such as spawn marks, hot-slot progress, queue burst, repair, or a tagged next shot.
+- Use the research-tech buttons to spend research on doctrine techs during a run.
+- Use the structure buttons to spend gold on up to three Unit Spawn Zone support buildings such as overflow spill, earlier high-tier access, or queue burst.
+- Use the preset buttons to load reproducible build identities, and `探针` to run the build probe overlay through queue, deployment, and deterministic combat impact.
 - The prototype can be played with mouse only. No unit micro is required.
+- The bottom HUD shows current relics, researched tech nodes, and installed Unit Spawn structures so the three build surfaces stay visible during play.
 
 ## Design
 
 This prototype tests a three-stage horizontal pinball pipeline above the battlefield:
 
-1. Launch Zone preprocesses balls into split, fire, or miss outcomes.
+1. Launch Zone preprocesses balls into split, fire, or miss outcomes, and can now carry tagged ball payloads.
 2. Decision Zone turns balls into gold, magic, spawn, or upgrade outcomes, with spawn kept near the middle of the row.
 3. Unit Spawn Zone receives only spawn balls, lets them fall through pegs, and lands them in one of five race unit slots.
 
@@ -41,9 +54,15 @@ The battlefield is a constrained fake 2D 3/4 auto-battle board. Units spawn near
 - Hive units: Grub, Spitter, Carapace, Brood Guard, Behemoth.
 - Mech units: Drone, Gunner, Walker, Siege Crawler, Titan.
 - Enemy units: Raider, Shooter, Brute.
-- Decision slots: SPAWN, GOLD, MAGIC, UP, SPECIAL.
+- Visible decision slots: GOLD, MAGIC, SPAWN, UP.
 - Unit slots: five visible race-specific `UnitSlotState` slots with icon art, progress bars, requirements, and overflow progress.
 - Phases: 6 continuous battlefield phases.
-- Rewards: machine slot changes, reserve queue speed, ball count, gold scaling, spell copy, Hive swarm, and Mech upgrade support.
-- Persistent systems: SPAWN adds to a reserve queue, standard and elite player units survive phase transitions, and elites gain veterancy when they live through a phase.
+- Rewards: phase-end choices are relic-first three-card offers; legacy stat cards fill only after relic choices run out.
+- Build layers: chamber buildings modify Launch / Decision / Unit Spawn zones; up to three Unit Spawn structures can also be bought directly with gold; launch and event relics modify ball tags or translate misses, blocked gates, magic, and upgrades into future value; doctrine techs add compact long-run direction. The top machine row now also renders a build identity badge, compact chamber summaries, per-chamber icon signatures, and small SVG structure silhouettes for the current build.
+- Research and fallback: MAGIC and UP hits create baseline research, every four baseline research pips returns into a stored spawn mark, research can be spent on doctrine techs, and any three consecutive non-SPAWN decisions create a stored spawn mark.
+- Phase tools: once-per-phase mid-phase purchases support immediate回流 through spawn marks, hot slots, queue surge, repair, and tagged launch balls.
+- Persistent systems: SPAWN adds to a reserve queue, standard and elite player units survive phase transitions, elites gain veterancy when they live through a phase, and phase completion records persistent chain history with build archetype, concrete queues, deployments, high-tier queue ratio, gate-block bounces, chamber contributions, resource return efficiency, longest non-SPAWN streak, first recovery timing, recovery sources, and visual build identity. Build probes also expose v1.2 scenario metrics such as low-tier deploy share, deploys per spawn hit, average unit level, tier-3 deploy timing, queue release rate, burst deploys, chain depth, and dead-effect count. The run state also exposes the v1.2 build-surface fields `launchRelics`, `decisionTechs`, `unitStructures`, and `ballTags`.
+- Command-line validation: `npm run probe` prints the deterministic build-probe table for all five debug identities and fails the process if the v1.2 guardrails regress.
+- Readiness audit: `npm run audit:v1.2` maps the v1.2 requirements to current evidence and explicitly reports remaining partial evidence before completion is claimed.
+- Visual validation: `npm run smoke:build-visuals` launches a temporary local Vite server and captures all five build identities in headless Chrome.
 - Assets: built-in generated image sheet saved under `public/assets/generated/reference/`, plus self-contained SVG fallback sprites used by the prototype.

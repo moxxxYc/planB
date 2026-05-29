@@ -8,6 +8,16 @@ export type UnitLifetime = 'standard' | 'elite' | 'temporary' | 'summon';
 export type PhaseObjectiveType = 'destroy_gate' | 'survive_pressure' | 'mini_boss' | 'destroy_core';
 export type PhaseCompleteReason = 'objective' | 'timer' | 'boss_defeated' | 'debug_skip';
 export type BallStage = 'launch' | 'decision' | 'unit';
+export type BallTagId = 'split+' | 'spawn-mark' | 'copy-mark' | 'heavy' | 'recycle';
+export type LaunchOutcomeId = 'split' | 'fire' | 'miss';
+export type BuildingChamber = 'launch' | 'decision' | 'unit';
+export type DoctrinePath = 'launch' | 'decision' | 'unit';
+export type PhaseToolId = 'spawn_beacon' | 'hot_slot_calibrator' | 'queue_surge' | 'field_repair' | 'marked_shot';
+
+export interface BallPayload {
+  value: number;
+  tags: BallTagId[];
+}
 
 export interface UnitSlotDef {
   index: number;
@@ -162,8 +172,28 @@ export interface BattleState {
 
 export interface PhaseStats {
   slotTriggers: Record<SlotId, number>;
+  launchOutcomes: Record<LaunchOutcomeId, number>;
+  buildingContributions: Record<BuildingChamber, number>;
+  spawnMarksCreated: number;
+  spawnMarksConsumed: number;
+  spawnCopiesCreated: number;
+  nonSpawnRecoveryEvents: number;
+  currentNonSpawnStreak: number;
+  nonSpawnStreakMax: number;
+  nonSpawnStreakStartedAtMs?: number;
+  timeToRecoverySpawnMs?: number;
+  recoverySources: Record<string, number>;
+  phaseToolsPurchased: number;
+  relicTriggers: number;
+  overflowProgressGranted: number;
+  gateAccelerationEvents: number;
+  gateBlockedEvents: number;
+  queueBurstEvents: number;
+  unitsQueuedById: Record<string, number>;
+  unitsDeployedById: Record<string, number>;
   unitsSpawned: number;
   unitsQueued: number;
+  advancedUnitsQueued: number;
   damageDealt: number;
   kills: number;
   eliteXpGained: number;
@@ -174,6 +204,22 @@ export interface PhaseStats {
 export interface GameStats {
   currentPhase: PhaseStats;
   lastPhase?: PhaseStats;
+}
+
+export interface PhaseChainHistoryEntry {
+  phaseIndex: number;
+  phaseId: string;
+  phaseName: string;
+  reason: PhaseCompleteReason;
+  archetype: string;
+  dominantChamber: string;
+  resourceReturnRate: number;
+  summaryLines: string[];
+  completedAtMs: number;
+  unitsQueued: number;
+  unitsDeployed: number;
+  advancedUnitsQueued: number;
+  gateBlockedEvents: number;
 }
 
 export interface GameModifiers {
@@ -210,6 +256,81 @@ export interface PersistentRunItem {
   id: string;
 }
 
+export interface BuildingDef {
+  id: string;
+  chamber: BuildingChamber;
+  name: string;
+  tag: string;
+  icon: string;
+  description: string;
+  maxLevel: number;
+}
+
+export interface BuildingInstance {
+  id: string;
+  chamber: BuildingChamber;
+  level: number;
+}
+
+export interface BuildingEventState {
+  coinPressGoldHits: number;
+}
+
+export interface RelicDef {
+  id: string;
+  name: string;
+  tag: string;
+  icon: string;
+  description: string;
+}
+
+export interface RelicEventState {
+  entropyCharges: number;
+}
+
+export interface DoctrineTechDef {
+  id: string;
+  path: DoctrinePath;
+  name: string;
+  tag: string;
+  icon: string;
+  researchCost: number;
+  description: string;
+}
+
+export interface DoctrineEventState {
+  conversionHits: number;
+  launchLosses: number;
+  researchReturnProgress: number;
+  nonSpawnStreak: number;
+}
+
+export interface PhaseToolDef {
+  id: PhaseToolId;
+  name: string;
+  shortLabel: string;
+  tag: string;
+  cost: number;
+  description: string;
+}
+
+export type DebugBuildPresetId = 'swarm' | 'magic_copy' | 'mech_elite' | 'economy_industry' | 'recovery';
+
+export interface DebugBuildPreset {
+  id: DebugBuildPresetId;
+  name: string;
+  shortLabel: string;
+  description: string;
+  raceId: RaceId;
+  buildingIds: string[];
+  rewardIds: string[];
+  gold?: number;
+  pendingSpawnMarks?: number;
+  pendingSpawnLevelBonus?: number;
+  nextSpawnCreatesElite?: boolean;
+  unitLevelBoosts?: Record<string, number>;
+}
+
 export interface GameSettings {
   magicEnabled: boolean;
 }
@@ -228,6 +349,13 @@ export interface GameState {
   firstUnitSlotForced: boolean;
   upTriggerCountTowardElite: number;
   nextSpawnCreatesElite: boolean;
+  pendingSpawnMarks: number;
+  pendingLaunchBallTags: BallTagId[];
+  ballTags: BallTagId[];
+  buildingEvents: BuildingEventState;
+  relicEvents: RelicEventState;
+  doctrineEvents: DoctrineEventState;
+  researchPoints: number;
   nextUnitId: number;
   nextBallId: number;
   nextQueueId: number;
@@ -237,9 +365,17 @@ export interface GameState {
   spawnQueue: SpawnQueueItem[];
   machineUpgrades: PersistentRunItem[];
   slotUpgrades: PersistentRunItem[];
-  buildings: PersistentRunItem[];
+  buildings: BuildingInstance[];
   relics: PersistentRunItem[];
+  doctrineTechs: PersistentRunItem[];
+  launchRelics: PersistentRunItem[];
+  decisionTechs: PersistentRunItem[];
+  unitStructures: BuildingInstance[];
+  phaseToolStock: PhaseToolId[];
+  usedPhaseTools: PhaseToolId[];
   selectedRewards: string[];
+  chainHistory: PhaseChainHistoryEntry[];
+  buildArchetypeHint: string;
   slots: Record<SlotId, SlotState>;
   battle: BattleState;
   stats: GameStats;

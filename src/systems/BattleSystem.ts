@@ -1,6 +1,7 @@
 import { raceDefs } from '../data/races';
 import { unitDefs } from '../data/units';
 import { randomInt } from '../utils/random';
+import { recordUnitDeployed } from './StatsSystem';
 import type { BattleLaneId, BattleLaneWeights, BattleUnit, GameState, Side, UnitLifetime } from '../types/game';
 
 const BATTLE_LANE_OFFSETS: Record<BattleLaneId, number> = {
@@ -77,6 +78,7 @@ export function spawnBattleUnit(
   addEffect(state, 'spawn', side, unit.id, unit.x, unit.laneOffset, 420);
   if (side === 'player') {
     state.stats.currentPhase.unitsSpawned += 1;
+    recordUnitDeployed(state.stats.currentPhase, defId);
   }
   return unit;
 }

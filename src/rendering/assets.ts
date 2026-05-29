@@ -22,4 +22,9 @@ export const svgAssets = [
   ['machine_ball', '/assets/generated/machine/ball.svg', 64, 64],
   ['machine_peg', '/assets/generated/machine/peg.svg', 48, 48],
   ['machine_bumper', '/assets/generated/machine/bumper.svg', 80, 56],
+  ['structure_swarm', '/assets/generated/structures/swarm.svg', 112, 112],
+  ['structure_magic_copy', '/assets/generated/structures/magic_copy.svg', 112, 112],
+  ['structure_mech_elite', '/assets/generated/structures/mech_elite.svg', 112, 112],
+  ['structure_economy_industry', '/assets/generated/structures/economy_industry.svg', 112, 112],
+  ['structure_recovery', '/assets/generated/structures/recovery.svg', 112, 112],
 ] as const;

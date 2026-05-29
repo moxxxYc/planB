@@ -3,8 +3,8 @@
 ## Current Status
 
 - Build status: `npm run build` passes
-- Dev server status: verified on `http://localhost:5175/`
-- Last checkpoint completed: P0 author-testability pass for weighted decision slots, first spawn loop assist, reward reroll, and spawn visibility
+- Dev server status: verified on `http://127.0.0.1:5175/`
+- Last checkpoint completed: v1.2 readiness audit READY
 
 ## Implemented
 
@@ -83,6 +83,157 @@
 - Saved the projectile-impact damage smoke screenshot to `docs/projectile-impact-damage-smoke.png`.
 - Added current-race debug unit spawn buttons for all five unit slots, with labels updating when the race changes and clicks spawning the matching player unit directly onto the battlefield.
 - Added low-damage base defense shots for both bases so nearby enemy units can be pushed back instead of freely stealing the base.
+- Added the first chamber-building gameplay slice with 6 blueprints across 发球区 / 抉择区 / 出兵区.
+- Building rewards now install or upgrade persistent chamber buildings, with each chamber limited to two building slots.
+- Added launch building effects for extra split relaunch balls and miss-to-spawn-mark recovery.
+- Added decision building effects for gold-to-spawn-mark conversion and magic-to-copy conversion.
+- Added unit building effects for overflow progress spill and earlier high-tier gate opening.
+- Added visible chamber-building summaries inside the three top machine zones.
+- Added Vitest coverage for building installation, split-ball expansion, miss recovery, gold回流, overflow spill, and gate acceleration.
+- Browser-smoke checked chamber-building summaries, reward blueprints, and installed-building display. Screenshots: `docs/chamber-building-smoke.png`, `docs/chamber-building-reward-smoke.png`, `docs/chamber-building-installed-smoke.png`.
+- Tuned reward offers so each phase reward set exposes at least one available chamber-building blueprint while filling the rest from the wider reward pool.
+- Added five debug build presets for 爆兵、法术复制、高阶精英、经济工业、逆风修复, with clickable in-game preset buttons and `window.planBAction('preset-...')` automation hooks.
+- Debug build presets reset prior build modifiers, slot widths, unit-slot progress, pending marks, and queued units before applying so repeated preset tests stay reproducible.
+- Added Vitest coverage for reward blueprint visibility and preset-specific machine states.
+- Added build telemetry to phase stats: chamber contributions, spawn-mark creation/consumption, copy creation, overflow progress, high-tier gate acceleration, and non-spawn recovery events.
+- Phase completion summaries now show build archetype, dominant chamber, resource return rate, and chamber contribution totals.
+- Added a first event-relic layer with 4 relics: 逆熵保险丝 for repeated miss recovery, 挡板动量芯 for high-tier blocker recovery, 法术回声石 for magic-to-copy recovery, and 校准存储芯 for upgrade carryover.
+- Reward offers now include one available event relic when possible, alongside one available chamber-building blueprint.
+- Wired event relics into live miss, MAGIC, blocked-gate, and queued-unit upgrade-consumption events; telemetry now counts relic triggers.
+- Debug presets now include matching event relics for 法术复制、高阶精英、经济工业、逆风修复 validation paths.
+- Added a compact doctrine-tech layer with 6 nodes across 发射学 / 抉择学 / 动员学.
+- Reward offers now surface one available doctrine tech alongside the building blueprint and event relic when possible.
+- Doctrine effects now cover immediate machine tuning (extra launcher, spawn width, queue speed), miss recovery research, non-spawn decision conversion, and low-tier upgrade carryover.
+- Phase summaries now include accumulated research points and infer archetypes from doctrine choices.
+- Added `BuildProbeSystem` to run deterministic validation scripts for 爆兵、法术复制、高阶精英、经济工业、逆风修复 presets using the live slot/building/relic/doctrine/queue systems.
+- Added in-game debug access for probes via the `探针` button and `window.planBAction('probe')`; results float in the scene and are also logged as a console table.
+- Fixed build-archetype inference so recovery-heavy builds with incidental gold income stay classified as `逆风修复` instead of being swallowed by `经济工业`.
+- Validation after the probe checkpoint: `npm test -- src/systems/prototypeRules.test.ts`, `npm run typecheck`, `npm test`, and `npm run build` pass.
+- Browser-smoke checked the in-game probe button and saved `docs/build-probe-smoke.png`.
+- Added a data-driven `fast_build_validation` pacing preset that shortens phases to 42-55 seconds, speeds automatic launch cadence to 1100ms, and opens the unit gate fully at 40% of phase duration.
+- Wired the pacing preset into `phaseDefs`, Unit Spawn Zone gate timing, and the scene's automatic multi-ball launch cadence.
+- Updated build probes and gate tests to sample the earlier high-tier opening window created by the new pacing.
+- Validation after the pacing checkpoint: `npm test`, `npm run typecheck`, and `npm run build` pass.
+- Browser-smoke checked the pacing preset scene launch plus probe overlay and saved `docs/pacing-preset-smoke.png`.
+- Added a lightweight phase tool layer with deterministic one-use stock per phase.
+- Phase tools currently include 出兵信标, 热槽校准器, 队列脉冲, 战地修复, and 标记投球, giving stage gold immediate ways to create spawn marks, unit progress, queue speed, recovery, or a tagged high-value next shot.
+- Wired phase tools into game state, phase transitions, HUD buttons, and `window.planBAction('tool-...')` automation hooks.
+- Added Vitest coverage for tool stock generation, purchase cost/stock consumption, spawn-mark回流, and immediate unit-progress回流.
+- Validation after the phase-tool checkpoint: `npm test -- src/systems/prototypeRules.test.ts`, `npm run typecheck`, `npm test`, and `npm run build` pass; local dev server responds on `http://localhost:5173/`.
+- Expanded phase telemetry so summaries now report launch outcomes, decision split, phase-tool purchases, concrete queued units, and concrete deployed units.
+- Wired launch outcomes, phase-tool purchases, queue additions, and player deployments into `PhaseStats`.
+- Enlarged the phase summary panel to fit the richer chain log.
+- Validation after the telemetry checkpoint: `npm test`, `npm run typecheck`, and `npm run build` pass.
+- Browser-smoke checked the updated scene with phase-tool controls and saved `docs/telemetry-summary-smoke.png`.
+- Added ball payload tags (`split+`, `spawn-mark`, `copy-mark`, `heavy`, `recycle`) so individual balls can carry build identity through the physical machine.
+- Added 标记投球 as a phase tool that loads the next launch ball with split, spawn-mark, and copy-mark tags.
+- Wired tagged balls through Launch split/fire/miss outcomes and Decision SPAWN handoff, including tagged miss recovery, split expansion, spawn value, and copy-mark creation.
+- Debug presets now clear any pending launch-ball tags before applying a reproducible build state.
+- Validation after the ball-tag rules checkpoint: `npm test -- src/systems/prototypeRules.test.ts` passes.
+- Full validation after wiring tagged balls into the Phaser scene: `npm run typecheck`, `npm test`, and `npm run build` pass.
+- Browser-smoke checked 标记投球 on `http://127.0.0.1:5174/` and saved `docs/ball-tag-smoke.png`.
+- Updated `README.md` to reflect the current visible decision slots, phase tools, build layers, debug presets, and telemetry.
+- Added the 出兵区 building `队列输送带`, which tags queued units with `queue-burst` and gives that batch a short deployment interval.
+- Queue burst events now contribute to Unit chamber telemetry and appear in the phase summary building line alongside overflow and gate acceleration.
+- The 爆兵 and 逆风修复 debug presets now include the conveyor as a reproducible deployment-burst path.
+- Validation after the queue-conveyor checkpoint: `npm test -- src/systems/prototypeRules.test.ts` passes.
+- Full validation after the queue-conveyor checkpoint: `npm run typecheck`, `npm test`, and `npm run build` pass.
+- Browser-smoke checked the 爆兵 preset with 队列输送带 visible in the 出兵区 summary and saved `docs/queue-conveyor-smoke.png`.
+- Added baseline research回流: MAGIC and UP hits now grant research, and every 4 baseline research pips creates a stored spawn mark.
+- Phase telemetry now displays research as accumulated points plus return progress, for example `研究 4(0/4)`.
+- Validation after the baseline research checkpoint: `npm test -- src/systems/prototypeRules.test.ts` passes.
+- Added research-costed doctrine tech purchases so accumulated research can unlock tech during a run instead of only through reward cards.
+- Added right-side research tech buttons and `window.planBAction('tech-...')` automation hooks for doctrine purchases.
+- Validation after the research-tech purchase checkpoint: `npm test -- src/systems/prototypeRules.test.ts` and `npm run typecheck` pass.
+- Full validation after the research-tech purchase checkpoint: `npm test` and `npm run build` pass.
+- Browser-smoke checked the research-tech button row and saved `docs/research-tech-smoke.png`.
+- Tightened phase-end reward selection so remaining build-surface candidates (buildings, relics, doctrine techs) fill all reward slots before legacy stat cards can appear.
+- Validation after the reward-priority checkpoint: `npm test -- src/systems/prototypeRules.test.ts` passes.
+- Added the launch relic `棱镜弹匣`, which primes the next launch ball with `split+` and `spawn-mark` tags at phase start.
+- The 爆兵 and 法术复制 debug presets now include `棱镜弹匣` as a reproducible launch-relic path.
+- Validation after the launch-relic tag checkpoint: `npm test -- src/systems/prototypeRules.test.ts` passes.
+- Added a baseline non-SPAWN decision fallback: any 3 consecutive GOLD / MAGIC / UP decisions create a stored spawn mark, and SPAWN resets the streak.
+- Phase telemetry now displays the fallback streak as `保底 X/3`.
+- Validation after the non-spawn fallback checkpoint: `npm test -- src/systems/prototypeRules.test.ts` passes.
+- Phase telemetry now displays high-tier queue ratio as `高阶 X/Y` and blocked gate bounces as `挡回 N`, sourced from the real Unit Spawn blocker and player queue events.
+- Validation after the high-tier telemetry checkpoint: `npm test -- src/systems/prototypeRules.test.ts` and `npm run typecheck` pass.
+- Phase completion now persists `chainHistory` entries with phase identity, completion reason, build archetype, dominant chamber, resource return rate, summary lines, queue totals, high-tier queue count, and blocked gate bounces.
+- `buildArchetypeHint` is stored on `GameState` so later UI/probe work can read the latest run identity without recomputing from transient phase stats.
+- Validation after the persistent-chain checkpoint: `npm test -- src/systems/prototypeRules.test.ts` and `npm run typecheck` pass.
+- Build probes now continue after deployment into a deterministic combat-impact check, recording `combatImpactChecks` and `combatImpactDamage`.
+- Probe summaries now include `战斗影响 N`, and probe warnings include `no_combat_impact` if a preset reaches deployment but fails to cause combat damage.
+- Validation after the combat-impact probe checkpoint: `npm test -- src/systems/prototypeRules.test.ts` and `npm run typecheck` pass.
+- Added bottom-HUD summaries for the three build surfaces required by v1.2: current relics, researched tech nodes, and installed structures.
+- Added `buildSurfaceHudSummaries(state)` coverage so HUD text for relics, techs, and structures is generated from the live run state instead of hard-coded scene text.
+- Browser-smoke checked the expanded HUD and saved `docs/hud-build-surface-smoke.png`.
+- Added the v1.2-named persistent build-surface fields `launchRelics`, `decisionTechs`, `unitStructures`, and `ballTags`, wired to the live relic, tech, structure, and pending launch tag systems.
+- Debug preset resets and pending launch tag writers now keep the named fields synchronized with the live gameplay state.
+- Validation after the named-state checkpoint: `npm test -- src/systems/prototypeRules.test.ts` and `npm run typecheck` pass.
+- Phase-end reward choices now follow the v1.2 relic-driven structure: while enough relics remain, the three-card phase reward offer is all relics.
+- Once relic rewards are exhausted, phase-end choices fall back to legacy stat cards; building and doctrine reward application paths remain available for debug presets and dedicated build-surface entry points.
+- Validation after the relic-first reward checkpoint: `npm test -- src/systems/prototypeRules.test.ts` and `npm run typecheck` pass.
+- Added a dedicated Unit Spawn structure shop so gold can buy or upgrade 出兵区 support buildings outside phase-end rewards.
+- Added `buyUnitStructureWithGold`, `getUnitStructureGoldCost`, and available-structure filtering coverage for purchases, upgrades, insufficient gold, and non-unit-building rejection.
+- Wired right-side structure buttons plus `window.planBAction('structure-...')` automation hooks for direct purchases during a run.
+- Browser-smoke checked the structure button row and saved `docs/unit-structure-shop-smoke.png`.
+- Validation after the unit-structure shop checkpoint: `npm test -- src/systems/prototypeRules.test.ts` and `npm run typecheck` pass.
+- Full validation after the unit-structure shop checkpoint: `npm test`, `npm run build`, and `git diff --check` pass.
+- Raised the Unit Spawn structure layer to the v1.2 target of three fixed工事位 while keeping Launch and Decision chambers at two building slots.
+- Split the v1.2 `unitStructures` named state field from the generic `buildings` list so the HUD 工事摘要 only reports 出兵区 structures.
+- Validation after the three-structure-capacity checkpoint: `npm test -- src/systems/prototypeRules.test.ts` passes.
+- Full validation after the three-structure-capacity checkpoint: `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check` pass.
+- Moved phase-tool purchases into a v1.2-style mid-phase recovery window: the stock is visible early, but purchases are rejected until the configured window opens.
+- Added pacing data for the phase-tool window and UI labels that show `中段` before tools become buyable.
+- Validation after the phase-tool-window checkpoint: `npm test -- src/systems/prototypeRules.test.ts` passes.
+- Browser-smoke checked the early-phase locked tool row and saved `docs/phase-tool-window-smoke.png`.
+- Full validation after the phase-tool-window checkpoint: `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check` pass.
+- Phase telemetry now prints `回流效率 N%` directly in the summary line, using recovered non-SPAWN events over GOLD / MAGIC / UP triggers.
+- Validation after the return-efficiency telemetry checkpoint: `npm test -- src/systems/prototypeRules.test.ts` passes.
+- Full validation after the return-efficiency telemetry checkpoint: `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check` pass.
+- Added v1.2 guardrail telemetry for non-SPAWN recovery: longest non-SPAWN streak, first recovery latency, and recovery source counts.
+- Wired the guardrail metrics into phase summaries and build probe metrics so the 15-second recovery standard can be checked from automated preset output.
+- Validation after the non-SPAWN guardrail telemetry checkpoint: `npm test -- src/systems/prototypeRules.test.ts` passes.
+- Full validation after the non-SPAWN guardrail telemetry checkpoint: `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check` pass.
+- Tightened the mid-phase tool window to one purchase per phase while preserving per-tool stock visibility.
+- Phase tool buttons now disable and relabel the remaining stock after the phase's tool purchase is used.
+- Validation after the phase-tool single-purchase checkpoint: `npm test -- src/systems/prototypeRules.test.ts` passes.
+- Full validation after the phase-tool single-purchase checkpoint: `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check` pass.
+- Expanded build probe output with v1.2 scenario metrics: low-tier deploy share, deploys per SPAWN hit, average unit level, first tier-3 deploy timing, queue release rate, burst deploys, cross-chamber chain count, chain depth, and dead-effect count.
+- Probe scripts now record launch-stage participation before decision and unit checks, so automated preset output can verify three-chamber chains instead of only queue/deploy totals.
+- The 经济工业 preset now includes 队列输送带 so its probe path measures gold-to-structure-to-burst deployment.
+- Validation after the v1.2 probe-metrics checkpoint: `npm test -- src/systems/prototypeRules.test.ts` and `npm run typecheck` pass.
+- Full validation after the v1.2 probe-metrics checkpoint: `npm test`, `npm run build`, and `git diff --check` pass.
+- Added a visual build-identity layer for the five target build identities. Each identity now maps to a distinct accent color plus Launch / Decision / Unit chamber icon signatures.
+- Wired the identity summary into the top machine row so debug presets visibly change chamber emphasis instead of only changing stats and logs.
+- Browser-smoke checked the 虫群爆兵 identity overlay in Chrome and saved `docs/build-identity-visual-smoke.png`.
+- Validation after the build-identity visual checkpoint: `npm test -- src/systems/prototypeRules.test.ts`, `npm run typecheck`, and `npm run build` pass.
+- Full validation after the build-identity visual checkpoint: `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check` pass.
+- Added `BuildProbeValidationSystem` and `npm run probe` for runnable v1.2 build-probe validation outside the Phaser scene.
+- The command-line report covers all five debug identities, key v1.2 scenario metrics, chain-depth checks, combat impact, recovery guardrails, and dead-effect warnings.
+- Validation after the runnable-probe checkpoint: `npm test -- src/systems/prototypeRules.test.ts` and `npm run probe` pass.
+- Full validation after the runnable-probe checkpoint: `npm run probe`, `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check` pass.
+- Added richer SVG structure silhouettes for the five target build identities: 虫群爆兵、法术复制、机械精英、经济工业、逆风修复.
+- `buildIdentityVisualSummary` now exposes per-chamber structure art nodes, and the top machine row renders them alongside the identity badge and chamber signatures.
+- Validation after the structure-visual checkpoint: the new red/green test, `npm test -- src/systems/prototypeRules.test.ts`, and `npm run typecheck` pass.
+- Browser-smoke fallback checked the 虫群爆兵 structure overlay in headless Chrome and saved `docs/build-structure-visual-smoke.png`.
+- Full validation after the structure-visual checkpoint: `npm run probe`, `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check` pass.
+- Added `BuildVisualSmokeSystem` plus `npm run smoke:build-visuals` to capture all five debug build identities from a temporary Vite server in headless Chrome.
+- The visual smoke command now writes `docs/build-identity-swarm-smoke.png`, `docs/build-identity-magic_copy-smoke.png`, `docs/build-identity-mech_elite-smoke.png`, `docs/build-identity-economy_industry-smoke.png`, and `docs/build-identity-recovery-smoke.png`.
+- Validation after the all-identity visual-smoke checkpoint: the new red/green test, `npm run typecheck`, and `npm run smoke:build-visuals` pass.
+- Full validation after the all-identity visual-smoke checkpoint: `npm run probe`, `npm run typecheck`, `npm test`, `npm run smoke:build-visuals`, `npm run build`, and `git diff --check` pass.
+- Added compact top-row chamber summaries so Launch shows buildings plus relics, Decision shows buildings plus techs, and Unit shows structures without crowding the build-identity art.
+- Phaser now reads those chamber summaries from `BuildTelemetrySystem`, so rules tests and the scene share the same compact formatting.
+- Re-ran all five build-identity smoke screenshots after the compact-summary pass.
+- Validation after the compact-summary checkpoint: the new red/green test, `npm test -- src/systems/prototypeRules.test.ts`, `npm run typecheck`, and `npm run smoke:build-visuals` pass.
+- Full validation after the compact-summary checkpoint: `npm run probe`, `npm run typecheck`, `npm test`, `npm run smoke:build-visuals`, `npm run build`, and `git diff --check` pass.
+- Added `V12ReadinessSystem` plus `npm run audit:v1.2` to produce a requirement-by-requirement v1.2 readiness report with `proved`, `partial`, and `missing` evidence states.
+- The current readiness report is `NOT_READY` with 9 proved items, 1 partial item, and 0 missing items; the remaining partial evidence is the timed runtime proof that two chambers visibly change within the first 90 seconds.
+- Validation after the v1.2 readiness-audit checkpoint: the new red/green test, `npm run typecheck`, and `npm run audit:v1.2` pass.
+- Command-line Vite validation scripts now disable HMR so probe, audit, and visual smoke runs do not race for the default WebSocket port.
+- Full validation after the v1.2 readiness-audit checkpoint: `npm run probe`, `npm run audit:v1.2`, `npm run typecheck`, `npm test`, `npm run smoke:build-visuals`, `npm run build`, and `git diff --check` pass.
+- Added `RuntimeVisualTimingSystem` to prove that a scripted 90-second playtest path creates visible chamber changes in at least two machine zones.
+- The readiness audit now reports `READY` with 10 proved items, 0 partial items, and 0 missing items.
+- Validation after the runtime visual-timing checkpoint: the new red/green test, `npm run audit:v1.2`, `npm run typecheck`, `npm test -- src/systems/prototypeRules.test.ts`, `npm run probe`, `npm run smoke:build-visuals`, `npm test`, `npm run build`, and `git diff --check` pass.
 
 ## Known Issues
 
@@ -95,4 +246,5 @@
 
 ## Next Steps
 
-- Playtest balance for phase pacing, reward card variety, and elite readability.
+- Continue tuning reward card variety, phase tool costs, chain-summary readability, and elite readability using probe output plus live playtests.
+- If this prototype moves beyond v1.2 validation, add longer playtest telemetry across multiple full runs instead of only preset probes.

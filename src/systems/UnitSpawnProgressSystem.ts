@@ -1,7 +1,17 @@
 import { phaseDefs } from '../data/phases';
+import { activePacingPreset } from '../data/pacing';
 import { raceDefs } from '../data/races';
 import { unitDefs } from '../data/units';
 import { addToSpawnQueue } from './SpawnQueueSystem';
+import { getDoctrineUpgradeCarry } from './DoctrineSystem';
+import { getUpgradeCacheCarry, recordRelicGateBlocked, recordUpgradeCacheCarry } from './RelicSystem';
+import {
+  recordBuildingContribution,
+  recordGateAcceleration,
+  recordGateBlocked,
+  recordOverflowProgress,
+  recordQueueBurst,
+} from './StatsSystem';
 import type { GameState, RaceId, UnitGateState, UnitSlotDef, UnitSlotState } from '../types/game';
 
 export type UnitBallResolution =
@@ -25,7 +35,7 @@ export function getUnitGateOpenBoundaryRatio(elapsedMs: number, durationMs: numb
 
 export function getUnitGateState(elapsedMs: number, durationMs: number): UnitGateState {
   const safeDuration = Math.max(1, durationMs);
-  const progress = clamp(elapsedMs / (safeDuration * 0.5), 0, 1);
+  const progress = clamp(elapsedMs / (safeDuration * activePacingPreset.unitGateFullOpenPhaseRatio), 0, 1);
   const openBoundaryRatio = 0.2 + progress * 0.8;
   const openSlotCount = clamp(Math.ceil(openBoundaryRatio * 5 - 0.00001), 1, 5);
   return {
@@ -53,6 +63,7 @@ export function addUnitSlotProgress(state: GameState, unitId: string, amount: nu
   }
 
   slot.progress = progress;
+  if (spawnedCount > 0) spillProgressToNextSlot(state, slot, spawnedCount);
   return spawnedCount;
 }
 
@@ -66,9 +77,18 @@ export function resolveUnitBallToSlot(
   const phase = phaseDefs[state.phaseIndex] ?? phaseDefs.at(-1);
   const elapsedMs = options.elapsedMs ?? state.phaseElapsedMs;
   const durationMs = options.durationMs ?? phase?.durationMs ?? 60000;
-  const unlockedCount = getUnitGateState(elapsedMs, durationMs).openSlotCount;
+  const normalGate = getUnitGateState(elapsedMs, durationMs);
+  const effectiveGate = getEffectiveGateState(state, elapsedMs, durationMs);
+  const unlockedCount = effectiveGate.openSlotCount;
+
+  if (effectiveGate.openSlotCount > normalGate.openSlotCount) {
+    recordBuildingContribution(state.stats.currentPhase, 'unit', effectiveGate.openSlotCount - normalGate.openSlotCount);
+    recordGateAcceleration(state.stats.currentPhase);
+  }
 
   if (slotIndex >= unlockedCount) {
+    recordGateBlocked(state.stats.currentPhase);
+    recordRelicGateBlocked(state);
     return {
       status: 'blocked',
       slotIndex,
@@ -112,14 +132,45 @@ function findUnitSlotState(state: GameState, unitId: string): UnitSlotState {
   throw new Error(`Unknown unit slot state for ${unitId}`);
 }
 
+function spillProgressToNextSlot(state: GameState, slot: UnitSlotState, spawnedCount: number) {
+  const building = state.buildings.find((candidate) => candidate.id === 'unit_overflow_hatchery');
+  const amount = (building?.level ?? 0) * spawnedCount;
+  if (amount <= 0) return;
+
+  const slots = state.unitSlotStates[state.currentRaceId];
+  const nextSlot = slots[slot.index + 1];
+  if (!nextSlot) return;
+
+  nextSlot.progress += amount;
+  recordBuildingContribution(state.stats.currentPhase, 'unit', amount);
+  recordOverflowProgress(state.stats.currentPhase, amount);
+  state.recentFloatingTexts.push({ label: `溢流孵化器：${nextSlot.label} +${amount}`, color: 0x86efac });
+}
+
+function getEffectiveGateState(state: GameState, elapsedMs: number, durationMs: number): UnitGateState {
+  const building = state.buildings.find((candidate) => candidate.id === 'unit_gate_actuator');
+  const level = building?.level ?? 0;
+  if (level <= 0) return getUnitGateState(elapsedMs, durationMs);
+
+  const effectiveDuration = durationMs * Math.max(0.28, 0.8 - (level - 1) * 0.1);
+  return getUnitGateState(elapsedMs, effectiveDuration);
+}
+
 function queueSpecificUnit(state: GameState, unitId: string) {
   const unit = unitDefs[unitId];
   const raceId = unit.raceId as RaceId;
+  const consumedLevelBonus = state.pendingSpawnLevelBonus;
   const baseLevel = (state.unitLevels[unitId] ?? 1)
-    + state.pendingSpawnLevelBonus
+    + consumedLevelBonus
     + state.modifiers.nextPhaseSpawnLevelBonus;
   const count = 1 + state.modifiers.spawnExtraCount + state.modifiers.pendingSpawnCopies;
   const createsElite = state.nextSpawnCreatesElite && unit.costTier > 1;
+  const queueBurst = getQueueConveyorBurst(state);
+  const tags = [
+    unit.costTier === 1 ? 'basic' : 'advanced',
+    ...(createsElite ? ['elite'] : []),
+    ...queueBurst.tags,
+  ];
 
   addToSpawnQueue(state, {
     unitId,
@@ -129,7 +180,8 @@ function queueSpecificUnit(state: GameState, unitId: string) {
     level: baseLevel,
     lifetime: createsElite ? 'elite' : 'standard',
     isElite: createsElite,
-    tags: [unit.costTier === 1 ? 'basic' : 'advanced', ...(createsElite ? ['elite'] : [])],
+    releaseIntervalMs: queueBurst.releaseIntervalMs,
+    tags,
   });
 
   if (createsElite) state.nextSpawnCreatesElite = false;
@@ -144,8 +196,28 @@ function queueSpecificUnit(state: GameState, unitId: string) {
     });
   }
 
-  state.pendingSpawnLevelBonus = 0;
+  const cachedLevelBonus = Math.max(
+    getUpgradeCacheCarry(state, unitId, consumedLevelBonus),
+    getDoctrineUpgradeCarry(state, unitId, consumedLevelBonus),
+  );
+  state.pendingSpawnLevelBonus = cachedLevelBonus;
+  recordUpgradeCacheCarry(state, cachedLevelBonus);
   state.modifiers.pendingSpawnCopies = 0;
+}
+
+function getQueueConveyorBurst(state: GameState): { releaseIntervalMs?: number; tags: string[] } {
+  const building = state.buildings.find((candidate) => candidate.id === 'unit_queue_conveyor');
+  const level = building?.level ?? 0;
+  if (level <= 0) return { tags: [] };
+
+  const releaseIntervalMs = Math.max(260, 470 - level * 70);
+  recordBuildingContribution(state.stats.currentPhase, 'unit', level);
+  recordQueueBurst(state.stats.currentPhase);
+  state.recentFloatingTexts.push({ label: `队列输送带：部署间隔 ${releaseIntervalMs}ms`, color: 0x93c5fd });
+  return {
+    releaseIntervalMs,
+    tags: ['queue-burst'],
+  };
 }
 
 function clamp(value: number, min: number, max: number): number {
