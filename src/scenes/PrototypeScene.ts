@@ -6,7 +6,6 @@ import { raceDefs } from '../data/races';
 import { decisionSlotDefs } from '../data/slots';
 import { unitDefs } from '../data/units';
 import { debugBuildPresets } from '../data/debugPresets';
-import { getEliteSummary } from '../systems/EliteSystem';
 import { getBattleContactRatio, getBattleFrontlineRatio, spawnDebugRaceUnit, updateBattle } from '../systems/BattleSystem';
 import {
   consumeSpawnMarkBonus,
@@ -30,6 +29,7 @@ import {
   projectBattlePoint,
 } from '../systems/BattlefieldViewSystem';
 import { createInitialGameState } from '../systems/GameState';
+import { buildCompactHudBlocks, getEventFeedSlot, getUiDensityPlan, type UiMode } from '../systems/UiDensitySystem';
 import { completePhase, isFinalPhaseComplete, resumeNextPhase, shouldCompletePhase, startPhase, updatePhaseEnemySpawns } from '../systems/PhaseSystem';
 import { buyPhaseTool, getPhaseToolWindowState } from '../systems/PhaseToolSystem';
 import {
@@ -38,7 +38,7 @@ import {
   getSweepingLauncherAngle,
 } from '../systems/PinballMachineSystem';
 import { buildRewardChoices, rerollRewardChoices } from '../systems/RewardSystem';
-import { countQueuedUnits, updateSpawnQueue } from '../systems/SpawnQueueSystem';
+import { updateSpawnQueue } from '../systems/SpawnQueueSystem';
 import { triggerSlot } from '../systems/SlotTriggerSystem';
 import { buildWeightedSlotLayouts } from '../systems/DecisionSlotLayoutSystem';
 import { recordLaunchOutcome } from '../systems/StatsSystem';
@@ -104,6 +104,10 @@ type UnitVisual = {
   shadow: Phaser.GameObjects.Ellipse;
 };
 
+type VisibleGameObject = Phaser.GameObjects.GameObject & {
+  setVisible(value: boolean): VisibleGameObject;
+};
+
 const GAME_W = 1280;
 const GAME_H = 720;
 const TOP_Y = 12;
@@ -147,6 +151,7 @@ export class PrototypeScene extends Phaser.Scene {
   private unitVisuals = new Map<string, UnitVisual>();
   private renderedEffectIds = new Set<string>();
   private hudTexts: Phaser.GameObjects.Text[] = [];
+  private hudDetailTexts: Phaser.GameObjects.Text[] = [];
   private buildSurfaceHudTexts: Phaser.GameObjects.Text[] = [];
   private decisionVisuals: OutcomeVisual[] = [];
   private unitSlotVisuals: UnitSlotVisual[] = [];
@@ -170,12 +175,22 @@ export class PrototypeScene extends Phaser.Scene {
   private cameraFollowButtonText?: Phaser.GameObjects.Text;
   private magicToggleButton?: Phaser.GameObjects.Rectangle;
   private magicToggleText?: Phaser.GameObjects.Text;
+  private debugToggleButton?: Phaser.GameObjects.Rectangle;
+  private debugToggleText?: Phaser.GameObjects.Text;
+  private buildShopToggleButton?: Phaser.GameObjects.Rectangle;
+  private buildShopToggleText?: Phaser.GameObjects.Text;
+  private debugControls: VisibleGameObject[] = [];
+  private buildShopControls: VisibleGameObject[] = [];
+  private uiMode: UiMode = 'play';
+  private buildShopOpen = false;
+  private localEventFeedIndex = 0;
   private debugUnitButtons: Array<{ plate: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; slotIndex: number }> = [];
   private phaseToolButtons: Array<{ plate: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; id: PhaseToolId }> = [];
   private researchTechButtons: Array<{ plate: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; id: string }> = [];
   private unitStructureButtons: Array<{ plate: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; id: string }> = [];
   private buildIdentityGraphics?: Phaser.GameObjects.Graphics;
   private buildIdentityBadge?: Phaser.GameObjects.Text;
+  private topExplanatoryTexts: Phaser.GameObjects.Text[] = [];
   private buildIdentityChamberVisuals: Array<{
     chamber: BuildingChamber;
     icon: Phaser.GameObjects.Image;
@@ -211,6 +226,8 @@ export class PrototypeScene extends Phaser.Scene {
     this.createPinballPipeline();
     this.createHud();
     this.createDebugControls();
+    this.createUiDrawerToggles();
+    this.syncUiDensity();
     this.bindDomControls();
     startPhase(this.state);
     this.spawnLaunchBall();
@@ -715,7 +732,7 @@ export class PrototypeScene extends Phaser.Scene {
   private createZonePanel(title: string, subtitle: string, x: number, y: number, w: number, h: number, color: number) {
     this.add.rectangle(x, y, w, h, color, 0.92).setOrigin(0).setStrokeStyle(3, 0x94a3b8, 0.42);
     this.add.text(x + 12, y + 9, title, this.textStyle(17, '#f8fafc'));
-    this.add.text(x + 12, y + 31, subtitle, this.textStyle(11, '#b6c2d2'));
+    this.topExplanatoryTexts.push(this.add.text(x + 12, y + 31, subtitle, this.textStyle(11, '#b6c2d2')));
   }
 
   private createBuildingSummaryTexts() {
@@ -936,31 +953,33 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private createHud() {
-    const labels = ['种族', '阶段', '我方基地', '敌方目标', '金币', '我方单位', '升级加成', '预备队', '决策统计'];
+    const labels = ['战况', '基地', '资源', '部队', '下次出兵', '抉择'];
     for (let index = 0; index < labels.length; index += 1) {
-      const x = 22 + index * 138;
+      const x = 22 + index * 202;
       this.add.text(x, HUD_TOP + 10, labels[index], this.textStyle(11, '#94a3b8'));
-      this.hudTexts.push(this.add.text(x, HUD_TOP + 28, '', this.textStyle(index >= 6 ? 12 : 14, '#f8fafc')));
+      this.hudTexts.push(this.add.text(x, HUD_TOP + 29, '', this.textStyle(index === 5 ? 13 : 14, '#f8fafc')).setWordWrapWidth(184));
+      this.hudDetailTexts.push(this.add.text(x, HUD_TOP + 49, '', this.textStyle(10, '#cbd5e1')).setWordWrapWidth(184));
     }
 
     const surfaceLabels = ['当前遗物', '科技节点', '工事摘要'];
     surfaceLabels.forEach((label, index) => {
       const x = 22 + index * 408;
-      this.add.text(x, HUD_TOP + 52, label, this.textStyle(10, '#93c5fd'));
-      this.buildSurfaceHudTexts.push(this.add.text(x + 66, HUD_TOP + 51, '', this.textStyle(11, '#e0f2fe')));
+      this.add.text(x, HUD_TOP + 72, label, this.textStyle(10, '#93c5fd'));
+      this.buildSurfaceHudTexts.push(this.add.text(x + 66, HUD_TOP + 71, '', this.textStyle(11, '#e0f2fe')).setWordWrapWidth(320));
     });
   }
 
   private createDebugControls() {
     const y = HUD_TOP + 88;
-    this.createButton(22, y, 88, '投球', () => this.spawnLaunchBall());
-    this.createButton(118, y, 98, '进抉择', () => this.spawnDecisionBall());
-    this.createButton(224, y, 98, '进出兵', () => this.spawnUnitBall());
-    this.createButton(330, y, 88, '切种族', () => this.toggleRace());
-    this.createButton(426, y, 108, '继续阶段', () => this.startPhaseFromDebug());
-    this.createButton(542, y, 108, '跳过阶段', () => this.skipPhase());
+    this.trackDebugObjects(...Object.values(this.createButton(22, y, 88, '投球', () => this.spawnLaunchBall())));
+    this.trackDebugObjects(...Object.values(this.createButton(118, y, 98, '进抉择', () => this.spawnDecisionBall())));
+    this.trackDebugObjects(...Object.values(this.createButton(224, y, 98, '进出兵', () => this.spawnUnitBall())));
+    this.trackDebugObjects(...Object.values(this.createButton(330, y, 88, '切种族', () => this.toggleRace())));
+    this.trackDebugObjects(...Object.values(this.createButton(426, y, 108, '继续阶段', () => this.startPhaseFromDebug())));
+    this.trackDebugObjects(...Object.values(this.createButton(542, y, 108, '跳过阶段', () => this.skipPhase())));
     this.createMagicToggle(658, y);
     this.createDebugUnitButtons(792, y);
+    this.createBuildShopPanel();
     this.createDebugPresetButtons();
     this.createPhaseToolButtons();
     this.createResearchTechButtons();
@@ -976,12 +995,126 @@ export class PrototypeScene extends Phaser.Scene {
     return { plate, text };
   }
 
+  private createBuildShopPanel() {
+    const panel = this.add.rectangle(GAME_W - 210, BATTLE_Y + 91, 392, 108, 0x020617, 0.76)
+      .setDepth(7996)
+      .setStrokeStyle(1, 0x64748b, 0.42);
+    const labels = [
+      ['工具', BATTLE_Y + 58],
+      ['研究', BATTLE_Y + 90],
+      ['工事', BATTLE_Y + 122],
+    ] as const;
+    this.trackBuildShopObjects(panel);
+    labels.forEach(([label, y]) => {
+      this.trackBuildShopObjects(this.add.text(GAME_W - 404, y - 7, label, this.textStyle(10, '#94a3b8')).setDepth(7998));
+    });
+  }
+
+  private createUiDrawerToggles() {
+    const y = BATTLE_Y + 26;
+    this.buildShopToggleButton = this.add.rectangle(GAME_W - 150, y, 68, 26, 0x172554, 0.96)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(2, 0x93c5fd, 0.72)
+      .setDepth(8100)
+      .setInteractive({ useHandCursor: true });
+    this.buildShopToggleText = this.add.text(GAME_W - 116, y, '构筑', this.textStyle(12, '#dbeafe'))
+      .setOrigin(0.5)
+      .setDepth(8101)
+      .setInteractive({ useHandCursor: true });
+    for (const item of [this.buildShopToggleButton, this.buildShopToggleText]) {
+      item.on('pointerdown', () => this.toggleBuildShopDrawer());
+    }
+
+    this.debugToggleButton = this.add.rectangle(GAME_W - 74, y, 54, 26, 0x1f2937, 0.96)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(2, 0x64748b, 0.72)
+      .setDepth(8100)
+      .setInteractive({ useHandCursor: true });
+    this.debugToggleText = this.add.text(GAME_W - 47, y, '调试', this.textStyle(12, '#cbd5e1'))
+      .setOrigin(0.5)
+      .setDepth(8101)
+      .setInteractive({ useHandCursor: true });
+    for (const item of [this.debugToggleButton, this.debugToggleText]) {
+      item.on('pointerdown', () => this.toggleDebugDrawer());
+    }
+    this.syncUiDensity();
+  }
+
+  private toggleBuildShopDrawer() {
+    this.buildShopOpen = !this.buildShopOpen;
+    this.syncUiDensity();
+  }
+
+  private toggleDebugDrawer() {
+    this.uiMode = this.uiMode === 'debug' ? 'play' : 'debug';
+    this.syncUiDensity();
+  }
+
+  private trackDebugObjects(...objects: VisibleGameObject[]) {
+    this.debugControls.push(...objects);
+  }
+
+  private trackBuildShopObjects(...objects: VisibleGameObject[]) {
+    this.buildShopControls.push(...objects);
+  }
+
+  private untrackBuildShopObjects(...objects: VisibleGameObject[]) {
+    const removed = new Set(objects);
+    this.buildShopControls = this.buildShopControls.filter((item) => !removed.has(item));
+  }
+
+  private syncUiDensity() {
+    const plan = getUiDensityPlan(this.uiMode);
+    const showBuildShop = plan.showBuildShopPanel || this.buildShopOpen;
+    this.debugControls.forEach((item) => item.setVisible(plan.showDebugControls));
+    this.buildShopControls.forEach((item) => item.setVisible(showBuildShop));
+    this.topExplanatoryTexts.forEach((item) => item.setVisible(plan.showTopExplanatoryText));
+    for (const text of Object.values(this.buildingSummaryTexts)) {
+      text?.setVisible(plan.showTopChamberSummaries);
+    }
+    this.setBuildIdentityOverlayVisible(plan.showBuildIdentityOverlay);
+    this.syncUiToggleVisuals(showBuildShop);
+  }
+
+  private setBuildIdentityOverlayVisible(visible: boolean) {
+    this.buildIdentityGraphics?.setVisible(visible);
+    this.buildIdentityBadge?.setVisible(visible);
+    for (const chamberVisual of this.buildIdentityChamberVisuals) {
+      chamberVisual.icon.setVisible(visible);
+      chamberVisual.label.setVisible(visible);
+      chamberVisual.detail.setVisible(visible);
+      chamberVisual.structureIcons.forEach((icon) => icon.setVisible(visible));
+      chamberVisual.structureLabel.setVisible(visible);
+    }
+  }
+
+  private syncUiToggleVisuals(showBuildShop: boolean) {
+    if (this.buildShopToggleButton && this.buildShopToggleText) {
+      this.buildShopToggleButton
+        .setFillStyle(showBuildShop ? 0x1e3a5f : 0x172554, 0.96)
+        .setStrokeStyle(2, showBuildShop ? 0xbfdbfe : 0x93c5fd, showBuildShop ? 0.9 : 0.72);
+      this.buildShopToggleText
+        .setText(showBuildShop ? '收起' : '构筑')
+        .setColor(showBuildShop ? '#f8fafc' : '#dbeafe');
+    }
+    if (this.debugToggleButton && this.debugToggleText) {
+      const debugOpen = this.uiMode === 'debug';
+      this.debugToggleButton
+        .setFillStyle(debugOpen ? 0x78350f : 0x1f2937, 0.96)
+        .setStrokeStyle(2, debugOpen ? 0xfacc15 : 0x64748b, debugOpen ? 0.9 : 0.72);
+      this.debugToggleText
+        .setText(debugOpen ? '收起' : '调试')
+        .setColor(debugOpen ? '#fef3c7' : '#cbd5e1');
+    }
+  }
+
   private createMagicToggle(x: number, y: number) {
     this.magicToggleButton = this.add.rectangle(x, y, 126, 26, 0x312e81).setOrigin(0, 0.5).setStrokeStyle(2, 0xc4b5fd);
     this.magicToggleText = this.add.text(x + 63, y, '', this.textStyle(12, '#f5f3ff')).setOrigin(0.5);
     for (const item of [this.magicToggleButton, this.magicToggleText]) {
       item.setDepth(7999).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.toggleMagic());
     }
+    this.trackDebugObjects(this.magicToggleButton, this.magicToggleText);
     this.syncMagicToggle();
   }
 
@@ -996,6 +1129,7 @@ export class PrototypeScene extends Phaser.Scene {
       for (const item of [plate, text]) {
         item.setDepth(7999).setInteractive({ useHandCursor: true }).on('pointerdown', spawn);
       }
+      this.trackDebugObjects(plate, text);
       this.debugUnitButtons.push({ plate, text, slotIndex: index });
     }
     this.syncDebugUnitButtons();
@@ -1006,14 +1140,15 @@ export class PrototypeScene extends Phaser.Scene {
     const gap = 6;
     const startX = GAME_W - 20 - debugBuildPresets.length * buttonW - (debugBuildPresets.length - 1) * gap;
     const y = BATTLE_Y + 26;
-    this.createButton(startX - 66, y, 56, '探针', () => this.runDebugBuildProbes());
+    this.trackDebugObjects(...Object.values(this.createButton(startX - 66, y, 56, '探针', () => this.runDebugBuildProbes())));
     debugBuildPresets.forEach((preset, index) => {
-      this.createButton(startX + index * (buttonW + gap), y, buttonW, preset.shortLabel, () => this.applyDebugPreset(preset.id));
+      this.trackDebugObjects(...Object.values(this.createButton(startX + index * (buttonW + gap), y, buttonW, preset.shortLabel, () => this.applyDebugPreset(preset.id))));
     });
   }
 
   private createPhaseToolButtons() {
     for (const button of this.phaseToolButtons) {
+      this.untrackBuildShopObjects(button.plate, button.text);
       button.plate.destroy();
       button.text.destroy();
     }
@@ -1028,13 +1163,16 @@ export class PrototypeScene extends Phaser.Scene {
       const label = def ? `${def.shortLabel} ${def.cost}` : toolId;
       const buy = () => this.buyPhaseToolFromUi(toolId);
       const { plate, text } = this.createButton(startX + index * (buttonW + gap), y, buttonW, label, buy);
+      this.trackBuildShopObjects(plate, text);
       this.phaseToolButtons.push({ plate, text, id: toolId });
     });
     this.syncPhaseToolButtons();
+    this.syncUiDensity();
   }
 
   private createResearchTechButtons() {
     for (const button of this.researchTechButtons) {
+      this.untrackBuildShopObjects(button.plate, button.text);
       button.plate.destroy();
       button.text.destroy();
     }
@@ -1048,13 +1186,16 @@ export class PrototypeScene extends Phaser.Scene {
     choices.forEach((tech, index) => {
       const buy = () => this.buyResearchTechFromUi(tech);
       const { plate, text } = this.createButton(startX + index * (buttonW + gap), y, buttonW, tech.name, buy);
+      this.trackBuildShopObjects(plate, text);
       this.researchTechButtons.push({ plate, text, id: tech.id });
     });
     this.syncResearchTechButtons();
+    this.syncUiDensity();
   }
 
   private createUnitStructureButtons() {
     for (const button of this.unitStructureButtons) {
+      this.untrackBuildShopObjects(button.plate, button.text);
       button.plate.destroy();
       button.text.destroy();
     }
@@ -1068,9 +1209,11 @@ export class PrototypeScene extends Phaser.Scene {
     choices.forEach((structure, index) => {
       const buy = () => this.buyUnitStructureFromUi(structure.id);
       const { plate, text } = this.createButton(startX + index * (buttonW + gap), y, buttonW, structure.name, buy);
+      this.trackBuildShopObjects(plate, text);
       this.unitStructureButtons.push({ plate, text, id: structure.id });
     });
     this.syncUnitStructureButtons();
+    this.syncUiDensity();
   }
 
   private bindDomControls() {
@@ -1081,6 +1224,14 @@ export class PrototypeScene extends Phaser.Scene {
       }
       if (action === 'probe') {
         this.runDebugBuildProbes();
+        return;
+      }
+      if (action === 'debug') {
+        this.toggleDebugDrawer();
+        return;
+      }
+      if (action === 'build-shop') {
+        this.toggleBuildShopDrawer();
         return;
       }
       if (action.startsWith('tool-')) {
@@ -2212,12 +2363,18 @@ export class PrototypeScene extends Phaser.Scene {
 
   private flushFloatingTexts() {
     while (this.lastRecentTextIndex < this.state.recentFloatingTexts.length) {
+      const eventIndex = this.lastRecentTextIndex;
       const item = this.state.recentFloatingTexts[this.lastRecentTextIndex++];
-      this.spawnFloatingText(DECISION_X + DECISION_W + 16, TOP_Y + 54 + (this.lastRecentTextIndex % 5) * 24, item.label, item.color);
+      const slot = getEventFeedSlot(eventIndex, getUiDensityPlan(this.uiMode).visibleEventFeedRows);
+      this.spawnEventFeedText(slot.x, slot.y, item.label, item.color);
     }
   }
 
   private spawnFloatingText(x: number, y: number, label: string, color: number) {
+    if (this.uiMode === 'play' && y < BATTLE_Y + 16) {
+      this.spawnLocalEventFeedText(label, color);
+      return;
+    }
     const text = this.add.text(x, y, label, this.textStyle(14, Phaser.Display.Color.IntegerToColor(color).rgba))
       .setOrigin(0.5)
       .setDepth(7000);
@@ -2227,6 +2384,29 @@ export class PrototypeScene extends Phaser.Scene {
       alpha: 0,
       duration: 900,
       onComplete: () => text.destroy(),
+    });
+  }
+
+  private spawnLocalEventFeedText(label: string, color: number) {
+    const slot = getEventFeedSlot(this.localEventFeedIndex++, getUiDensityPlan(this.uiMode).visibleEventFeedRows);
+    this.spawnEventFeedText(slot.x, slot.y, label, color);
+  }
+
+  private spawnEventFeedText(x: number, y: number, label: string, color: number) {
+    const compactLabel = label.length > 18 ? `${label.slice(0, 17)}...` : label;
+    const container = this.add.container(x, y).setDepth(7000);
+    const bg = this.add.rectangle(0, 0, 226, 21, 0x020617, 0.74)
+      .setOrigin(1, 0.5)
+      .setStrokeStyle(1, color, 0.24);
+    const text = this.add.text(-8, 0, compactLabel, this.textStyle(12, Phaser.Display.Color.IntegerToColor(color).rgba))
+      .setOrigin(1, 0.5);
+    container.add([bg, text]);
+    this.tweens.add({
+      targets: container,
+      y: y - 18,
+      alpha: 0,
+      duration: 1200,
+      onComplete: () => container.destroy(true),
     });
   }
 
@@ -2264,6 +2444,7 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private drawTransferTrail(x1: number, y1: number, x2: number, y2: number, color: number) {
+    if (!getUiDensityPlan(this.uiMode).showTransferTrails) return;
     const trail = this.add.graphics().setDepth(6500);
     trail.lineStyle(4, color, 0.76);
     trail.beginPath();
@@ -2275,26 +2456,20 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private updateHud() {
-    if (this.hudTexts.length < 9) return;
-    const race = raceDefs[this.state.currentRaceId];
-    const phase = phaseDefs[this.state.phaseIndex];
-    const eliteSummary = getEliteSummary(this.state);
-    this.hudTexts[0].setText(race.name).setColor(`#${race.color.toString(16).padStart(6, '0')}`);
-    this.hudTexts[1].setText(`${this.state.phaseIndex + 1}/${phaseDefs.length} ${this.state.phaseActive ? '推进中' : this.state.isBuildPause ? '构筑暂停' : '暂停'}`);
-    this.hudTexts[2].setText(`${Math.ceil(this.state.battle.bases.player.hp)}/${this.state.battle.bases.player.maxHp}`);
-    this.hudTexts[3].setText(`${Math.ceil(this.state.battle.bases.enemy.hp)}/${this.state.battle.bases.enemy.maxHp}`);
-    this.hudTexts[4].setText(String(this.state.gold));
-    this.hudTexts[5].setText(String(this.state.battle.units.filter((unit) => unit.side === 'player' && unit.hp > 0).length));
-    this.hudTexts[6].setText(this.state.pendingSpawnLevelBonus > 0 ? `下次出兵 Lv+${this.state.pendingSpawnLevelBonus}` : '下次出兵 Lv+0');
-    this.hudTexts[7].setText(`${this.getReservePreview()} 精${eliteSummary.count} Lv${eliteSummary.maxLevel}`);
-    this.hudTexts[8].setText(`金${this.state.stats.currentPhase.slotTriggers.gold} 法${this.state.stats.currentPhase.slotTriggers.magic} 出${this.state.stats.currentPhase.slotTriggers.spawn} 升${this.state.stats.currentPhase.slotTriggers.upgrade}`);
+    if (this.hudTexts.length < 6) return;
+    const blocks = buildCompactHudBlocks(this.state);
+    blocks.forEach((block, index) => {
+      this.hudTexts[index]
+        .setText(block.value)
+        .setColor(block.color ?? '#f8fafc');
+      this.hudDetailTexts[index]?.setText(block.detail ?? '');
+    });
     this.syncBuildIdentityVisuals();
     this.syncBuildSurfaceHud();
     this.syncMagicToggle();
     this.syncPhaseToolButtons();
     this.syncResearchTechButtons();
     this.syncUnitStructureButtons();
-    if (!phase) this.hudTexts[1].setText('已完成');
   }
 
   private syncBuildSurfaceHud() {
@@ -2352,19 +2527,6 @@ export class PrototypeScene extends Phaser.Scene {
         .setText(def ? `${def.name.slice(0, 2)} ${cost}金` : button.id)
         .setColor(canBuy ? '#dcfce7' : '#94a3b8');
     }
-  }
-
-  private getReservePreview() {
-    if (countQueuedUnits(this.state) === 0) return '空';
-    return this.state.spawnQueue
-      .filter((item) => item.side === 'player' && item.count > 0)
-      .slice(0, 3)
-      .map((item) => {
-        const unit = unitDefs[item.unitId];
-        const elite = item.isElite ? '精' : '';
-        return `${unit.name}Lv${item.level}${elite}x${item.count}`;
-      })
-      .join(' ');
   }
 
   private textStyle(size: number, color: string): Phaser.Types.GameObjects.Text.TextStyle {

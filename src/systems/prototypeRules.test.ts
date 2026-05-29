@@ -42,6 +42,7 @@ import { buildProbeValidationReport, formatBuildProbeValidationReport } from './
 import { buildIdentitySmokePlan } from './BuildVisualSmokeSystem';
 import { buildV12ReadinessReport, formatV12ReadinessReport } from './V12ReadinessSystem';
 import { buildRuntimeVisualTimingReport } from './RuntimeVisualTimingSystem';
+import { buildCompactHudBlocks, getEventFeedSlot, getUiDensityPlan } from './UiDensitySystem';
 import {
   installRelic,
   isRelicReward,
@@ -1252,6 +1253,53 @@ describe('build telemetry rules', () => {
       techs: '副投射学 / 中央校准学',
       structures: '队列输送带L1',
     });
+  });
+
+  it('defaults to a low-noise play layout and keeps debug surfaces behind a drawer', () => {
+    const playPlan = getUiDensityPlan('play');
+    const debugPlan = getUiDensityPlan('debug');
+
+    expect(playPlan.showDebugControls).toBe(false);
+    expect(playPlan.showBuildShopPanel).toBe(false);
+    expect(playPlan.showTopChamberSummaries).toBe(false);
+    expect(playPlan.showTopExplanatoryText).toBe(false);
+    expect(playPlan.showBuildIdentityOverlay).toBe(false);
+    expect(playPlan.showTransferTrails).toBe(false);
+    expect(playPlan.visibleEventFeedRows).toBe(3);
+    expect(debugPlan.showDebugControls).toBe(true);
+    expect(debugPlan.showBuildShopPanel).toBe(true);
+    expect(debugPlan.showTopChamberSummaries).toBe(true);
+    expect(debugPlan.showTopExplanatoryText).toBe(true);
+    expect(debugPlan.showBuildIdentityOverlay).toBe(true);
+    expect(debugPlan.showTransferTrails).toBe(true);
+  });
+
+  it('routes machine feedback into a small battlefield event feed', () => {
+    expect(getEventFeedSlot(0)).toEqual({ x: 1242, y: 242, row: 0, align: 'right' });
+    expect(getEventFeedSlot(1)).toEqual({ x: 1242, y: 266, row: 1, align: 'right' });
+    expect(getEventFeedSlot(2)).toEqual({ x: 1242, y: 290, row: 2, align: 'right' });
+    expect(getEventFeedSlot(3)).toEqual({ x: 1242, y: 242, row: 0, align: 'right' });
+  });
+
+  it('compresses the bottom HUD into six readable status blocks', () => {
+    const state = createInitialGameState('hive', 79);
+    state.gold = 91;
+    state.researchPoints = 20;
+    state.pendingSpawnLevelBonus = 1;
+    startPhase(state);
+    state.stats.currentPhase.slotTriggers.gold = 7;
+    state.stats.currentPhase.slotTriggers.magic = 3;
+    state.stats.currentPhase.slotTriggers.spawn = 5;
+    state.stats.currentPhase.slotTriggers.upgrade = 2;
+
+    const blocks = buildCompactHudBlocks(state);
+
+    expect(blocks.map((block) => block.label)).toEqual(['战况', '基地', '资源', '部队', '下次出兵', '抉择']);
+    expect(blocks).toHaveLength(6);
+    expect(blocks[0]).toMatchObject({ value: '虫群 1/6', detail: '推进中' });
+    expect(blocks[2].value).toBe('金 91 / 研 20');
+    expect(blocks[4].value).toBe('Lv+1');
+    expect(blocks[5].value).toBe('金7 法3 出5 升2');
   });
 
   it('keeps top-row chamber summaries compact for structure art readability', () => {
