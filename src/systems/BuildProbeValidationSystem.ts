@@ -1,4 +1,4 @@
-import { runAllBuildProbes, type BuildProbeResult } from './BuildProbeSystem';
+import { runAllBuildProbes, runNaturalBlueprintRewardProbe, type BuildProbeResult, type NaturalBlueprintRewardProbeResult } from './BuildProbeSystem';
 import type { DebugBuildPresetId } from '../types/game';
 
 export interface BuildProbeValidationRow {
@@ -22,17 +22,23 @@ export interface BuildProbeValidationReport {
   ok: boolean;
   seed: number;
   rows: BuildProbeValidationRow[];
+  naturalBlueprintRewardProbe: NaturalBlueprintRewardProbeResult;
   failures: string[];
 }
 
 export function buildProbeValidationReport(seed = 170): BuildProbeValidationReport {
   const results = runAllBuildProbes(seed);
+  const naturalBlueprintRewardProbe = runNaturalBlueprintRewardProbe(seed + 40);
   const rows = results.map(toValidationRow);
-  const failures = results.flatMap(validateProbeResult);
+  const failures = [
+    ...results.flatMap(validateProbeResult),
+    ...validateNaturalBlueprintRewardProbe(naturalBlueprintRewardProbe),
+  ];
   return {
     ok: failures.length === 0,
     seed,
     rows,
+    naturalBlueprintRewardProbe,
     failures,
   };
 }
@@ -56,6 +62,15 @@ export function formatBuildProbeValidationReport(report: BuildProbeValidationRep
       row.chainDepth,
       row.warnings.length === 0 ? 'none' : row.warnings.join(','),
     ].join(' | ')),
+    [
+      report.naturalBlueprintRewardProbe.probeId,
+      report.naturalBlueprintRewardProbe.finalArchetype,
+      `${report.naturalBlueprintRewardProbe.metrics.unitsQueued}/${report.naturalBlueprintRewardProbe.metrics.unitsDeployed}`,
+      report.naturalBlueprintRewardProbe.metrics.combatImpactDamage,
+      `selections=${report.naturalBlueprintRewardProbe.rewardSelections.map((selection) => selection.chamber).join('/')}`,
+      `phase2=${report.naturalBlueprintRewardProbe.phaseTwoArchetype}`,
+      report.naturalBlueprintRewardProbe.warnings.length === 0 ? 'none' : report.naturalBlueprintRewardProbe.warnings.join(','),
+    ].join(' | '),
   ];
 
   if (!report.ok) {
@@ -122,6 +137,10 @@ function validateProbeResult(result: BuildProbeResult): string[] {
   }
 
   return failures;
+}
+
+function validateNaturalBlueprintRewardProbe(result: NaturalBlueprintRewardProbeResult): string[] {
+  return result.warnings.map((warning) => `${result.probeId}: ${warning}`);
 }
 
 function formatPercent(value: number): string {

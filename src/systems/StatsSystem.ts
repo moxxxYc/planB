@@ -10,8 +10,9 @@ export function createPhaseStats(): PhaseStats {
       special: 0,
     },
     launchOutcomes: {
+      standby: 0,
       split: 0,
-      fire: 0,
+      spawn: 0,
       miss: 0,
     },
     buildingContributions: {

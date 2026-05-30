@@ -9,10 +9,13 @@ export type PhaseObjectiveType = 'destroy_gate' | 'survive_pressure' | 'mini_bos
 export type PhaseCompleteReason = 'objective' | 'timer' | 'boss_defeated' | 'debug_skip';
 export type BallStage = 'launch' | 'decision' | 'unit';
 export type BallTagId = 'split+' | 'spawn-mark' | 'copy-mark' | 'heavy' | 'recycle';
-export type LaunchOutcomeId = 'split' | 'fire' | 'miss';
+export type LaunchOutcomeId = 'standby' | 'split' | 'spawn' | 'miss';
 export type BuildingChamber = 'launch' | 'decision' | 'unit';
+export type RewardChamber = BuildingChamber;
+export type RewardSourceType = 'relic' | 'building' | 'doctrine' | 'legacy';
 export type DoctrinePath = 'launch' | 'decision' | 'unit';
 export type PhaseToolId = 'spawn_beacon' | 'hot_slot_calibrator' | 'queue_surge' | 'field_repair' | 'marked_shot';
+export type GameSpeedMultiplier = 1 | 2 | 4;
 
 export interface BallPayload {
   value: number;
@@ -338,6 +341,7 @@ export interface GameSettings {
 export interface GameState {
   seed: number;
   currentRaceId: RaceId;
+  speedMultiplier: GameSpeedMultiplier;
   phaseIndex: number;
   phaseActive: boolean;
   isBuildPause: boolean;
@@ -392,6 +396,8 @@ export interface RewardDef {
   tag: string;
   icon: string;
   description: string;
+  chamber: RewardChamber;
+  sourceType: RewardSourceType;
 }
 
 export interface PhaseDef {

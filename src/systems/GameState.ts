@@ -22,6 +22,7 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
   return {
     seed,
     currentRaceId: raceId,
+    speedMultiplier: 1,
     phaseIndex: 0,
     phaseActive: false,
     isBuildPause: false,

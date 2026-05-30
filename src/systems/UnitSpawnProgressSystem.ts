@@ -152,7 +152,7 @@ function getEffectiveGateState(state: GameState, elapsedMs: number, durationMs: 
   const level = building?.level ?? 0;
   if (level <= 0) return getUnitGateState(elapsedMs, durationMs);
 
-  const effectiveDuration = durationMs * Math.max(0.28, 0.8 - (level - 1) * 0.1);
+  const effectiveDuration = durationMs * Math.max(0.29, 0.45 - (level - 1) * 0.08);
   return getUnitGateState(elapsedMs, effectiveDuration);
 }
 

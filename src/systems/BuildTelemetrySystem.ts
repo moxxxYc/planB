@@ -43,7 +43,7 @@ export interface BuildIdentityVisualSummary {
 
 const chamberLabels: Record<BuildingChamber, string> = {
   launch: '发球区',
-  decision: '抉择区',
+  decision: '战备区',
   unit: '出兵区',
 };
 
@@ -86,10 +86,10 @@ export function buildPhaseTelemetrySummary(state: GameState, stats: PhaseStats =
     resourceReturnRate,
     lines: [
       `构筑 ${archetype}  主仓 ${dominantLabel}`,
-      `发球 split${stats.launchOutcomes.split} fire${stats.launchOutcomes.fire} miss${stats.launchOutcomes.miss}  抉择 金${stats.slotTriggers.gold} 法${stats.slotTriggers.magic} 出${stats.slotTriggers.spawn} 升${stats.slotTriggers.upgrade}`,
+      `发球 战备${stats.launchOutcomes.standby} 分裂${stats.launchOutcomes.split} 发兵${stats.launchOutcomes.spawn} 丢失${stats.launchOutcomes.miss}  战备 金${stats.slotTriggers.gold} 法${stats.slotTriggers.magic} 升${stats.slotTriggers.upgrade}  发兵${stats.slotTriggers.spawn}`,
       `回流工具 ${stats.phaseToolsPurchased}  标记 ${stats.spawnMarksCreated}/${stats.spawnMarksConsumed}  复制 ${stats.spawnCopiesCreated}  遗物 ${stats.relicTriggers}  研究 ${state.researchPoints}(${state.doctrineEvents.researchReturnProgress}/4)  保底 ${state.doctrineEvents.nonSpawnStreak}/3  回流效率 ${formatPercent(resourceReturnRate)}  最长非出兵 ${stats.nonSpawnStreakMax}  首次回流 ${formatRecoveryLatency(stats.timeToRecoverySpawnMs)}  来源 ${formatRecoverySources(stats.recoverySources)}`,
       `入队 ${formatUnitCounts(stats.unitsQueuedById)}  部署 ${formatUnitCounts(stats.unitsDeployedById)}  高阶 ${stats.advancedUnitsQueued}/${stats.unitsQueued}`,
-      `建筑贡献 发${stats.buildingContributions.launch} 抉${stats.buildingContributions.decision} 出${stats.buildingContributions.unit}  溢流${stats.overflowProgressGranted} 开门${stats.gateAccelerationEvents} 挡回 ${stats.gateBlockedEvents} 爆发${stats.queueBurstEvents}`,
+      `建筑贡献 发${stats.buildingContributions.launch} 备${stats.buildingContributions.decision} 出${stats.buildingContributions.unit}  溢流${stats.overflowProgressGranted} 开门${stats.gateAccelerationEvents} 挡回 ${stats.gateBlockedEvents} 爆发${stats.queueBurstEvents}`,
     ],
   };
 }
@@ -231,7 +231,7 @@ const identityVisualPresets: Record<string, Omit<BuildIdentityVisualSummary, 'ar
     zoneEmphasis: { launch: 2, decision: 1, unit: 3 },
     chambers: {
       launch: { label: '分裂增殖', detail: '多球/裂变', iconKey: 'icon_spawn' },
-      decision: { label: 'SPAWN 扩张', detail: '宽槽导流', iconKey: 'icon_spawn' },
+      decision: { label: '发兵扩张', detail: '路线导流', iconKey: 'icon_spawn' },
       unit: { label: '溢流输送', detail: '低阶密度', iconKey: 'icon_spawn' },
     },
     structures: {
@@ -294,7 +294,7 @@ const identityVisualPresets: Record<string, Omit<BuildIdentityVisualSummary, 'ar
     accentColor: 0xfacc15,
     zoneEmphasis: { launch: 1, decision: 3, unit: 2 },
     chambers: {
-      launch: { label: '回收供能', detail: 'miss 转产', iconKey: 'icon_gold' },
+      launch: { label: '回收供能', detail: '丢失转产', iconKey: 'icon_gold' },
       decision: { label: '金币工业', detail: '金币回流', iconKey: 'icon_gold' },
       unit: { label: '队列爆发', detail: '工事兑现', iconKey: 'icon_spawn' },
     },
@@ -315,7 +315,7 @@ const identityVisualPresets: Record<string, Omit<BuildIdentityVisualSummary, 'ar
     accentColor: 0xfb7185,
     zoneEmphasis: { launch: 3, decision: 2, unit: 2 },
     chambers: {
-      launch: { label: 'miss 回收', detail: '落空补偿', iconKey: 'icon_special' },
+      launch: { label: '丢失回收', detail: '落空补偿', iconKey: 'icon_special' },
       decision: { label: '金币保底', detail: '非出兵兜底', iconKey: 'icon_gold' },
       unit: { label: '修复输送', detail: '回流入队', iconKey: 'icon_spawn' },
     },

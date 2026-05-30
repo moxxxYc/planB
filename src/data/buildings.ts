@@ -63,7 +63,7 @@ export const buildingDefs: BuildingDef[] = [
     name: '高阶绞盘',
     tag: '出兵建筑',
     icon: 'icon_upgrade',
-    description: '高阶挡板在阶段前 40% 内完成开放。',
+    description: '加快高阶挡板开放，让高阶单位槽更早可用。',
     maxLevel: 3,
   },
   {

@@ -13,6 +13,7 @@ try {
   } = await server.ssrLoadModule('/src/systems/V12ReadinessSystem.ts');
   const report = buildV12ReadinessReport(170);
   console.log(formatV12ReadinessReport(report));
+  process.exitCode = report.readyForCompletion ? 0 : 1;
 } finally {
   await server.close();
 }

@@ -167,6 +167,22 @@ export function buildBattleHeatBands(units: BattleUnit[], playerBaseX: number, e
   return bands;
 }
 
+export function getPlayerVanguardRatio(state: GameState): number {
+  return getPlayerEnemyBaseFocusRatio(state);
+}
+
+export function getPlayerEnemyBaseFocusRatio(state: GameState): number {
+  const playerBaseX = state.battle.bases.player.x;
+  const enemyBaseX = state.battle.bases.enemy.x;
+  const span = Math.max(1, enemyBaseX - playerBaseX);
+  const playerUnits = state.battle.units.filter((unit) => unit.side === 'player' && unit.hp > 0);
+  if (playerUnits.length <= 0) return getBattleFrontlineRatio(state);
+
+  const focusedUnit = playerUnits
+    .sort((a, b) => Math.abs(enemyBaseX - a.x) - Math.abs(enemyBaseX - b.x))[0];
+  return Math.max(0, Math.min(1, (focusedUnit.x - playerBaseX) / span));
+}
+
 export function getBattleHotspotRatio(state: GameState): number {
-  return getBattleFrontlineRatio(state);
+  return getPlayerVanguardRatio(state);
 }

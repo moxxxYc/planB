@@ -8,11 +8,12 @@ import { createInitialGameState } from './GameState';
 import { startPhase } from './PhaseSystem';
 import { recordDoctrineLaunchMiss } from './DoctrineSystem';
 import { recordRelicLaunchMiss } from './RelicSystem';
+import { applyReward, buildRewardChoices, rewardChambers } from './RewardSystem';
 import { triggerSlot } from './SlotTriggerSystem';
 import { updateSpawnQueue } from './SpawnQueueSystem';
 import { recordLaunchOutcome } from './StatsSystem';
 import { resolveUnitBallToSlot } from './UnitSpawnProgressSystem';
-import type { DebugBuildPresetId, GameState, RaceId, SlotId, SpawnQueueItem } from '../types/game';
+import type { DebugBuildPresetId, GameState, RaceId, RewardChamber, RewardDef, RewardSourceType, SlotId, SpawnQueueItem } from '../types/game';
 
 export interface BuildProbeMetrics {
   slotTriggers: Record<SlotId, number>;
@@ -60,6 +61,41 @@ export interface BuildProbeResult {
   warnings: string[];
 }
 
+export interface NaturalBlueprintRewardSelection {
+  phaseIndex: number;
+  rewardId: string;
+  rewardName: string;
+  chamber: RewardChamber;
+  sourceType: RewardSourceType;
+}
+
+export interface NaturalBlueprintRewardProbeMetrics {
+  launchBlueprints: number;
+  decisionBlueprints: number;
+  unitBlueprints: number;
+  naturalLaunchOrDecisionBuildingInstalled: boolean;
+  nonSpawnRecoveryWithin15s: boolean;
+  recoveredUnitBallValue: number;
+  unitsQueued: number;
+  unitsDeployed: number;
+  combatImpactDamage: number;
+}
+
+export interface NaturalBlueprintRewardProbeResult {
+  probeId: 'natural_blueprint_reward_probe';
+  debugPresetUsed: false;
+  ok: boolean;
+  raceId: RaceId;
+  rewardSelections: NaturalBlueprintRewardSelection[];
+  offeredChambersByPhase: RewardChamber[][];
+  acquiredChambers: RewardChamber[];
+  phaseTwoArchetype: string;
+  finalArchetype: string;
+  metrics: NaturalBlueprintRewardProbeMetrics;
+  summaryLines: string[];
+  warnings: string[];
+}
+
 const PROBE_PHASE_MS = 60000;
 
 export function runAllBuildProbes(seed = 100): BuildProbeResult[] {
@@ -100,31 +136,86 @@ export function runBuildProbe(presetId: DebugBuildPresetId, seed = 100): BuildPr
   };
 }
 
+export function runNaturalBlueprintRewardProbe(seed = 180): NaturalBlueprintRewardProbeResult {
+  const state = createInitialGameState('hive', seed);
+  const rewardSelections: NaturalBlueprintRewardSelection[] = [];
+  const offeredChambersByPhase: RewardChamber[][] = [];
+  let phaseTwoArchetype = '混合构筑';
+
+  rewardChambers.forEach((targetChamber, index) => {
+    const choices = buildRewardChoices(state);
+    offeredChambersByPhase.push(choices.map((reward) => reward.chamber));
+    const selected = selectChamberReward(choices, targetChamber);
+    applyReward(state, selected.id);
+    state.selectedRewards.push(selected.id);
+    rewardSelections.push({
+      phaseIndex: index,
+      rewardId: selected.id,
+      rewardName: selected.name,
+      chamber: selected.chamber,
+      sourceType: selected.sourceType,
+    });
+    if (index === 1) phaseTwoArchetype = buildPhaseTelemetrySummary(state).archetype;
+  });
+
+  startPhase(state);
+  const recoveredUnitBallValue = exerciseNaturalRecoveryIntoSpawn(state);
+  const queuedSnapshot = state.spawnQueue.map((item) => ({ ...item }));
+  deployProbeQueue(state);
+  const combatImpact = measureProbeCombatImpact(state);
+  const telemetry = buildPhaseTelemetrySummary(state);
+  const acquiredChambers = rewardChambers.filter((chamber) => rewardSelections.some((selection) => selection.chamber === chamber));
+  const metrics = buildNaturalBlueprintMetrics(state, rewardSelections, queuedSnapshot, combatImpact, recoveredUnitBallValue);
+  const warnings = buildNaturalBlueprintWarnings(offeredChambersByPhase, acquiredChambers, metrics);
+
+  return {
+    probeId: 'natural_blueprint_reward_probe',
+    debugPresetUsed: false,
+    ok: warnings.length === 0,
+    raceId: state.currentRaceId,
+    rewardSelections,
+    offeredChambersByPhase,
+    acquiredChambers,
+    phaseTwoArchetype,
+    finalArchetype: telemetry.archetype,
+    metrics,
+    summaryLines: [
+      `natural_blueprint_reward_probe ${rewardSelections.map((selection) => `${selection.chamber}:${selection.rewardName}`).join(' / ')}`,
+      ...telemetry.lines,
+      `自然奖励 入队 ${metrics.unitsQueued} 部署 ${metrics.unitsDeployed} 回流球值 ${metrics.recoveredUnitBallValue} 战斗影响 ${metrics.combatImpactDamage}`,
+    ],
+    warnings,
+  };
+}
+
 function runProbeScript(state: GameState, presetId: DebugBuildPresetId) {
   if (presetId === 'swarm') {
     recordProbeLaunch(state, 'split');
-    recordProbeLaunch(state, 'fire');
+    recordProbeLaunch(state, 'spawn');
     resolveSpawnBall(state, 0, 3, 12000);
     return;
   }
 
   if (presetId === 'magic_copy') {
-    recordProbeLaunch(state, 'fire');
+    recordProbeLaunch(state, 'standby');
     triggerSlot(state, 'magic');
+    recordProbeLaunch(state, 'spawn');
     resolveSpawnBall(state, 0, 1, 12000);
     return;
   }
 
   if (presetId === 'mech_elite') {
-    recordProbeLaunch(state, 'fire');
+    recordProbeLaunch(state, 'standby');
     triggerSlot(state, 'upgrade');
+    recordProbeLaunch(state, 'spawn');
     resolveSpawnBall(state, 2, 5, 15000);
     return;
   }
 
   if (presetId === 'economy_industry') {
-    recordProbeLaunch(state, 'fire');
+    recordProbeLaunch(state, 'standby');
     triggerGoldBurst(state);
+    recordProbeLaunch(state, 'spawn');
     resolveSpawnBall(state, 0, 1, 12000);
     return;
   }
@@ -135,6 +226,34 @@ function runProbeScript(state: GameState, presetId: DebugBuildPresetId) {
   resolveUnitBallToSlot(state, 4, 1, { elapsedMs: 0, durationMs: PROBE_PHASE_MS });
   triggerGoldBurst(state);
   resolveSpawnBall(state, 0, 1, 12000);
+}
+
+function selectChamberReward(choices: RewardDef[], chamber: RewardChamber): RewardDef {
+  const selected = choices.find((reward) => reward.chamber === chamber);
+  if (!selected) throw new Error(`Natural blueprint probe did not offer ${chamber}`);
+  return selected;
+}
+
+function exerciseNaturalRecoveryIntoSpawn(state: GameState): number {
+  const hasCoinPress = state.buildings.some((building) => building.id === 'decision_coin_press');
+  if (hasCoinPress) {
+    for (const elapsedMs of [2000, 6000, 10000]) {
+      state.phaseElapsedMs = elapsedMs;
+      triggerSlot(state, 'gold');
+    }
+  } else {
+    state.phaseElapsedMs = 8000;
+    triggerSlot(state, 'magic');
+  }
+
+  state.phaseElapsedMs = 12000;
+  triggerSlot(state, 'spawn');
+  const recoveredValue = consumeSpawnMarkBonus(state, 1);
+  resolveUnitBallToSlot(state, 0, recoveredValue, {
+    elapsedMs: state.phaseElapsedMs,
+    durationMs: PROBE_PHASE_MS,
+  });
+  return recoveredValue;
 }
 
 function triggerGoldBurst(state: GameState) {
@@ -150,7 +269,7 @@ function recordProbeLaunchMiss(state: GameState) {
   recordDoctrineLaunchMiss(state);
 }
 
-function recordProbeLaunch(state: GameState, outcome: 'split' | 'fire' | 'miss') {
+function recordProbeLaunch(state: GameState, outcome: 'standby' | 'split' | 'spawn' | 'miss') {
   recordLaunchOutcome(state.stats.currentPhase, outcome);
 }
 
@@ -254,10 +373,54 @@ function buildMetrics(
   };
 }
 
+function buildNaturalBlueprintMetrics(
+  state: GameState,
+  selections: NaturalBlueprintRewardSelection[],
+  queuedSnapshot: SpawnQueueItem[],
+  combatImpact: { checks: number; damage: number },
+  recoveredUnitBallValue: number,
+): NaturalBlueprintRewardProbeMetrics {
+  const playerUnits = state.battle.units.filter((unit) => unit.side === 'player');
+  return {
+    launchBlueprints: selections.filter((selection) => selection.chamber === 'launch').length,
+    decisionBlueprints: selections.filter((selection) => selection.chamber === 'decision').length,
+    unitBlueprints: selections.filter((selection) => selection.chamber === 'unit').length,
+    naturalLaunchOrDecisionBuildingInstalled: state.buildings.some((building) => building.chamber === 'launch' || building.chamber === 'decision'),
+    nonSpawnRecoveryWithin15s: (state.stats.currentPhase.timeToRecoverySpawnMs ?? Number.POSITIVE_INFINITY) <= 15000
+      || state.stats.currentPhase.spawnCopiesCreated > 0,
+    recoveredUnitBallValue,
+    unitsQueued: queuedSnapshot.reduce((sum, item) => sum + item.count, 0),
+    unitsDeployed: playerUnits.length,
+    combatImpactDamage: combatImpact.damage,
+  };
+}
+
+function buildNaturalBlueprintWarnings(
+  offeredChambersByPhase: RewardChamber[][],
+  acquiredChambers: RewardChamber[],
+  metrics: NaturalBlueprintRewardProbeMetrics,
+): string[] {
+  const warnings: string[] = [];
+  const completeOffer = rewardChambers.join('|');
+  if (!offeredChambersByPhase.every((chambers) => chambers.join('|') === completeOffer)) {
+    warnings.push('phase_reward_not_three_chamber_offer');
+  }
+  for (const chamber of rewardChambers) {
+    if (!acquiredChambers.includes(chamber)) warnings.push(`missing_${chamber}_blueprint_acquisition`);
+  }
+  if (!metrics.naturalLaunchOrDecisionBuildingInstalled) warnings.push('no_launch_or_decision_building_from_natural_reward');
+  if (!metrics.nonSpawnRecoveryWithin15s) warnings.push('no_non_spawn_recovery_within_15s');
+  if (metrics.unitsQueued <= 0) warnings.push('no_units_queued');
+  if (metrics.unitsDeployed <= 0) warnings.push('no_units_deployed');
+  if (metrics.combatImpactDamage <= 0) warnings.push('no_combat_impact');
+  return warnings;
+}
+
 function getActiveProbeChambers(state: GameState): Array<'launch' | 'decision' | 'unit'> {
   const stats = state.stats.currentPhase;
-  const launchSignals = stats.launchOutcomes.split
-    + stats.launchOutcomes.fire
+  const launchSignals = stats.launchOutcomes.standby
+    + stats.launchOutcomes.split
+    + stats.launchOutcomes.spawn
     + stats.launchOutcomes.miss
     + stats.buildingContributions.launch
     + stats.relicTriggers;

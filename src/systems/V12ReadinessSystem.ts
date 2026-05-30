@@ -29,6 +29,7 @@ export interface V12ReadinessReport {
 
 export function buildV12ReadinessReport(seed = 170): V12ReadinessReport {
   const probe = buildProbeValidationReport(seed);
+  const naturalBlueprint = probe.naturalBlueprintRewardProbe;
   const state = createInitialGameState('hive', seed);
   const surfaceHud = buildSurfaceHudSummaries(state);
   const telemetry = buildPhaseTelemetrySummary(state);
@@ -45,7 +46,7 @@ export function buildV12ReadinessReport(seed = 170): V12ReadinessReport {
     {
       id: 'three_surface_layers',
       status: hasThreeSurfaceData() ? 'proved' : 'missing',
-      requirement: '发球区有遗物层，抉择区有科技层，出兵区有工事层。',
+      requirement: '发球区有遗物层，战备区有科技层，出兵区有工事层。',
       evidence: [
         `relicDefs=${relicDefs.length}`,
         `doctrineTechDefs=${doctrineTechDefs.length}`,
@@ -67,12 +68,24 @@ export function buildV12ReadinessReport(seed = 170): V12ReadinessReport {
     {
       id: 'midgame_pacing',
       status: hasMidgamePacing() ? 'proved' : 'missing',
-      requirement: '阶段节奏为中短局，自动投球加快，挡板在阶段 35%-45% 左右全开，并有中段工具窗口。',
+      requirement: '阶段节奏为中短局，自动投球加快，挡板缩短速度为旧版 1/5，阶段内不再全开，并有中段工具窗口。',
       evidence: [
         `phaseDurations=${phaseDefs.map((phase) => phase.durationMs).join(',')}`,
         `autoLaunchIntervalMs=${activePacingPreset.autoLaunchIntervalMs}`,
         `unitGateFullOpenRatio=${activePacingPreset.unitGateFullOpenPhaseRatio}`,
         `phaseToolWindowOpenRatio=${activePacingPreset.phaseToolWindowOpenRatio}`,
+      ],
+    },
+    {
+      id: 'three_chamber_blueprint_rewards',
+      status: hasThreeChamberBlueprintRewards(naturalBlueprint) ? 'proved' : 'missing',
+      requirement: '阶段结束奖励固定给发球区、战备区、出兵区三张蓝图，且自然流程能通过蓝图形成构筑。',
+      evidence: [
+        `probeOk=${naturalBlueprint.ok}`,
+        `offers=${naturalBlueprint.offeredChambersByPhase.map((chambers) => chambers.join('/')).join(' | ')}`,
+        `selections=${naturalBlueprint.rewardSelections.map((selection) => `${selection.chamber}:${selection.rewardId}:${selection.sourceType}`).join(' / ')}`,
+        `phaseTwoArchetype=${naturalBlueprint.phaseTwoArchetype}`,
+        `queuedDeployed=${naturalBlueprint.metrics.unitsQueued}/${naturalBlueprint.metrics.unitsDeployed}`,
       ],
     },
     {
@@ -87,7 +100,7 @@ export function buildV12ReadinessReport(seed = 170): V12ReadinessReport {
     {
       id: 'cross_chamber_chain',
       status: probe.ok && probe.rows.every((row) => row.chainDepth >= 3) ? 'proved' : 'missing',
-      requirement: '第 3 阶段前至少出现一次发球变化影响抉择再影响出兵兑现的跨三仓连锁。',
+      requirement: '第 3 阶段前至少出现一次发球变化影响战备再影响出兵兑现的跨三仓连锁。',
       evidence: [
         `probeOk=${probe.ok}`,
         `chainDepths=${probe.rows.map((row) => `${row.presetName}:${row.chainDepth}`).join(' / ')}`,
@@ -104,7 +117,7 @@ export function buildV12ReadinessReport(seed = 170): V12ReadinessReport {
     {
       id: 'phase_telemetry_answers',
       status: telemetryAnswersRequiredQuestions(telemetry.lines) ? 'proved' : 'missing',
-      requirement: '阶段结束 telemetry 能回答球从哪里来、抉择怎么分流、单位如何入队部署、主要靠哪一仓赢。',
+      requirement: '阶段结束 telemetry 能回答球从哪里来、战备怎么分流、单位如何入队部署、主要靠哪一仓赢。',
       evidence: telemetry.lines,
     },
     {
@@ -121,7 +134,7 @@ export function buildV12ReadinessReport(seed = 170): V12ReadinessReport {
     {
       id: 'automated_validation',
       status: probe.ok && smokePlan.length >= 5 ? 'proved' : 'missing',
-      requirement: '自动化或半自动验证脚本检查 launch -> decision -> unit slot -> queue -> deploy -> combat impact。',
+      requirement: '自动化或半自动验证脚本检查 launch -> standby -> unit slot -> queue -> deploy -> combat impact。',
       evidence: [
         `probeRows=${probe.rows.length}`,
         `probeFailures=${probe.failures.length}`,
@@ -188,16 +201,28 @@ function hasNamedStateFields(state: ReturnType<typeof createInitialGameState>): 
 function hasMidgamePacing(): boolean {
   return phaseDefs.every((phase) => phase.durationMs >= 40000 && phase.durationMs <= 55000)
     && activePacingPreset.autoLaunchIntervalMs <= 1200
-    && activePacingPreset.unitGateFullOpenPhaseRatio >= 0.35
-    && activePacingPreset.unitGateFullOpenPhaseRatio <= 0.45
+    && activePacingPreset.unitGateFullOpenPhaseRatio >= 1.95
+    && activePacingPreset.unitGateFullOpenPhaseRatio <= 2.05
     && activePacingPreset.phaseToolWindowOpenRatio > 0
     && activePacingPreset.phaseToolWindowOpenRatio < 1;
+}
+
+function hasThreeChamberBlueprintRewards(naturalBlueprint: ReturnType<typeof buildProbeValidationReport>['naturalBlueprintRewardProbe']): boolean {
+  return naturalBlueprint.ok
+    && naturalBlueprint.offeredChambersByPhase.length >= 2
+    && naturalBlueprint.offeredChambersByPhase.every((chambers) => chambers.join('|') === 'launch|decision|unit')
+    && naturalBlueprint.acquiredChambers.join('|') === 'launch|decision|unit'
+    && naturalBlueprint.phaseTwoArchetype !== '混合构筑'
+    && naturalBlueprint.metrics.naturalLaunchOrDecisionBuildingInstalled
+    && naturalBlueprint.metrics.nonSpawnRecoveryWithin15s
+    && naturalBlueprint.metrics.unitsQueued > 0
+    && naturalBlueprint.metrics.unitsDeployed > 0;
 }
 
 function telemetryAnswersRequiredQuestions(lines: string[]): boolean {
   const text = lines.join('\n');
   return text.includes('发球')
-    && text.includes('抉择')
+    && text.includes('战备')
     && text.includes('入队')
     && text.includes('部署')
     && text.includes('主仓')

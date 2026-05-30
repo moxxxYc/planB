@@ -6,6 +6,7 @@ import { raceDefs } from '../data/races';
 import { decisionSlotDefs } from '../data/slots';
 import { unitDefs } from '../data/units';
 import { debugBuildPresets } from '../data/debugPresets';
+import { createRewardDescriptionTextStyle } from '../rendering/rewardTextLayout';
 import { getBattleContactRatio, getBattleFrontlineRatio, spawnDebugRaceUnit, updateBattle } from '../systems/BattleSystem';
 import {
   consumeSpawnMarkBonus,
@@ -29,16 +30,27 @@ import {
   projectBattlePoint,
 } from '../systems/BattlefieldViewSystem';
 import { createInitialGameState } from '../systems/GameState';
-import { buildCompactHudBlocks, getEventFeedSlot, getUiDensityPlan, type UiMode } from '../systems/UiDensitySystem';
+import { buildRightAlignedButtonRow, buildTopZoneLayout, PROTOTYPE_LAYOUT } from '../systems/PrototypeLayoutSystem';
+import {
+  buildCompactHudBlocks,
+  getEventFeedSlot,
+  getUiDensityPlan,
+  toggleBuildShopDrawerState,
+  toggleDebugDrawerState,
+  type UiMode,
+} from '../systems/UiDensitySystem';
 import { completePhase, isFinalPhaseComplete, resumeNextPhase, shouldCompletePhase, startPhase, updatePhaseEnemySpawns } from '../systems/PhaseSystem';
 import { buyPhaseTool, getPhaseToolWindowState } from '../systems/PhaseToolSystem';
 import {
   getControlledGateBounceVelocity,
   getLauncherVelocity,
   getSweepingLauncherAngle,
+  launchOutcomeSlotDefs,
+  resolveLaunchOutcomeWithSplitLimit,
 } from '../systems/PinballMachineSystem';
-import { buildRewardChoices, rerollRewardChoices } from '../systems/RewardSystem';
+import { buildRewardChoices, getRewardChamberLabel, rerollRewardChoices } from '../systems/RewardSystem';
 import { updateSpawnQueue } from '../systems/SpawnQueueSystem';
+import { cycleGameSpeed, getScaledDeltaMs } from '../systems/SpeedSystem';
 import { triggerSlot } from '../systems/SlotTriggerSystem';
 import { buildWeightedSlotLayouts } from '../systems/DecisionSlotLayoutSystem';
 import { recordLaunchOutcome } from '../systems/StatsSystem';
@@ -70,6 +82,7 @@ type PinballBall = {
   stage: BallStage;
   value: number;
   tags: BallTagId[];
+  originalBallId: string;
   blockedGateHits: number;
   createdAt: number;
   lastGateBounceAt: number;
@@ -108,25 +121,42 @@ type VisibleGameObject = Phaser.GameObjects.GameObject & {
   setVisible(value: boolean): VisibleGameObject;
 };
 
-const GAME_W = 1280;
-const GAME_H = 720;
-const TOP_Y = 12;
-const TOP_H = 196;
-const HUD_H = 104;
-const BATTLE_Y = TOP_Y + TOP_H + 8;
-const BATTLE_H = GAME_H - BATTLE_Y - HUD_H - 8;
-const HUD_TOP = GAME_H - HUD_H;
+const GAME_W = PROTOTYPE_LAYOUT.gameW;
+const GAME_H = PROTOTYPE_LAYOUT.gameH;
+const TOP_Y = PROTOTYPE_LAYOUT.topY;
+const TOP_H = PROTOTYPE_LAYOUT.topH;
+const HUD_H = PROTOTYPE_LAYOUT.hudH;
+const BATTLE_Y = PROTOTYPE_LAYOUT.battleY;
+const BATTLE_H = PROTOTYPE_LAYOUT.battleH;
+const HUD_TOP = PROTOTYPE_LAYOUT.hudTop;
+const OUTCOME_SLOT_H = PROTOTYPE_LAYOUT.outcomeSlotH;
+const UNIT_SLOT_H = PROTOTYPE_LAYOUT.unitSlotH;
+const OUTCOME_SLOT_CENTER_Y = PROTOTYPE_LAYOUT.outcomeSlotCenterY;
+const UNIT_SLOT_CENTER_Y = PROTOTYPE_LAYOUT.unitSlotCenterY;
 const MINIMAP_X = 20;
 const MINIMAP_Y = HUD_TOP - 128;
 const MINIMAP_W = 202;
 const MINIMAP_H = 104;
 
-const LAUNCH_X = 14;
-const LAUNCH_W = 225;
-const DECISION_X = LAUNCH_X + LAUNCH_W + 10;
+const TOP_ZONE_MARGIN = 14;
+const TOP_ZONE_GAP = 10;
+const BASE_LAUNCH_W = 225;
 const DECISION_W = 350;
-const UNIT_X = DECISION_X + DECISION_W + 10;
-const UNIT_W = GAME_W - UNIT_X - 14;
+const BASE_UNIT_W = GAME_W - TOP_ZONE_MARGIN * 2 - TOP_ZONE_GAP * 2 - BASE_LAUNCH_W - DECISION_W;
+const TOP_ZONE_LAYOUT = buildTopZoneLayout({
+  gameW: GAME_W,
+  sideMargin: TOP_ZONE_MARGIN,
+  gap: TOP_ZONE_GAP,
+  launchW: BASE_LAUNCH_W,
+  decisionW: DECISION_W,
+  unitW: BASE_UNIT_W,
+  unitWidthScale: 0.75,
+});
+const LAUNCH_X = TOP_ZONE_LAYOUT.launch.x;
+const LAUNCH_W = TOP_ZONE_LAYOUT.launch.w;
+const DECISION_X = TOP_ZONE_LAYOUT.decision.x;
+const UNIT_X = TOP_ZONE_LAYOUT.unit.x;
+const UNIT_W = TOP_ZONE_LAYOUT.unit.w;
 const BATTLE_SCREEN_START = { x: 300, y: BATTLE_Y + BATTLE_H - 88 };
 const BATTLE_SCREEN_END = { x: 1110, y: BATTLE_Y + 44 };
 
@@ -138,8 +168,7 @@ const LAUNCHER_SWEEP_CYCLE_MS = 2400;
 const LAUNCHER_SPEED = 3.2;
 const UNIT_GATE_HEIGHT = 12.2;
 const UNIT_GATE_RESTITUTION = 1.35;
-const UNIT_SLOT_CENTER_Y = TOP_Y + TOP_H - 20;
-const UNIT_SLOT_TOP_Y = UNIT_SLOT_CENTER_Y - 24;
+const UNIT_SLOT_TOP_Y = UNIT_SLOT_CENTER_Y - UNIT_SLOT_H / 2;
 const UNIT_GATE_Y = UNIT_SLOT_TOP_Y - UNIT_GATE_HEIGHT / 2;
 const BATTLE_UNIT_TOP_PADDING = 52;
 const BATTLE_UNIT_BOTTOM_PADDING = 32;
@@ -149,6 +178,7 @@ export class PrototypeScene extends Phaser.Scene {
   private state!: GameState;
   private balls = new Map<string, PinballBall>();
   private unitVisuals = new Map<string, UnitVisual>();
+  private launchSplitCounts = new Map<string, number>();
   private renderedEffectIds = new Set<string>();
   private hudTexts: Phaser.GameObjects.Text[] = [];
   private hudDetailTexts: Phaser.GameObjects.Text[] = [];
@@ -173,6 +203,8 @@ export class PrototypeScene extends Phaser.Scene {
   private frontlineButtonText?: Phaser.GameObjects.Text;
   private cameraFollowButton?: Phaser.GameObjects.Rectangle;
   private cameraFollowButtonText?: Phaser.GameObjects.Text;
+  private speedButton?: Phaser.GameObjects.Rectangle;
+  private speedButtonText?: Phaser.GameObjects.Text;
   private magicToggleButton?: Phaser.GameObjects.Rectangle;
   private magicToggleText?: Phaser.GameObjects.Text;
   private debugToggleButton?: Phaser.GameObjects.Rectangle;
@@ -227,7 +259,9 @@ export class PrototypeScene extends Phaser.Scene {
     this.createHud();
     this.createDebugControls();
     this.createUiDrawerToggles();
+    this.createSpeedControl();
     this.syncUiDensity();
+    this.applyGameSpeedToRuntime();
     this.bindDomControls();
     startPhase(this.state);
     this.spawnLaunchBall();
@@ -236,19 +270,21 @@ export class PrototypeScene extends Phaser.Scene {
 
   update(time: number, delta: number) {
     if (!this.state || this.gameOver) return;
+    this.applyGameSpeedToRuntime();
+    const scaledDelta = getScaledDeltaMs(this.state, delta);
     if (this.state.phaseActive) {
       const previousPhaseElapsed = this.state.phaseElapsedMs;
-      if (time - this.lastBallDropMs > activePacingPreset.autoLaunchIntervalMs) {
+      if (this.time.now - this.lastBallDropMs > activePacingPreset.autoLaunchIntervalMs) {
         for (let index = 0; index < this.state.modifiers.ballCount; index += 1) {
           this.time.delayedCall(index * activePacingPreset.multiBallDelayMs, () => this.spawnLaunchBall());
         }
-        this.lastBallDropMs = time;
+        this.lastBallDropMs = this.time.now;
       }
-      updateBattle(this.state, delta);
-      updateSpawnQueue(this.state, delta);
+      updateBattle(this.state, scaledDelta);
+      updateSpawnQueue(this.state, scaledDelta);
       updatePhaseEnemySpawns(this.state, previousPhaseElapsed);
       this.runFirstSpawnLoopAssist();
-      this.updateBattleCamera(delta);
+      this.updateBattleCamera(scaledDelta);
       if (shouldCompletePhase(this.state)) {
         this.endPhase();
       }
@@ -264,7 +300,7 @@ export class PrototypeScene extends Phaser.Scene {
     this.syncCombatFeedback();
     this.syncMiniMap();
     this.syncBases();
-    this.syncSlotFeedback(time);
+    this.syncSlotFeedback(this.time.now);
     this.syncBuildingSummaryTexts();
     this.flushFloatingTexts();
     this.updateHud();
@@ -311,7 +347,7 @@ export class PrototypeScene extends Phaser.Scene {
       .setDepth(4705)
       .setStrokeStyle(1, 0x86efac, 0.76)
       .setInteractive({ useHandCursor: true });
-    this.cameraFollowButtonText = this.add.text(x, y, '回前线', this.textStyle(13, '#dcfce7'))
+    this.cameraFollowButtonText = this.add.text(x, y, '回先锋', this.textStyle(13, '#dcfce7'))
       .setOrigin(0.5)
       .setDepth(4706);
     this.cameraFollowButton.on('pointerdown', () => this.restoreBattleCameraFollow());
@@ -631,7 +667,7 @@ export class PrototypeScene extends Phaser.Scene {
       .setDepth(4703)
       .setStrokeStyle(1, 0x93c5fd, 0.72)
       .setInteractive({ useHandCursor: true });
-    this.frontlineButtonText = this.add.text(x + w - 45, y + 19, '回前线', this.textStyle(11, '#f8fafc'))
+    this.frontlineButtonText = this.add.text(x + w - 45, y + 19, '回先锋', this.textStyle(11, '#f8fafc'))
       .setOrigin(0.5)
       .setDepth(4704);
     this.frontlineButton.on('pointerdown', () => this.restoreBattleCameraFollow());
@@ -696,8 +732,8 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private createPinballPipeline() {
-    this.createZonePanel('发球区', '分裂 / 发射 / 落空', LAUNCH_X, TOP_Y, LAUNCH_W, TOP_H, 0x1f332e);
-    this.createZonePanel('抉择区', '金币 / 法术 / 出兵 / 升级', DECISION_X, TOP_Y, DECISION_W, TOP_H, 0x222f46);
+    this.createZonePanel('战备区', '金币 / 法术 / 升级', DECISION_X, TOP_Y, DECISION_W, TOP_H, 0x222f46);
+    this.createZonePanel('发球区', '战备 / 分裂 / 发兵', LAUNCH_X, TOP_Y, LAUNCH_W, TOP_H, 0x1f332e);
     this.createZonePanel('出兵区', '5 槽进度 + 连续挡板', UNIT_X, TOP_Y, UNIT_W, TOP_H, 0x263044);
 
     this.createZoneBounds(LAUNCH_X, TOP_Y, LAUNCH_W, TOP_H);
@@ -795,16 +831,17 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private createPipelineArrows() {
-    this.drawPipelineArrow(LAUNCH_X + LAUNCH_W + 3, TOP_Y + 108, DECISION_X - 3, TOP_Y + 108, 0x93c5fd);
-    this.drawPipelineArrow(DECISION_X + DECISION_W + 3, TOP_Y + 108, UNIT_X - 3, TOP_Y + 108, 0x4ade80);
+    this.drawPipelineArrow(LAUNCH_X - 3, TOP_Y + 108, DECISION_X + DECISION_W + 3, TOP_Y + 108, 0x93c5fd);
+    this.drawPipelineArrow(LAUNCH_X + LAUNCH_W + 3, TOP_Y + 108, UNIT_X - 3, TOP_Y + 108, 0x4ade80);
   }
 
   private drawPipelineArrow(x1: number, y1: number, x2: number, y2: number, color: number) {
     const g = this.add.graphics().setDepth(55);
+    const direction = x2 >= x1 ? 1 : -1;
     g.lineStyle(3, color, 0.7);
     g.lineBetween(x1, y1, x2, y2);
     g.fillStyle(color, 0.7);
-    g.fillTriangle(x2, y2, x2 - 10, y2 - 7, x2 - 10, y2 + 7);
+    g.fillTriangle(x2, y2, x2 - direction * 10, y2 - 7, x2 - direction * 10, y2 + 7);
   }
 
   private createLauncherTurret() {
@@ -840,27 +877,23 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private createLaunchSlots() {
-    const slots = [
-      ['split', '分裂', 0x86efac],
-      ['fire', '发射', 0x93c5fd],
-      ['miss', '落空', 0xfca5a5],
-    ] as const;
-    this.createOutcomeSlots('launch', LAUNCH_X, LAUNCH_W, slots, TOP_Y + TOP_H - 24);
+    const slots = launchOutcomeSlotDefs.map((slot) => [slot.id, slot.label, slot.color, slot.widthWeight] as const);
+    this.createOutcomeSlots('launch', LAUNCH_X, LAUNCH_W, slots, OUTCOME_SLOT_CENTER_Y);
   }
 
   private createDecisionSlots() {
     this.destroyOutcomeVisuals(this.decisionVisuals);
     this.decisionVisuals = [];
     const slots = decisionSlotDefs.map((slot) => [slot.id, slot.label, slot.color] as const);
-    this.decisionVisuals = this.createOutcomeSlots('decision', DECISION_X, DECISION_W, slots, TOP_Y + TOP_H - 24);
+    this.decisionVisuals = this.createOutcomeSlots('decision', DECISION_X, DECISION_W, slots, OUTCOME_SLOT_CENTER_Y);
   }
 
-  private createOutcomeSlots(stage: BallStage, zoneX: number, zoneW: number, slots: ReadonlyArray<readonly [string, string, number]>, y: number): OutcomeVisual[] {
+  private createOutcomeSlots(stage: BallStage, zoneX: number, zoneW: number, slots: ReadonlyArray<readonly [string, string, number, number?]>, centerY: number): OutcomeVisual[] {
     const visuals: OutcomeVisual[] = [];
     const layouts = buildWeightedSlotLayouts(
-      slots.map(([id]) => ({
+      slots.map(([id, , , widthWeight]) => ({
         id,
-        widthWeight: stage === 'decision' ? this.state.slots[id as SlotId].widthWeight : 1,
+        widthWeight: stage === 'decision' ? this.state.slots[id as SlotId].widthWeight : widthWeight ?? 1,
       })),
       zoneX,
       zoneW,
@@ -873,16 +906,16 @@ export class PrototypeScene extends Phaser.Scene {
       const displayLabel = stage === 'decision'
         ? `${label} x${this.state.slots[id as SlotId].widthWeight.toFixed(1)}`
         : label;
-      const body = this.matter.add.rectangle(x, y + 4, layout.sensorWidth, 42, {
+      const body = this.matter.add.rectangle(x, centerY, layout.sensorWidth, OUTCOME_SLOT_H + 8, {
         isStatic: true,
         isSensor: true,
         label: `${SENSOR_LABEL_PREFIX}${stage}:${id}`,
       });
-      const plate = this.add.rectangle(x, y + 4, layout.plateWidth, 42, color, 0.28).setStrokeStyle(2, color, 0.88);
-      const text = this.add.text(x, y + 3, displayLabel, this.textStyle(12, '#f8fafc')).setOrigin(0.5);
+      const plate = this.add.rectangle(x, centerY, layout.plateWidth, OUTCOME_SLOT_H, color, 0.28).setStrokeStyle(2, color, 0.88);
+      const text = this.add.text(x, centerY - (stage === 'decision' ? 2 : 0), displayLabel, this.textStyle(9, '#f8fafc')).setOrigin(0.5);
       let count: Phaser.GameObjects.Text | undefined;
       if (stage === 'decision') {
-        count = this.add.text(x, y + 18, '0', this.textStyle(10, '#d1d5db')).setOrigin(0.5);
+        count = this.add.text(x, centerY + 6, '0', this.textStyle(7, '#d1d5db')).setOrigin(0.5);
       }
       visuals.push({ id, body, plate, label: text, count });
     });
@@ -912,21 +945,21 @@ export class PrototypeScene extends Phaser.Scene {
 
     const slots = getCurrentRaceUnitSlotStates(this.state);
     const slotW = (UNIT_W - 20) / slots.length;
-    const y = TOP_Y + TOP_H - 24;
+    const centerY = UNIT_SLOT_CENTER_Y;
     slots.forEach((slot, index) => {
       const x = UNIT_X + 10 + slotW * index + slotW / 2;
-      const body = this.matter.add.rectangle(x, y + 4, slotW - 5, 42, {
+      const body = this.matter.add.rectangle(x, centerY, slotW - 5, UNIT_SLOT_H + 8, {
         isStatic: true,
         isSensor: true,
         label: `${SENSOR_LABEL_PREFIX}unit:${index}`,
       });
       const unit = unitDefs[slot.unitId];
-      const plate = this.add.rectangle(x, y + 4, slotW - 5, 48, 0x111827, 0.52).setStrokeStyle(2, raceDefs[this.state.currentRaceId].color, 0.75);
-      const icon = this.add.image(x - slotW * 0.28, y + 3, unit.assetKey).setScale(0.2);
-      const label = this.add.text(x, y - 10, slot.label, this.textStyle(11, '#f8fafc')).setOrigin(0.5);
-      const progressBack = this.add.rectangle(x + slotW * 0.12, y + 10, slotW * 0.42, 5, 0x020617, 0.9);
-      const progressFill = this.add.rectangle(x + slotW * 0.12 - slotW * 0.21, y + 10, 0, 4, raceDefs[this.state.currentRaceId].color, 0.95).setOrigin(0, 0.5);
-      const progressText = this.add.text(x + slotW * 0.12, y + 21, `0/${slot.requirement}`, this.textStyle(10, '#dbeafe')).setOrigin(0.5);
+      const plate = this.add.rectangle(x, centerY, slotW - 5, UNIT_SLOT_H, 0x111827, 0.52).setStrokeStyle(2, raceDefs[this.state.currentRaceId].color, 0.75);
+      const icon = this.add.image(x - slotW * 0.31, centerY, unit.assetKey).setScale(0.13);
+      const label = this.add.text(x, centerY - 5, slot.label, this.textStyle(8, '#f8fafc')).setOrigin(0.5);
+      const progressBack = this.add.rectangle(x + slotW * 0.12, centerY + 2, slotW * 0.42, 3, 0x020617, 0.9);
+      const progressFill = this.add.rectangle(x + slotW * 0.12 - slotW * 0.21, centerY + 2, 0, 2, raceDefs[this.state.currentRaceId].color, 0.95).setOrigin(0, 0.5);
+      const progressText = this.add.text(x + slotW * 0.12, centerY + 7, `0/${slot.requirement}`, this.textStyle(7, '#dbeafe')).setOrigin(0.5);
       this.unitSlotVisuals.push({ slot, body, plate, icon, label, progressBack, progressFill, progressText });
     });
 
@@ -953,7 +986,7 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private createHud() {
-    const labels = ['战况', '基地', '资源', '部队', '下次出兵', '抉择'];
+    const labels = ['战况', '基地', '资源', '部队', '下次出兵', '战备'];
     for (let index = 0; index < labels.length; index += 1) {
       const x = 22 + index * 202;
       this.add.text(x, HUD_TOP + 10, labels[index], this.textStyle(11, '#94a3b8'));
@@ -972,7 +1005,7 @@ export class PrototypeScene extends Phaser.Scene {
   private createDebugControls() {
     const y = HUD_TOP + 88;
     this.trackDebugObjects(...Object.values(this.createButton(22, y, 88, '投球', () => this.spawnLaunchBall())));
-    this.trackDebugObjects(...Object.values(this.createButton(118, y, 98, '进抉择', () => this.spawnDecisionBall())));
+    this.trackDebugObjects(...Object.values(this.createButton(118, y, 98, '进战备', () => this.spawnDecisionBall())));
     this.trackDebugObjects(...Object.values(this.createButton(224, y, 98, '进出兵', () => this.spawnUnitBall())));
     this.trackDebugObjects(...Object.values(this.createButton(330, y, 88, '切种族', () => this.toggleRace())));
     this.trackDebugObjects(...Object.values(this.createButton(426, y, 108, '继续阶段', () => this.startPhaseFromDebug())));
@@ -1040,13 +1073,60 @@ export class PrototypeScene extends Phaser.Scene {
     this.syncUiDensity();
   }
 
+  private createSpeedControl() {
+    const x = 374;
+    const y = BATTLE_Y + 26;
+    this.speedButton = this.add.rectangle(x, y, 58, 26, 0x12322b, 0.96)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(2, 0x86efac, 0.72)
+      .setDepth(8100)
+      .setInteractive({ useHandCursor: true });
+    this.speedButtonText = this.add.text(x + 29, y, '', this.textStyle(12, '#dcfce7'))
+      .setOrigin(0.5)
+      .setDepth(8101)
+      .setInteractive({ useHandCursor: true });
+    for (const item of [this.speedButton, this.speedButtonText]) {
+      item.on('pointerdown', () => this.cycleGameSpeedFromUi());
+    }
+    this.syncSpeedControl();
+  }
+
+  private cycleGameSpeedFromUi() {
+    cycleGameSpeed(this.state);
+    this.applyGameSpeedToRuntime();
+    this.syncSpeedControl();
+    this.spawnFloatingText(404, BATTLE_Y + 62, `速度 ${this.state.speedMultiplier}x`, 0x86efac);
+  }
+
+  private applyGameSpeedToRuntime() {
+    const speed = this.state.speedMultiplier;
+    this.time.timeScale = speed;
+    this.matter.world.engine.timing.timeScale = speed;
+    (this.tweens as Phaser.Tweens.TweenManager & { timeScale: number }).timeScale = speed;
+  }
+
+  private syncSpeedControl() {
+    if (!this.speedButton || !this.speedButtonText) return;
+    const boosted = this.state.speedMultiplier > 1;
+    this.speedButton
+      .setFillStyle(boosted ? 0x14532d : 0x12322b, 0.96)
+      .setStrokeStyle(2, boosted ? 0xbbf7d0 : 0x86efac, boosted ? 0.92 : 0.72);
+    this.speedButtonText
+      .setText(`${this.state.speedMultiplier}x`)
+      .setColor(boosted ? '#f0fdf4' : '#dcfce7');
+  }
+
   private toggleBuildShopDrawer() {
-    this.buildShopOpen = !this.buildShopOpen;
+    const next = toggleBuildShopDrawerState({ mode: this.uiMode, buildShopOpen: this.buildShopOpen });
+    this.uiMode = next.mode;
+    this.buildShopOpen = next.buildShopOpen;
     this.syncUiDensity();
   }
 
   private toggleDebugDrawer() {
-    this.uiMode = this.uiMode === 'debug' ? 'play' : 'debug';
+    const next = toggleDebugDrawerState({ mode: this.uiMode, buildShopOpen: this.buildShopOpen });
+    this.uiMode = next.mode;
+    this.buildShopOpen = next.buildShopOpen;
     this.syncUiDensity();
   }
 
@@ -1138,11 +1218,18 @@ export class PrototypeScene extends Phaser.Scene {
   private createDebugPresetButtons() {
     const buttonW = 54;
     const gap = 6;
-    const startX = GAME_W - 20 - debugBuildPresets.length * buttonW - (debugBuildPresets.length - 1) * gap;
+    const row = buildRightAlignedButtonRow({
+      rightEdge: GAME_W - 160,
+      leadingButtonWidth: 56,
+      leadingGap: 10,
+      itemCount: debugBuildPresets.length,
+      itemWidth: buttonW,
+      gap,
+    });
     const y = BATTLE_Y + 26;
-    this.trackDebugObjects(...Object.values(this.createButton(startX - 66, y, 56, '探针', () => this.runDebugBuildProbes())));
+    this.trackDebugObjects(...Object.values(this.createButton(row.leadingX, y, 56, '探针', () => this.runDebugBuildProbes())));
     debugBuildPresets.forEach((preset, index) => {
-      this.trackDebugObjects(...Object.values(this.createButton(startX + index * (buttonW + gap), y, buttonW, preset.shortLabel, () => this.applyDebugPreset(preset.id))));
+      this.trackDebugObjects(...Object.values(this.createButton(row.itemXs[index], y, buttonW, preset.shortLabel, () => this.applyDebugPreset(preset.id))));
     });
   }
 
@@ -1232,6 +1319,10 @@ export class PrototypeScene extends Phaser.Scene {
       }
       if (action === 'build-shop') {
         this.toggleBuildShopDrawer();
+        return;
+      }
+      if (action === 'speed') {
+        this.cycleGameSpeedFromUi();
         return;
       }
       if (action.startsWith('tool-')) {
@@ -1371,8 +1462,8 @@ export class PrototypeScene extends Phaser.Scene {
     this.lastBallDropMs = this.time.now;
   }
 
-  private spawnLiftedLaunchBall(value = 1, point = this.getTopBandDropPoint(LAUNCH_X, LAUNCH_W), tags: BallTagId[] = []) {
-    this.spawnBall('launch', point.x, point.y, value, Phaser.Math.FloatBetween(-0.55, 0.55), 1.35, tags);
+  private spawnLiftedLaunchBall(value = 1, point = this.getTopBandDropPoint(LAUNCH_X, LAUNCH_W), tags: BallTagId[] = [], originalBallId?: string) {
+    this.spawnBall('launch', point.x, point.y, value, Phaser.Math.FloatBetween(-0.55, 0.55), 1.35, tags, originalBallId);
   }
 
   private spawnDecisionBall(value = 1, point = this.getTopBandDropPoint(DECISION_X, DECISION_W), tags: BallTagId[] = []) {
@@ -1406,8 +1497,9 @@ export class PrototypeScene extends Phaser.Scene {
     };
   }
 
-  private spawnBall(stage: BallStage, x: number, y: number, value: number, vx: number, vy: number, tags: BallTagId[] = []) {
+  private spawnBall(stage: BallStage, x: number, y: number, value: number, vx: number, vy: number, tags: BallTagId[] = [], originalBallId?: string) {
     const label = `${BALL_LABEL_PREFIX}${this.state.nextBallId++}`;
+    const lineageId = originalBallId ?? label;
     const ball = this.matter.add.image(x, y, 'machine_ball', undefined, {
       label,
       restitution: 0.74,
@@ -1422,11 +1514,15 @@ export class PrototypeScene extends Phaser.Scene {
       ball.setScale(PINBALL_BALL_SCALE * 1.08);
     }
     (ball.body as MatterJS.BodyType).label = label;
+    if (stage === 'launch' && !this.launchSplitCounts.has(lineageId)) {
+      this.launchSplitCounts.set(lineageId, 0);
+    }
     this.balls.set(label, {
       image: ball,
       stage,
       value,
       tags: normalizedTags,
+      originalBallId: lineageId,
       blockedGateHits: 0,
       createdAt: this.time.now,
       lastGateBounceAt: 0,
@@ -1460,11 +1556,24 @@ export class PrototypeScene extends Phaser.Scene {
   private handleLaunchOutcome(label: string, ball: PinballBall, outcome: string) {
     const x = ball.image.x;
     const y = ball.image.y;
-    this.destroyBall(label);
-    if (outcome === 'split' || outcome === 'fire' || outcome === 'miss') {
-      recordLaunchOutcome(this.state.stats.currentPhase, outcome as LaunchOutcomeId);
+    let launchOutcome = outcome as LaunchOutcomeId;
+    const assist = getFirstSpawnAssistPlan(this.state);
+    if (assist.forceDecisionSpawn && launchOutcome !== 'miss') {
+      launchOutcome = 'spawn';
+      markFirstSpawnOutcomeForced(this.state);
     }
-    if (outcome === 'split') {
+    const splitResolution = resolveLaunchOutcomeWithSplitLimit(
+      launchOutcome,
+      this.launchSplitCounts.get(ball.originalBallId) ?? 0,
+    );
+    if (launchOutcome === 'split' && splitResolution.outcome === 'split') {
+      this.launchSplitCounts.set(ball.originalBallId, splitResolution.nextSplitCount);
+    }
+    this.destroyBall(label);
+    if (launchOutcome === 'standby' || launchOutcome === 'split' || launchOutcome === 'spawn' || launchOutcome === 'miss') {
+      recordLaunchOutcome(this.state.stats.currentPhase, splitResolution.outcome);
+    }
+    if (splitResolution.outcome === 'split') {
       const extraSplitBalls = getExtraSplitBallCount(this.state);
       const relaunches = buildTaggedSplitRelaunchPlan({ value: ball.value, tags: ball.tags }, extraSplitBalls).map((item) => ({
         ...item,
@@ -1473,13 +1582,23 @@ export class PrototypeScene extends Phaser.Scene {
       this.spawnFloatingText(x, y - 26, `分裂 x${relaunches.length}`, 0x86efac);
       for (const [index, relaunch] of relaunches.entries()) {
         this.drawTransferTrail(x, y, relaunch.point.x, relaunch.point.y, 0x86efac);
-        this.time.delayedCall(80 + index * 100, () => this.spawnLiftedLaunchBall(relaunch.value, relaunch.point, relaunch.tags));
+        this.time.delayedCall(80 + index * 100, () => this.spawnLiftedLaunchBall(relaunch.value, relaunch.point, relaunch.tags, ball.originalBallId));
       }
-    } else if (outcome === 'fire') {
-      this.spawnFloatingText(x, y - 26, '发射', 0x93c5fd);
+    } else if (splitResolution.outcome === 'standby') {
+      this.spawnFloatingText(x, y - 26, '战备', 0x93c5fd);
       const drop = this.getTopBandDropPoint(DECISION_X, DECISION_W);
       this.drawTransferTrail(x, y, drop.x, drop.y, 0x93c5fd);
       this.spawnDecisionBall(ball.value, drop, ball.tags);
+    } else if (splitResolution.outcome === 'spawn') {
+      triggerSlot(this.state, 'spawn');
+      const taggedPayload = applyDecisionSpawnTags(this.state, { value: ball.value, tags: ball.tags });
+      const unitAssist = getFirstSpawnAssistPlan(this.state);
+      const drop = unitAssist.forceUnitSlotIndex === undefined
+        ? this.getTopBandDropPoint(UNIT_X, UNIT_W)
+        : this.getUnitSlotDropPoint(unitAssist.forceUnitSlotIndex);
+      this.spawnFloatingText(x, y - 26, splitResolution.limitReached ? '分裂上限 -> 发兵' : '发兵', 0x4ade80);
+      this.drawTransferTrail(x, y, drop.x, drop.y, 0x4ade80);
+      this.spawnUnitBall(consumeSpawnMarkBonus(this.state, taggedPayload.value), drop, taggedPayload.tags);
     } else {
       const recovered = recordLaunchMiss(this.state)
         + recordRelicLaunchMiss(this.state)
@@ -1492,11 +1611,6 @@ export class PrototypeScene extends Phaser.Scene {
 
   private handleDecisionOutcome(label: string, ball: PinballBall, slotId: SlotId) {
     this.destroyBall(label);
-    const assist = getFirstSpawnAssistPlan(this.state);
-    if (assist.forceDecisionSpawn) {
-      slotId = 'spawn';
-      markFirstSpawnOutcomeForced(this.state);
-    }
     const triggerResult = triggerSlot(this.state, slotId);
     this.slotFlashUntil.set(slotId, this.time.now + 420);
     const visual = this.decisionVisuals.find((candidate) => candidate.id === slotId);
@@ -1504,15 +1618,6 @@ export class PrototypeScene extends Phaser.Scene {
       this.spawnFloatingText(visual.plate.x, visual.plate.y - 44, this.state.recentFloatingTexts.at(-1)?.label ?? visual.id, visual.plate.fillColor);
     }
     if (triggerResult.status === 'disabled') return;
-    if (slotId === 'spawn') {
-      const taggedPayload = applyDecisionSpawnTags(this.state, { value: ball.value, tags: ball.tags });
-      const unitAssist = getFirstSpawnAssistPlan(this.state);
-      const drop = unitAssist.forceUnitSlotIndex === undefined
-        ? this.getTopBandDropPoint(UNIT_X, UNIT_W)
-        : this.getUnitSlotDropPoint(unitAssist.forceUnitSlotIndex);
-      this.drawTransferTrail(visual?.plate.x ?? DECISION_X + DECISION_W / 2, visual?.plate.y ?? TOP_Y + TOP_H - 20, drop.x, drop.y, 0x4ade80);
-      this.spawnUnitBall(consumeSpawnMarkBonus(this.state, taggedPayload.value), drop, taggedPayload.tags);
-    }
     if (slotId === 'magic') this.drawMagicFx();
   }
 
@@ -1669,7 +1774,7 @@ export class PrototypeScene extends Phaser.Scene {
     panel.add(this.add.rectangle(0, 0, 420, 250, 0x0f172a, 0.94).setStrokeStyle(2, 0x94a3b8));
     panel.add(this.add.text(-190, -108, title, this.textStyle(17, '#f8fafc')));
     const lines = [
-      `抉择 金币:${stats.slotTriggers.gold} 法术:${stats.slotTriggers.magic} 出兵:${stats.slotTriggers.spawn} 升级:${stats.slotTriggers.upgrade}`,
+      `战备 金币:${stats.slotTriggers.gold} 法术:${stats.slotTriggers.magic} 发兵:${stats.slotTriggers.spawn} 升级:${stats.slotTriggers.upgrade}`,
       `入队 ${stats.unitsQueued}  部署 ${stats.unitsSpawned}  老兵经验 ${stats.eliteXpGained}`,
       `伤害 ${stats.damageDealt}  击杀 ${stats.kills}  基地伤害 造成 ${stats.enemyBaseDamage}  承受 ${stats.playerBaseDamage}`,
       ...buildSummary.lines,
@@ -1689,7 +1794,7 @@ export class PrototypeScene extends Phaser.Scene {
     this.rewardContainer?.destroy(true);
     const panel = this.add.container(650, 355).setDepth(6000);
     panel.add(this.add.rectangle(0, 0, 590, 280, 0x101827, 0.96).setStrokeStyle(3, 0xf8fafc, 0.3));
-    panel.add(this.add.text(-250, -104, '选择一个奖励', this.textStyle(22, '#f8fafc')));
+    panel.add(this.add.text(-250, -104, '这一波要改造哪一段机器？', this.textStyle(20, '#f8fafc')));
     this.currentRewardChoices.forEach((reward, index) => {
       const cardX = -180 + index * 180;
       this.addRewardCard(panel, cardX, 25, reward);
@@ -1724,10 +1829,16 @@ export class PrototypeScene extends Phaser.Scene {
 
   private addRewardCard(panel: Phaser.GameObjects.Container, x: number, y: number, reward: RewardDef) {
     const card = this.add.rectangle(x, y, 158, 170, 0x1e293b).setStrokeStyle(2, 0x94a3b8);
-    const icon = this.add.image(x, y - 52, reward.icon).setScale(0.38);
-    const name = this.add.text(x, y - 16, reward.name, this.textStyle(14, '#f8fafc')).setOrigin(0.5).setWordWrapWidth(135);
-    const tag = this.add.text(x, y + 16, reward.tag, this.textStyle(12, '#facc15')).setOrigin(0.5);
-    const desc = this.add.text(x, y + 42, reward.description, this.textStyle(11, '#cbd5e1')).setOrigin(0.5, 0).setWordWrapWidth(132).setAlign('center');
+    const chamber = this.add.text(x, y - 70, `【${getRewardChamberLabel(reward.chamber)}】`, this.textStyle(12, '#facc15')).setOrigin(0.5);
+    const icon = this.add.image(x, y - 42, reward.icon).setScale(0.34);
+    const name = this.add.text(x, y - 9, reward.name, this.textStyle(14, '#f8fafc')).setOrigin(0.5).setWordWrapWidth(135).setAlign('center');
+    const tag = this.add.text(x, y + 22, reward.tag.replace(`${getRewardChamberLabel(reward.chamber)} · `, ''), this.textStyle(11, '#93c5fd')).setOrigin(0.5).setWordWrapWidth(135).setAlign('center');
+    const desc = this.add.text(
+      x,
+      y + 42,
+      reward.description,
+      createRewardDescriptionTextStyle(this.textStyle(10, '#cbd5e1')),
+    ).setOrigin(0.5, 0);
     const choose = () => {
       this.rewardContainer?.destroy(true);
       this.rewardContainer = undefined;
@@ -1739,7 +1850,7 @@ export class PrototypeScene extends Phaser.Scene {
       this.createResearchTechButtons();
       this.spawnLaunchBall();
     };
-    for (const item of [card, icon, name, tag, desc]) {
+    for (const item of [card, chamber, icon, name, tag, desc]) {
       item.setInteractive({ useHandCursor: true }).on('pointerdown', choose);
       panel.add(item);
     }
@@ -2044,14 +2155,14 @@ export class PrototypeScene extends Phaser.Scene {
     if (!this.frontlineButton || !this.frontlineButtonText || !this.cameraFollowButton || !this.cameraFollowButtonText) return;
     if (this.state.battle.camera.manualOverride) {
       this.frontlineButton.setFillStyle(0x78350f, 0.92).setStrokeStyle(1, 0xfacc15, 0.9);
-      this.frontlineButtonText.setText('回前线').setColor('#fef3c7');
+      this.frontlineButtonText.setText('回先锋').setColor('#fef3c7');
       this.cameraFollowButton.setFillStyle(0x78350f, 0.94).setStrokeStyle(1, 0xfacc15, 0.96);
-      this.cameraFollowButtonText.setText('回前线').setColor('#fef3c7');
+      this.cameraFollowButtonText.setText('回先锋').setColor('#fef3c7');
     } else {
       this.frontlineButton.setFillStyle(0x12322b, 0.88).setStrokeStyle(1, 0x86efac, 0.68);
-      this.frontlineButtonText.setText('回前线').setColor('#dcfce7');
+      this.frontlineButtonText.setText('回先锋').setColor('#dcfce7');
       this.cameraFollowButton.setFillStyle(0x12322b, 0.9).setStrokeStyle(1, 0x86efac, 0.76);
-      this.cameraFollowButtonText.setText('回前线').setColor('#dcfce7');
+      this.cameraFollowButtonText.setText('回先锋').setColor('#dcfce7');
     }
     this.syncDomCameraControls();
   }
@@ -2063,7 +2174,7 @@ export class PrototypeScene extends Phaser.Scene {
     if (!controls || !mode || !follow) return;
     controls.classList.toggle('manual', this.state.battle.camera.manualOverride);
     mode.textContent = this.state.battle.camera.manualOverride ? '手动镜头' : '自动跟随';
-    follow.textContent = '回前线';
+    follow.textContent = '回先锋';
   }
 
   private worldXToFrontlineRatio(worldX: number) {
@@ -2214,15 +2325,14 @@ export class PrototypeScene extends Phaser.Scene {
     }
     const assist = getFirstSpawnAssistPlan(this.state);
     if (!assist.forceDecisionSpawn) return;
-    const activeDecisionBall = [...this.balls.values()].some((ball) => ball.stage === 'decision');
+    const activeLaunchBall = [...this.balls.values()].some((ball) => ball.stage === 'launch');
     const activeUnitBall = [...this.balls.values()].some((ball) => ball.stage === 'unit');
-    if (activeDecisionBall || activeUnitBall || this.state.phaseElapsedMs < 1200) return;
-    const spawnVisual = this.decisionVisuals.find((visual) => visual.id === 'spawn');
-    this.spawnDecisionBall(1, {
-      x: spawnVisual?.plate.x ?? DECISION_X + DECISION_W / 2,
-      y: TOP_Y + 28,
-    });
-    this.spawnFloatingText(spawnVisual?.plate.x ?? DECISION_X + DECISION_W / 2, TOP_Y + 62, '开局闭环助推', 0x4ade80);
+    if (activeLaunchBall || activeUnitBall || this.state.phaseElapsedMs < 1200) return;
+    const drop = this.getUnitSlotDropPoint(assist.forceUnitSlotIndex ?? 0);
+    triggerSlot(this.state, 'spawn');
+    markFirstSpawnOutcomeForced(this.state);
+    this.spawnUnitBall(consumeSpawnMarkBonus(this.state, 1), drop);
+    this.spawnFloatingText(drop.x, TOP_Y + 62, '开局发兵助推', 0x4ade80);
   }
 
   private syncSlotFeedback(time: number) {
@@ -2466,6 +2576,7 @@ export class PrototypeScene extends Phaser.Scene {
     });
     this.syncBuildIdentityVisuals();
     this.syncBuildSurfaceHud();
+    this.syncSpeedControl();
     this.syncMagicToggle();
     this.syncPhaseToolButtons();
     this.syncResearchTechButtons();

@@ -30,7 +30,7 @@ const UNIT_STRUCTURE_LEVEL_COST = 18;
 
 const chamberLabels: Record<BuildingChamber, string> = {
   launch: '发球区',
-  decision: '抉择区',
+  decision: '战备区',
   unit: '出兵区',
 };
 
@@ -167,7 +167,7 @@ export function getEffectiveUnitGateState(state: GameState, elapsedMs: number, d
   const gateActuatorLevel = getBuildingLevel(state, 'unit_gate_actuator');
   if (gateActuatorLevel <= 0) return getUnitGateState(elapsedMs, durationMs);
 
-  const effectiveDuration = durationMs * Math.max(0.28, 0.8 - (gateActuatorLevel - 1) * 0.1);
+  const effectiveDuration = durationMs * Math.max(0.29, 0.45 - (gateActuatorLevel - 1) * 0.08);
   return getUnitGateState(elapsedMs, effectiveDuration);
 }
 

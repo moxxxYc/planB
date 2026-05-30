@@ -84,3 +84,28 @@ The prototype is done when:
 - It has wave rewards.
 - It has basic combat stats.
 - It has a README and progress log.
+
+## gstack-game Codex Skills
+
+Project-local design skills live under `.codex/skills/`. They are migrated from
+`/Users/yang/Projects/gstack-game` and adapted only for Codex on macOS. Preserve
+the original gstack-game design methods and rubrics.
+
+Use these skill groups:
+
+- Creative and direction: `spark-lens`, `game-ideation`, `game-direction`,
+  `pitch-review`.
+- GDD and design documents: `game-import`, `game-review`,
+  `plan-design-review`.
+- Player experience and validation: `player-experience`,
+  `build-playability-review`, `feel-pass`, `playtest`.
+
+Runtime rules:
+
+- Use repository-local files and macOS shell commands such as `rg`, `find`,
+  `sed`, and `ls`.
+- Do not use legacy generated automation, external artifact stores, or
+  platform-specific paths from the source gstack-game project.
+- When a skill asks for a persistent artifact, write it inside this repository,
+  usually under `docs/gstack-artifacts/`, unless the skill names a canonical
+  path such as `docs/gdd.md`.

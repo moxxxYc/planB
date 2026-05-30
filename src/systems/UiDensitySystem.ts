@@ -5,6 +5,11 @@ import type { GameState } from '../types/game';
 
 export type UiMode = 'play' | 'debug';
 
+export interface UiDrawerState {
+  mode: UiMode;
+  buildShopOpen: boolean;
+}
+
 export interface UiDensityPlan {
   showDebugControls: boolean;
   showBuildShopPanel: boolean;
@@ -41,7 +46,7 @@ const playPlan: UiDensityPlan = {
 
 const debugPlan: UiDensityPlan = {
   showDebugControls: true,
-  showBuildShopPanel: true,
+  showBuildShopPanel: false,
   showTopChamberSummaries: true,
   showTopExplanatoryText: true,
   showBuildIdentityOverlay: true,
@@ -51,6 +56,22 @@ const debugPlan: UiDensityPlan = {
 
 export function getUiDensityPlan(mode: UiMode): UiDensityPlan {
   return mode === 'debug' ? debugPlan : playPlan;
+}
+
+export function toggleDebugDrawerState(state: UiDrawerState): UiDrawerState {
+  const openingDebug = state.mode !== 'debug';
+  return {
+    mode: openingDebug ? 'debug' : 'play',
+    buildShopOpen: openingDebug ? false : state.buildShopOpen,
+  };
+}
+
+export function toggleBuildShopDrawerState(state: UiDrawerState): UiDrawerState {
+  const buildShopOpen = !state.buildShopOpen;
+  return {
+    mode: buildShopOpen ? 'play' : state.mode,
+    buildShopOpen,
+  };
 }
 
 export function getEventFeedSlot(index: number, visibleRows = playPlan.visibleEventFeedRows): EventFeedSlot {
@@ -100,7 +121,7 @@ export function buildCompactHudBlocks(state: GameState): CompactHudBlock[] {
       value: `Lv+${state.pendingSpawnLevelBonus}`,
     },
     {
-      label: '抉择',
+      label: '战备',
       value: `金${state.stats.currentPhase.slotTriggers.gold} 法${state.stats.currentPhase.slotTriggers.magic} 出${state.stats.currentPhase.slotTriggers.spawn} 升${state.stats.currentPhase.slotTriggers.upgrade}`,
     },
   ];

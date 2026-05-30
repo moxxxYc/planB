@@ -9,6 +9,7 @@ import { doctrineTechDefs } from '../data/doctrineTechs';
 import { decisionSlotDefs, slotDefs } from '../data/slots';
 import { unitDefs } from '../data/units';
 import { svgAssets } from '../rendering/assets';
+import { createRewardDescriptionTextStyle, REWARD_CARD_DESCRIPTION_WRAP_WIDTH } from '../rendering/rewardTextLayout';
 import { createInitialGameState } from './GameState';
 import { triggerSlot } from './SlotTriggerSystem';
 import { getBattleContactRatio, getBattleFrontlineRatio, getBattleLaneOffset, spawnBattleUnit, spawnDebugRaceUnit, updateBattle } from './BattleSystem';
@@ -37,12 +38,19 @@ import {
 import { applyDebugBuildPreset, debugBuildPresets } from './DebugPresetSystem';
 import { buildChamberPanelSummaries, buildIdentityVisualSummary, buildPhaseTelemetrySummary, getDominantBuildChamber } from './BuildTelemetrySystem';
 import * as BuildTelemetrySystem from './BuildTelemetrySystem';
-import { runAllBuildProbes, runBuildProbe } from './BuildProbeSystem';
+import { runAllBuildProbes, runBuildProbe, runNaturalBlueprintRewardProbe } from './BuildProbeSystem';
 import { buildProbeValidationReport, formatBuildProbeValidationReport } from './BuildProbeValidationSystem';
 import { buildIdentitySmokePlan } from './BuildVisualSmokeSystem';
 import { buildV12ReadinessReport, formatV12ReadinessReport } from './V12ReadinessSystem';
 import { buildRuntimeVisualTimingReport } from './RuntimeVisualTimingSystem';
-import { buildCompactHudBlocks, getEventFeedSlot, getUiDensityPlan } from './UiDensitySystem';
+import {
+  buildCompactHudBlocks,
+  getEventFeedSlot,
+  getUiDensityPlan,
+  toggleBuildShopDrawerState,
+  toggleDebugDrawerState,
+} from './UiDensitySystem';
+import { buildPrototypeLayout, buildRightAlignedButtonRow, buildTopZoneLayout } from './PrototypeLayoutSystem';
 import {
   installRelic,
   isRelicReward,
@@ -56,10 +64,12 @@ import {
 } from './DoctrineSystem';
 import { getFirstSpawnAssistPlan, markFirstSpawnLoopSeen } from './FirstSpawnLoopAssistSystem';
 import {
+  buildLaunchOutcomeSlotLayouts,
   buildLaunchSplitRelaunchPlan,
   getControlledGateBounceVelocity,
   getLauncherVelocity,
   getSweepingLauncherAngle,
+  resolveLaunchOutcomeWithSplitLimit,
 } from './PinballMachineSystem';
 import { addToSpawnQueue, updateSpawnQueue } from './SpawnQueueSystem';
 import {
@@ -81,6 +91,12 @@ import {
   getPannedBattleCameraCenter,
   projectBattlePoint,
 } from './BattlefieldViewSystem';
+import {
+  GAME_SPEED_STEPS,
+  cycleGameSpeed,
+  getScaledDeltaMs,
+  setGameSpeed,
+} from './SpeedSystem';
 
 describe('slot trigger rules', () => {
   it('does not expose a charge slot or charge rewards', () => {
@@ -89,12 +105,12 @@ describe('slot trigger rules', () => {
     expect(rewardDefs.some((reward) => reward.description.includes('蓄力') || reward.description.includes('CHARGE'))).toBe(false);
   });
 
-  it('presents decision slots without SPECIAL and keeps SPAWN in the middle', () => {
+  it('presents standby slots without SPAWN or SPECIAL', () => {
     const decisionIds = decisionSlotDefs.map((slot) => slot.id);
 
-    expect(decisionIds).toEqual(['gold', 'magic', 'spawn', 'upgrade']);
+    expect(decisionIds).toEqual(['gold', 'magic', 'upgrade']);
+    expect(decisionIds).not.toContain('spawn');
     expect(decisionIds).not.toContain('special');
-    expect(Math.abs(decisionIds.indexOf('spawn') - (decisionIds.length - 1) / 2)).toBeLessThanOrEqual(0.5);
   });
 
   it('SPAWN records the decision outcome without directly queueing random units', () => {
@@ -197,6 +213,36 @@ describe('slot trigger rules', () => {
 });
 
 describe('pinball machine rules', () => {
+  it('starts at normal speed and cycles through capped mouse-only speed steps', () => {
+    const state = createInitialGameState('hive', 7);
+
+    expect(state.speedMultiplier).toBe(1);
+    expect(GAME_SPEED_STEPS).toEqual([1, 2, 4]);
+    expect(cycleGameSpeed(state)).toBe(2);
+    expect(cycleGameSpeed(state)).toBe(4);
+    expect(cycleGameSpeed(state)).toBe(1);
+  });
+
+  it('clamps direct game speed changes to the supported maximum of 4x', () => {
+    const state = createInitialGameState('mech', 8);
+
+    expect(setGameSpeed(state, 3)).toBe(4);
+    expect(state.speedMultiplier).toBe(4);
+    expect(setGameSpeed(state, 12)).toBe(4);
+    expect(state.speedMultiplier).toBe(4);
+    expect(setGameSpeed(state, 0)).toBe(1);
+    expect(state.speedMultiplier).toBe(1);
+  });
+
+  it('scales custom simulation delta with the selected game speed', () => {
+    const state = createInitialGameState('hive', 9);
+
+    expect(getScaledDeltaMs(state, 250)).toBe(250);
+    setGameSpeed(state, 4);
+    expect(getScaledDeltaMs(state, 250)).toBe(1000);
+    expect(getScaledDeltaMs(state, -10)).toBe(0);
+  });
+
   it('sweeps the launch turret across a deterministic 180 degree arc', () => {
     expect(getSweepingLauncherAngle(0, 2400)).toBe(-90);
     expect(getSweepingLauncherAngle(600, 2400)).toBe(0);
@@ -216,6 +262,36 @@ describe('pinball machine rules', () => {
       { stage: 'launch', value: 2 },
       { stage: 'launch', value: 2 },
     ]);
+  });
+
+  it('weights launch outcome slots as standby 2, split 1, spawn 2 by default', () => {
+    const layouts = buildLaunchOutcomeSlotLayouts(0, 500, 0, 0);
+
+    expect(layouts.map((slot) => slot.id)).toEqual(['standby', 'split', 'spawn']);
+    expect(layouts.map((slot) => slot.plateWidth)).toEqual([200, 100, 200]);
+  });
+
+  it('converts a third split from the same original ball into spawn', () => {
+    expect(resolveLaunchOutcomeWithSplitLimit('split', 0)).toEqual({
+      outcome: 'split',
+      nextSplitCount: 1,
+      limitReached: false,
+    });
+    expect(resolveLaunchOutcomeWithSplitLimit('split', 1)).toEqual({
+      outcome: 'split',
+      nextSplitCount: 2,
+      limitReached: false,
+    });
+    expect(resolveLaunchOutcomeWithSplitLimit('split', 2)).toEqual({
+      outcome: 'spawn',
+      nextSplitCount: 2,
+      limitReached: true,
+    });
+    expect(resolveLaunchOutcomeWithSplitLimit('standby', 2)).toEqual({
+      outcome: 'standby',
+      nextSplitCount: 2,
+      limitReached: false,
+    });
   });
 
   it('lets a launch building add an extra split relaunch ball', () => {
@@ -350,6 +426,8 @@ describe('unit spawn progress rules', () => {
     const startGate = getUnitGateState(0, durationMs);
     const barelyOpenGate = getUnitGateState(1000, durationMs);
     const quarterGate = getUnitGateState(durationMs * 0.25, durationMs);
+    const oldFullOpenGate = getUnitGateState(durationMs * 0.4, durationMs);
+    const phaseEndGate = getUnitGateState(durationMs, durationMs);
     const fullOpenGate = getUnitGateState(durationMs * activePacingPreset.unitGateFullOpenPhaseRatio, durationMs);
 
     expect(getUnlockedUnitSlotCount(state, 0, durationMs)).toBe(1);
@@ -362,10 +440,12 @@ describe('unit spawn progress rules', () => {
     expect(quarterGate.openUnitIndex).toBeLessThan(4);
     expect(getUnitGateOpenBoundaryRatio(durationMs * 0.25, durationMs)).toBeGreaterThan(0.2);
     expect(getUnitGateOpenBoundaryRatio(durationMs * 0.25, durationMs)).toBeLessThan(1);
+    expect(oldFullOpenGate.openSlotCount).toBeLessThan(5);
+    expect(phaseEndGate.openBoundaryRatio).toBeCloseTo(0.6, 5);
     expect(getUnitGateOpenBoundaryRatio(durationMs * activePacingPreset.unitGateFullOpenPhaseRatio, durationMs)).toBe(1);
     expect(fullOpenGate.openUnitIndex).toBe(4);
     expect(fullOpenGate.openSlotCount).toBe(5);
-    expect(getUnitGateOpenBoundaryRatio(durationMs * 0.8, durationMs)).toBe(1);
+    expect(getUnitGateOpenBoundaryRatio(durationMs * 0.8, durationMs)).toBeLessThan(1);
     expect(getUnlockedUnitSlotCount(state, durationMs * activePacingPreset.unitGateFullOpenPhaseRatio, durationMs)).toBe(5);
   });
 
@@ -376,7 +456,10 @@ describe('unit spawn progress rules', () => {
     installOrUpgradeBuilding(built, 'unit_gate_actuator');
 
     expect(getEffectiveUnitGateState(plain, 15000, 60000).openSlotCount).toBeLessThan(5);
-    expect(getEffectiveUnitGateState(built, 15000, 60000).openSlotCount).toBe(5);
+    expect(getEffectiveUnitGateState(built, 15000, 60000).openSlotCount).toBeGreaterThan(
+      getEffectiveUnitGateState(plain, 15000, 60000).openSlotCount,
+    );
+    expect(getEffectiveUnitGateState(built, 15000, 60000).openSlotCount).toBeGreaterThanOrEqual(3);
   });
 
   it('counts a ball as valid when it lands in a partially open unit slot', () => {
@@ -792,6 +875,33 @@ describe('battlefield view rules', () => {
     expect(getBattleHotspotRatio(state)).toBeGreaterThan(0);
   });
 
+  it('focuses automatic camera follow on the living player unit closest to the enemy base', () => {
+    const state = createInitialGameState('hive', 304);
+    const backline = spawnBattleUnit(state, 'player', 'hive_grub');
+    const vanguard = spawnBattleUnit(state, 'player', 'hive_spitter');
+    const enemy = spawnBattleUnit(state, 'enemy', 'enemy_raider');
+    backline.x = 420;
+    vanguard.x = 910;
+    enemy.x = 760;
+
+    const span = state.battle.bases.enemy.x - state.battle.bases.player.x;
+    expect(getBattleHotspotRatio(state)).toBeCloseTo((vanguard.x - state.battle.bases.player.x) / span, 5);
+
+    vanguard.hp = 0;
+    expect(getBattleHotspotRatio(state)).toBeCloseTo((backline.x - state.battle.bases.player.x) / span, 5);
+  });
+
+  it('uses true enemy-base distance for automatic player-unit camera focus', () => {
+    const state = createInitialGameState('hive', 305);
+    const nearEnemyBase = spawnBattleUnit(state, 'player', 'hive_grub');
+    const overshotEnemyBase = spawnBattleUnit(state, 'player', 'hive_spitter');
+    nearEnemyBase.x = state.battle.bases.enemy.x - 70;
+    overshotEnemyBase.x = state.battle.bases.enemy.x + 130;
+
+    const span = state.battle.bases.enemy.x - state.battle.bases.player.x;
+    expect(getBattleHotspotRatio(state)).toBeCloseTo((nearEnemyBase.x - state.battle.bases.player.x) / span, 5);
+  });
+
   it('keeps heat bands stable when there are no units', () => {
     const state = createInitialGameState('mech', 404);
     const bands = buildBattleHeatBands(state.battle.units, state.battle.bases.player.x, state.battle.bases.enemy.x, 16);
@@ -802,6 +912,18 @@ describe('battlefield view rules', () => {
 });
 
 describe('reward rules', () => {
+  it('configures reward description text for centered CJK wrapping inside cards', () => {
+    const style = createRewardDescriptionTextStyle({ color: '#cbd5e1', fontSize: '10px' });
+
+    expect(style.align).toBe('center');
+    expect(style.fixedWidth).toBe(REWARD_CARD_DESCRIPTION_WRAP_WIDTH);
+    expect(style.wordWrap).toEqual({
+      width: REWARD_CARD_DESCRIPTION_WRAP_WIDTH,
+      useAdvancedWrap: true,
+    });
+    expect(style.lineSpacing).toBeGreaterThanOrEqual(1);
+  });
+
   it('installs and upgrades chamber buildings from reward blueprints', () => {
     const state = createInitialGameState('hive', 60);
 
@@ -813,7 +935,7 @@ describe('reward rules', () => {
     expect(state.buildings).toEqual([
       { id: 'decision_coin_press', chamber: 'decision', level: 2 },
     ]);
-    expect(getBuildingSummary(state)).toContain('抉择区: 铸币导槽 Lv2');
+    expect(getBuildingSummary(state)).toContain('战备区: 铸币导槽 Lv2');
   });
 
   it('lets gold buy and upgrade unit structures outside phase-end rewards', () => {
@@ -875,27 +997,36 @@ describe('reward rules', () => {
     expect(state.slots.spawn.widthWeight).toBeGreaterThan(1);
   });
 
-  it('offers phase-end rewards as a relic triplet while enough relics remain', () => {
+  it('offers phase-end rewards as one blueprint for each machine chamber', () => {
     const state = createInitialGameState('hive', 20);
 
     const choices = buildRewardChoices(state);
 
     expect(choices).toHaveLength(3);
-    expect(choices.every((reward) => isRelicReward(reward.id))).toBe(true);
-    expect(choices.some((reward) => isBuildingReward(reward.id))).toBe(false);
-    expect(choices.some((reward) => isDoctrineTechReward(reward.id))).toBe(false);
+    expect(choices.map((reward) => reward.chamber)).toEqual(['launch', 'decision', 'unit']);
+    expect(choices.map((reward) => reward.sourceType)).toEqual(['building', 'building', 'building']);
+    expect(choices.every((reward) => reward.tag.includes('蓝图'))).toBe(true);
+    expect(new Set(choices.map((reward) => reward.chamber)).size).toBe(3);
   });
 
-  it('falls back to legacy cards once relic rewards are exhausted', () => {
+  it('falls back to same-chamber legacy cards after permanent blueprint choices are exhausted', () => {
     const state = createInitialGameState('hive', 28);
     state.relics = relicDefs.map((relic) => ({ id: relic.id }));
+    state.doctrineTechs = doctrineTechDefs.map((tech) => ({ id: tech.id }));
+    for (const buildingId of ['launch_splitter_rack', 'launch_recycle_buffer']) {
+      installOrUpgradeBuilding(state, buildingId);
+      installOrUpgradeBuilding(state, buildingId);
+      installOrUpgradeBuilding(state, buildingId);
+    }
 
     const choices = buildRewardChoices(state);
+    const launchChoice = choices.find((reward) => reward.chamber === 'launch');
 
     expect(choices).toHaveLength(3);
-    expect(choices.some((reward) => isBuildingReward(reward.id))).toBe(false);
-    expect(choices.some((reward) => isDoctrineTechReward(reward.id))).toBe(false);
-    expect(choices.every((reward) => !isRelicReward(reward.id))).toBe(true);
+    expect(launchChoice?.sourceType).toBe('legacy');
+    expect(['extra_ball_interval', 'double_drop']).toContain(launchChoice?.id);
+    expect(choices.map((reward) => reward.chamber)).toEqual(['launch', 'decision', 'unit']);
+    expect(choices.every((reward) => reward.sourceType !== 'relic')).toBe(true);
   });
 
   it('lets a decision building convert repeated gold hits into spawn mark value', () => {
@@ -912,10 +1043,10 @@ describe('reward rules', () => {
     expect(state.recentFloatingTexts.at(-1)?.label).toBe('铸币导槽：出兵标记 +1');
   });
 
-  it('lays out decision slots from live width weights instead of equal columns', () => {
+  it('lays out standby slots from live width weights instead of equal columns', () => {
     const state = createInitialGameState('hive', 19);
-    state.slots.spawn.widthWeight = 1.2;
     state.slots.gold.widthWeight = 1.3;
+    state.slots.upgrade.widthWeight = 1.2;
 
     const layouts = buildWeightedSlotLayouts(
       decisionSlotDefs.map((slot) => state.slots[slot.id]),
@@ -924,13 +1055,14 @@ describe('reward rules', () => {
       9,
       4,
     );
-    const spawn = layouts.find((slot) => slot.id === 'spawn');
     const magic = layouts.find((slot) => slot.id === 'magic');
     const gold = layouts.find((slot) => slot.id === 'gold');
+    const upgrade = layouts.find((slot) => slot.id === 'upgrade');
 
-    expect(layouts).toHaveLength(4);
-    expect(spawn?.sensorWidth).toBeGreaterThan(magic?.sensorWidth ?? 0);
-    expect(gold?.plateWidth).toBeGreaterThan(spawn?.plateWidth ?? 0);
+    expect(layouts).toHaveLength(3);
+    expect(layouts.map((slot) => slot.id)).toEqual(['gold', 'magic', 'upgrade']);
+    expect(gold?.sensorWidth).toBeGreaterThan(magic?.sensorWidth ?? 0);
+    expect(upgrade?.plateWidth).toBeGreaterThan(magic?.plateWidth ?? 0);
     expect(layouts[0].left).toBeCloseTo(249);
     expect(layouts.at(-1)?.right).toBeCloseTo(591);
   });
@@ -1267,11 +1399,68 @@ describe('build telemetry rules', () => {
     expect(playPlan.showTransferTrails).toBe(false);
     expect(playPlan.visibleEventFeedRows).toBe(3);
     expect(debugPlan.showDebugControls).toBe(true);
-    expect(debugPlan.showBuildShopPanel).toBe(true);
+    expect(debugPlan.showBuildShopPanel).toBe(false);
     expect(debugPlan.showTopChamberSummaries).toBe(true);
     expect(debugPlan.showTopExplanatoryText).toBe(true);
     expect(debugPlan.showBuildIdentityOverlay).toBe(true);
     expect(debugPlan.showTransferTrails).toBe(true);
+  });
+
+  it('keeps debug and build drawers mutually exclusive', () => {
+    expect(toggleDebugDrawerState({ mode: 'play', buildShopOpen: false })).toEqual({ mode: 'debug', buildShopOpen: false });
+    expect(toggleDebugDrawerState({ mode: 'play', buildShopOpen: true })).toEqual({ mode: 'debug', buildShopOpen: false });
+    expect(toggleBuildShopDrawerState({ mode: 'debug', buildShopOpen: false })).toEqual({ mode: 'play', buildShopOpen: true });
+    expect(toggleBuildShopDrawerState({ mode: 'play', buildShopOpen: true })).toEqual({ mode: 'play', buildShopOpen: false });
+  });
+
+  it('shrinks pinball slot frames to one third and gives the reclaimed height to the battlefield', () => {
+    const layout = buildPrototypeLayout({
+      gameW: 1280,
+      gameH: 720,
+      topY: 12,
+      hudH: 104,
+    });
+
+    expect(layout.outcomeSlotH).toBe(14);
+    expect(layout.unitSlotH).toBe(16);
+    expect(layout.topH).toBe(164);
+    expect(layout.battleY).toBe(184);
+    expect(layout.battleH).toBe(424);
+  });
+
+  it('places standby, launch, and unit zones from left to right', () => {
+    const zones = buildTopZoneLayout({
+      gameW: 1280,
+      sideMargin: 14,
+      gap: 10,
+      launchW: 225,
+      decisionW: 350,
+      unitW: 657,
+      unitWidthScale: 0.75,
+    });
+
+    expect(zones.launch.w).toBeCloseTo(389.25, 5);
+    expect(zones.decision.w).toBe(350);
+    expect(zones.unit.w).toBeCloseTo(492.75, 5);
+    expect(zones.decision.x).toBe(14);
+    expect(zones.launch.x).toBe(374);
+    expect(zones.unit.x).toBeCloseTo(773.25, 5);
+    expect(zones.unit.x + zones.unit.w).toBe(1266);
+  });
+
+  it('keeps top-row debug preset buttons clear of the drawer toggles', () => {
+    const drawerToggleLeft = 1280 - 150;
+    const row = buildRightAlignedButtonRow({
+      rightEdge: drawerToggleLeft - 10,
+      leadingButtonWidth: 56,
+      leadingGap: 10,
+      itemCount: debugBuildPresets.length,
+      itemWidth: 54,
+      gap: 6,
+    });
+
+    expect(row.leadingX + 56).toBeLessThan(row.itemXs[0]);
+    expect(Math.max(...row.itemXs.map((x) => x + 54))).toBeLessThanOrEqual(drawerToggleLeft - 10);
   });
 
   it('routes machine feedback into a small battlefield event feed', () => {
@@ -1294,7 +1483,7 @@ describe('build telemetry rules', () => {
 
     const blocks = buildCompactHudBlocks(state);
 
-    expect(blocks.map((block) => block.label)).toEqual(['战况', '基地', '资源', '部队', '下次出兵', '抉择']);
+    expect(blocks.map((block) => block.label)).toEqual(['战况', '基地', '资源', '部队', '下次出兵', '战备']);
     expect(blocks).toHaveLength(6);
     expect(blocks[0]).toMatchObject({ value: '虫群 1/6', detail: '推进中' });
     expect(blocks[2].value).toBe('金 91 / 研 20');
@@ -1337,11 +1526,11 @@ describe('build telemetry rules', () => {
 
   it('maps each target build identity to distinct visible machine signatures', () => {
     const expected = [
-      ['swarm', '虫群爆兵', '分裂增殖', 'SPAWN 扩张', '溢流输送'],
+      ['swarm', '虫群爆兵', '分裂增殖', '发兵扩张', '溢流输送'],
       ['magic_copy', '法术复制', '棱镜弹匣', '法术复制', '复制兑现'],
       ['mech_elite', '机械精英', '稳定供球', '升级校准', '高阶绞盘'],
       ['economy_industry', '经济工业', '回收供能', '金币工业', '队列爆发'],
-      ['recovery', '逆风修复', 'miss 回收', '金币保底', '修复输送'],
+      ['recovery', '逆风修复', '丢失回收', '金币保底', '修复输送'],
     ] as const;
 
     const accentColors = new Set<number>();
@@ -1409,6 +1598,7 @@ describe('build telemetry rules', () => {
       'three_surface_layers',
       'named_state_fields',
       'midgame_pacing',
+      'three_chamber_blueprint_rewards',
       'debug_build_identities',
       'cross_chamber_chain',
       'recovery_guardrail',
@@ -1564,8 +1754,9 @@ describe('build telemetry rules', () => {
     startPhase(state);
     state.phaseElapsedMs = phaseDefs[state.phaseIndex].durationMs * 0.5;
 
+    recordLaunchOutcome(state.stats.currentPhase, 'standby');
     recordLaunchOutcome(state.stats.currentPhase, 'split');
-    recordLaunchOutcome(state.stats.currentPhase, 'fire');
+    recordLaunchOutcome(state.stats.currentPhase, 'spawn');
     recordLaunchOutcome(state.stats.currentPhase, 'miss');
     triggerSlot(state, 'gold');
     buyPhaseTool(state, 'spawn_beacon');
@@ -1585,7 +1776,7 @@ describe('build telemetry rules', () => {
     expect(state.stats.currentPhase.unitsQueuedById.hive_grub).toBe(2);
     expect(state.stats.currentPhase.unitsDeployedById.hive_grub).toBe(1);
     expect(summary.lines).toEqual(expect.arrayContaining([
-      '发球 split1 fire1 miss1  抉择 金1 法0 出0 升0',
+      '发球 战备1 分裂1 发兵1 丢失1  战备 金1 法0 升0  发兵0',
       '回流工具 1  标记 2/0  复制 0  遗物 0  研究 0(0/4)  保底 1/3  回流效率 100%  最长非出兵 1  首次回流 0.0s  来源 工具x1',
       '入队 幼虫兵x2  部署 幼虫兵x1  高阶 0/2',
     ]));
@@ -1649,6 +1840,27 @@ describe('build probe rules', () => {
     expect(result.warnings).not.toContain('no_combat_impact');
   });
 
+  it('proves natural phase rewards can form a three-chamber blueprint build without debug presets', () => {
+    const result = runNaturalBlueprintRewardProbe(180);
+
+    expect(result.probeId).toBe('natural_blueprint_reward_probe');
+    expect(result.debugPresetUsed).toBe(false);
+    expect(result.ok).toBe(true);
+    expect(result.rewardSelections.map((selection) => selection.chamber)).toEqual(['launch', 'decision', 'unit']);
+    expect(result.rewardSelections.every((selection) => selection.sourceType === 'building')).toBe(true);
+    expect(result.offeredChambersByPhase.every((chambers) => chambers.join('|') === 'launch|decision|unit')).toBe(true);
+    expect(result.acquiredChambers).toEqual(['launch', 'decision', 'unit']);
+    expect(result.phaseTwoArchetype).not.toBe('混合构筑');
+    expect(result.metrics.launchBlueprints).toBeGreaterThan(0);
+    expect(result.metrics.decisionBlueprints).toBeGreaterThan(0);
+    expect(result.metrics.unitBlueprints).toBeGreaterThan(0);
+    expect(result.metrics.naturalLaunchOrDecisionBuildingInstalled).toBe(true);
+    expect(result.metrics.nonSpawnRecoveryWithin15s).toBe(true);
+    expect(result.metrics.unitsQueued).toBeGreaterThan(0);
+    expect(result.metrics.unitsDeployed).toBeGreaterThan(0);
+    expect(result.warnings).toEqual([]);
+  });
+
   it('reports the v1.2 scenario metrics needed to compare build identities', () => {
     const swarm = runBuildProbe('swarm', 160);
     const magic = runBuildProbe('magic_copy', 161);
@@ -1677,8 +1889,10 @@ describe('build probe rules', () => {
 
     expect(report.ok).toBe(true);
     expect(report.rows.map((row) => row.presetId)).toEqual(debugBuildPresets.map((preset) => preset.id));
+    expect(report.naturalBlueprintRewardProbe.ok).toBe(true);
     expect(report.failures).toEqual([]);
     expect(output).toContain('BUILD PROBE VALIDATION PASS');
+    expect(output).toContain('natural_blueprint_reward_probe');
     expect(output).toContain('虫群爆兵');
     expect(output).toContain('法术复制');
     expect(output).toContain('机械精英');
@@ -1693,7 +1907,7 @@ describe('pacing preset rules', () => {
   it('uses a fast build-focused pacing preset for early build identity', () => {
     expect(activePacingPreset.id).toBe('fast_build_validation');
     expect(activePacingPreset.autoLaunchIntervalMs).toBeLessThanOrEqual(1150);
-    expect(activePacingPreset.unitGateFullOpenPhaseRatio).toBeCloseTo(0.4, 5);
+    expect(activePacingPreset.unitGateFullOpenPhaseRatio).toBeCloseTo(2, 5);
     expect(activePacingPreset.phaseDurationsMs).toHaveLength(phaseDefs.length);
     expect(Math.max(...activePacingPreset.phaseDurationsMs)).toBeLessThanOrEqual(55000);
     expect(Math.min(...activePacingPreset.phaseDurationsMs)).toBeGreaterThanOrEqual(40000);

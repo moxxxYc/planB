@@ -11,7 +11,6 @@ export const slotDefs: Array<Pick<SlotState, 'id' | 'label' | 'color'>> = [
 export const decisionSlotDefs = [
   slotDefs.find((slot) => slot.id === 'gold'),
   slotDefs.find((slot) => slot.id === 'magic'),
-  slotDefs.find((slot) => slot.id === 'spawn'),
   slotDefs.find((slot) => slot.id === 'upgrade'),
 ].filter((slot): slot is Pick<SlotState, 'id' | 'label' | 'color'> => Boolean(slot));
 
