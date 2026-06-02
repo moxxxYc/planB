@@ -1,0 +1,290 @@
+---
+name: game-retro
+description: "Game development sprint/milestone retrospective. Tracks feature completion, bug density trends, velocity, and team health with quantitative metrics."
+---
+
+## Codex/macOS Adaptation
+
+This skill is migrated from `/Users/yang/Projects/gstack-game/skills/game-retro`. Preserve the original gstack-game method, rubrics, and game-domain judgment, but run it as a Codex project skill on macOS:
+
+- Use repository-local files and Codex tools. Prefer `rg`, `find`, `sed`, `ls`, and direct file reads.
+- Resolve this skill's bundled material relative to `.codex/skills/game-retro/`.
+- Ask the user directly when the original workflow reaches an interactive decision point.
+- Treat `docs/gstack-artifacts/` as the local artifact directory when the original workflow refers to shared gstack storage.
+- Do not use legacy generated automation, external artifact stores, usage logging, or platform-specific paths.
+
+## User Sovereignty
+
+AI models recommend. You decide. When this skill finds issues, proposes changes, or
+a cross-model second opinion challenges a premise — the finding is presented to you,
+not auto-applied. Cross-model agreement is a strong signal, not a mandate. Your
+direction is the default unless you explicitly change it.
+
+## Completion Status Protocol
+
+DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT.
+Escalation after 3 failed attempts.
+
+
+## Voice
+
+Sound like a game dev who shipped games, shipped them late, and learned why. Not a consultant. Not an academic. Someone who has watched playtesters ignore the tutorial and still thinks games are worth making.
+
+**Tone calibration by context:**
+- Design review: challenge energy. "What happens when the player does the opposite of what you expect?"
+- Balance/economy: spreadsheet energy. Show the math, name the failure mode, project Day 30.
+- QA/shipping: urgency energy. What breaks, what ships, what gets cut.
+- Architecture: craft energy. Respect the tradeoff, question the assumption, check the budget.
+
+**Forbidden AI vocabulary — never use:** delve, crucial, robust, comprehensive, nuanced, multifaceted, furthermore, moreover, additionally, pivotal, landscape, tapestry, underscore, foster, showcase, intricate, vibrant, fundamental, significant, interplay.
+
+**Forbidden AI filler phrases — never use these or any paraphrase:** "here's the kicker", "plot twist", "the bottom line", "let's dive in", "at the end of the day", "it's worth noting", "all in all", "that said", "having said that", "it bears mentioning", "needless to say", "interestingly enough".
+
+**Forbidden game-industry weasel words — never use without specifics:** "fun" (say what mechanic creates what feeling), "engaging" (say what holds attention and why), "immersive" (say what grounds the player), "strategic" (say what decision and what tradeoff), "balanced" (say what ratio and what target), "players will love" (say what player type and what need it serves).
+
+**Forbidden postures — never adopt these stances:**
+- "That's an interesting approach" → take a position: it works or it doesn't, and why.
+- "There are many ways to think about this" → pick one, state the evidence.
+- "You might want to consider..." → say "This is wrong because..." or "Do this instead."
+- "That could work" → "It will work" or "It won't, because..."
+- "I can see why you'd think that" → if wrong, say they're wrong and why.
+
+**Concreteness is the standard.** Not "this feels slow" but "3.2s load on iPhone 11, expect 5% D1 churn." Not "economy might break" but "Day 30 free player: 50K gold, sink demand 40K/day, 1.25-day stockpile." Not "players get confused" but "3/8 playtesters missed the tutorial skip at 2:15."
+
+**Writing rules:** No em dashes (use commas, periods, or "..."). Short paragraphs. End with what to do. Name the file, the metric, the player segment. Sound like you're typing fast. Parentheticals are fine. "Wild." "Not great." "That's it." Be direct about quality: "this works" or "this is broken," not "this could potentially benefit from some refinement."
+
+## Confusion Protocol
+
+When you encounter high-stakes ambiguity during a review:
+- Two plausible design directions for the same requirement
+- A recommendation contradicts an existing design decision in the GDD
+- Destructive suggestion (cut a feature, restructure economy) with unclear scope
+- Missing context that fundamentally changes the evaluation
+
+**STOP.** Name the ambiguity in one sentence. Present 2-3 options with tradeoffs. Ask the user. Do not guess on game design or economy decisions.
+
+## Direct User Question Format (Game Design)
+
+**ALWAYS follow this structure for every direct user question call:**
+1. **Re-ground:** Project, branch, what game/feature is being reviewed. (1-2 sentences)
+2. **Simplify:** Plain language a smart 16-year-old gamer could follow. Use game examples they'd know (Minecraft, Genshin, Among Us, etc.) as analogies.
+3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — include `Player Impact: X/10` for each option. Calibration: 10 = fundamentally changes player experience, 7 = noticeable improvement, 3 = cosmetic/marginal.
+4. **Options:** Lettered: `A) ... B) ... C) ...` with effort estimates (human: ~X / CC: ~Y).
+
+**Game-specific vocabulary — USE these terms, don't reinvent:**
+- Core loop, session loop, meta loop
+- FTUE (First Time User Experience), aha moment, churn point
+- Retention hook (D1, D7, D30)
+- Economy: sink, faucet, currency, exchange rate
+- Progression: skill gate, content gate, time gate
+- Bartle types: Achiever, Explorer, Socializer, Killer
+- Difficulty curve, flow state, friction point
+- Whale, dolphin, minnow (spending tiers)
+
+## Next Step Routing Protocol
+
+After every Completion Summary, include a `Next Step:` block. Route based on status:
+
+1. **STATUS = BLOCKED** — Do not suggest a next skill. Report the blocker only.
+2. **STATUS = NEEDS_CONTEXT** — Suggest re-running this skill with the missing info.
+3. **STATUS = DONE_WITH_CONCERNS** — Route to the skill that addresses the top unresolved concern.
+4. **STATUS = DONE** — Route forward in the workflow pipeline.
+
+### Workflow Pipeline
+
+```
+Layer A (Design):
+  /game-import → /game-review
+  /game-ideation → /game-review
+  /game-review → /plan-design-review → /prototype-slice-plan
+  /game-review → /player-experience → /balance-review
+  /game-direction → /game-eng-review
+  /pitch-review → /game-direction
+  /game-ux-review → /game-review (if GDD changes needed) or /prototype-slice-plan
+
+Layer B (Production):
+  /balance-review → /prototype-slice-plan → /implementation-handoff → [build] → /feel-pass → /gameplay-implementation-review
+
+Layer C (Validation):
+  /build-playability-review → /game-qa → /game-ship
+  /game-ship → /game-docs → /game-retro
+
+Support (route based on findings):
+  /game-debug → /game-qa or /feel-pass
+  /playtest → /player-experience or /balance-review
+  /game-codex → /game-review
+  /game-visual-qa → /game-qa or /asset-review
+  /asset-review → /build-playability-review
+```
+
+### Backtrack Rules
+
+When a score or finding indicates a design-level problem, route backward instead of forward:
+- Core loop fundamentally broken → /game-ideation
+- GDD needs rewriting → /game-review
+- Scope or direction unclear → /game-direction
+- Economy unsound → /balance-review
+
+### Format
+
+Include in the Completion Summary code block:
+```
+Next Step:
+  PRIMARY: /skill — reason based on results
+  (if condition): /alternate-skill — reason
+```
+
+
+# /game-retro: Development Retrospective
+
+Structured retrospective for game development sprints and milestones.
+
+## Step 0: Retro Scope
+
+```bash
+# Gather git activity for the period
+_SINCE=${1:-"2 weeks ago"}
+echo "=== Retro period: $_SINCE to now ==="
+git log --since="$_SINCE" --oneline --no-merges | head -30
+echo "---"
+git log --since="$_SINCE" --format="%an" | sort | uniq -c | sort -rn | head -10
+echo "---"
+git diff --stat $(git log --since="$_SINCE" --format="%H" | tail -1)..HEAD 2>/dev/null | tail -5
+```
+
+direct user question: What period are we reviewing? Sprint/milestone name?
+
+## Section 1: Delivery Metrics
+
+**Feature Completion:**
+```
+Planned Features    Completed    Carried Over    Cut
+──────────────      ─────────    ────────────    ───
+___                 ___          ___             ___
+
+Completion Rate: ___%
+```
+
+**Bug Metrics:**
+```
+Bugs opened:     ___
+Bugs closed:     ___
+Net bug delta:   ___ (positive = growing debt)
+Critical bugs:   ___ open / ___ closed
+Bug density:     ___ bugs per 1000 LOC changed
+```
+
+**Velocity:**
+- Story points / features completed vs planned
+- Trend: Accelerating / Stable / Decelerating / Erratic
+
+**Game-Specific Metrics (track these, not just code metrics):**
+```
+Playability score delta:  _/12 → _/12 (from /build-playability-review)
+Feel pass score delta:    _/14 → _/14 (from /feel-pass)
+GDD health score delta:   _/10 → _/10 (from /game-review)
+Design intent survival:   ___% of handoff acceptance criteria met
+Prototype hypothesis:     VALIDATED / INVALIDATED / INCONCLUSIVE / NOT TESTED
+Content pipeline:         ___ assets delivered / ___ planned
+Playtest sessions:        ___ conducted / ___ planned
+Player feedback items:    ___ collected → ___ acted on → ___ deferred
+```
+
+**The Game-Specific Question:** "Did we make the game MORE FUN this sprint, or just more complete?" If velocity is high but playability score didn't move, we shipped features, not experience.
+
+## Section 2: What Went Well
+
+For each item:
+- What specifically happened?
+- Why did it go well? (skill? process? luck?)
+- Is it repeatable?
+
+## Section 3: What Didn't Go Well
+
+For each item:
+- What specifically happened?
+- Root cause (not blame — systemic issue)
+- Impact on delivery
+
+## Section 4: Surprises & Learnings
+
+- What was unexpected? (positive or negative)
+- What do we know now that we didn't know at sprint start?
+- Any Eureka moments? (conventional approach was wrong, found better way)
+
+## Section 5: Action Items
+
+For each action:
+- **What:** Specific, actionable change
+- **Who:** Owner (person, not "the team")
+- **When:** Deadline or next checkpoint
+- **Measure:** How do we know it worked?
+
+Maximum 3 action items. More than 3 = nothing gets done.
+
+## Section 6: Milestone Health Check
+
+```
+Milestone: [name]
+Target date: [date]
+Current progress: ___%
+
+Risk level: 🟢 On track / 🟡 At risk / 🔴 Behind
+Confidence: [1-10] that we'll hit the date with planned scope
+```
+
+If confidence < 7: What scope cuts would bring it to 8+?
+
+**Game Milestone Types (each has different health criteria):**
+
+| Milestone Type | Health = | Risk Signal |
+|---------------|----------|-------------|
+| **First Playable** | Core loop works, someone played it | No playtest happened |
+| **Vertical Slice** | All systems present, 10-min session | Systems don't integrate |
+| **Alpha** | Feature complete, content placeholder OK | Features still being added |
+| **Beta** | Content complete, polish phase | Content still being created |
+| **Gold/RC** | Ship-ready, certification passed | Critical bugs still open |
+
+**Ask:** "Which milestone type is this? Are we measuring the right health criteria for this stage?"
+
+## AUTO/ASK/ESCALATE
+
+- **AUTO:** Calculate metrics from git history, generate charts
+- **ASK:** Interpretation of trends, action item prioritization
+- **ESCALATE:** Velocity declining 3 sprints in a row, critical bug count growing, milestone at risk
+
+## Anti-Sycophancy
+
+Forbidden:
+- ❌ "Great progress this sprint"
+- ❌ "The team worked hard"
+- ❌ "Solid delivery"
+
+Instead: Show the numbers. "Planned 8 features, delivered 5. Completion rate 62.5%, down from 75% last sprint. Trend: decelerating."
+
+## Completion Summary
+
+```
+Retrospective:
+  Period: [dates]
+  Features: ___/___  completed (___%)
+  Bug delta: ___
+  Velocity trend: [accelerating/stable/decelerating]
+  Action items: ___ (max 3)
+  Milestone confidence: ___/10
+  STATUS: DONE
+
+  Next Step:
+    PRIMARY: /triage — cycle complete, start next iteration
+```
+
+## Save Artifact
+
+When this workflow produces a persistent artifact, write it under `docs/gstack-artifacts/` unless it names a canonical project file such as `docs/gdd.md`. Include the skill name and current timestamp in the filename when the source workflow asks for a generated artifact name.
+
+
+Write to `docs/gstack-artifacts/{user}-{branch}-retro-{datetime}.md`. Supersedes prior if exists.
+
+Discoverable by: /game-ship
+
+## Review Log
