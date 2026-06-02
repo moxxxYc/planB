@@ -96,6 +96,24 @@ export interface NaturalBlueprintRewardProbeResult {
   warnings: string[];
 }
 
+export interface ArcaneSecondaryRuneProbeResult {
+  probeId: 'arcane_secondary_rune_probe';
+  debugPresetUsed: false;
+  ok: boolean;
+  mainRaceId: RaceId;
+  secondaryRaceId: 'arcane';
+  metrics: {
+    runeGenerated: number;
+    runeSpent: number;
+    goldGeneratedRune: boolean;
+    unitProgressFromRune: number;
+    finalRune: number;
+    queuedUnits: number;
+  };
+  summaryLines: string[];
+  warnings: string[];
+}
+
 const PROBE_PHASE_MS = 60000;
 
 export function runAllBuildProbes(seed = 100): BuildProbeResult[] {
@@ -183,6 +201,50 @@ export function runNaturalBlueprintRewardProbe(seed = 180): NaturalBlueprintRewa
       `natural_blueprint_reward_probe ${rewardSelections.map((selection) => `${selection.chamber}:${selection.rewardName}`).join(' / ')}`,
       ...telemetry.lines,
       `自然奖励 入队 ${metrics.unitsQueued} 部署 ${metrics.unitsDeployed} 回流球值 ${metrics.recoveredUnitBallValue} 战斗影响 ${metrics.combatImpactDamage}`,
+    ],
+    warnings,
+  };
+}
+
+export function runArcaneSecondaryRuneProbe(seed = 220): ArcaneSecondaryRuneProbeResult {
+  const state = createInitialGameState('hive', seed, { secondaryRaceId: 'arcane' });
+  startPhase(state);
+
+  triggerSlot(state, 'magic');
+  const runeAfterMagic = state.arcaneRune.current;
+  triggerSlot(state, 'gold');
+  const runeAfterGold = state.arcaneRune.current;
+  triggerSlot(state, 'upgrade');
+  resolveUnitBallToSlot(state, 1, 1, {
+    elapsedMs: 1000,
+    durationMs: 60000,
+  });
+
+  const metrics = {
+    runeGenerated: state.stats.currentPhase.runeGenerated,
+    runeSpent: state.stats.currentPhase.runeSpent,
+    goldGeneratedRune: runeAfterGold > runeAfterMagic,
+    unitProgressFromRune: state.stats.currentPhase.runeProgressGranted,
+    finalRune: state.arcaneRune.current,
+    queuedUnits: state.spawnQueue.reduce((total, item) => total + item.count, 0),
+  };
+  const warnings = [
+    ...(metrics.runeGenerated !== 2 ? ['rune_generation_not_two'] : []),
+    ...(metrics.goldGeneratedRune ? ['gold_generated_rune'] : []),
+    ...(metrics.runeSpent !== 2 ? ['rune_not_spent_on_unit_spawn'] : []),
+    ...(metrics.unitProgressFromRune !== 2 ? ['rune_progress_not_applied'] : []),
+  ];
+
+  return {
+    probeId: 'arcane_secondary_rune_probe',
+    debugPresetUsed: false,
+    ok: warnings.length === 0,
+    mainRaceId: state.currentRaceId,
+    secondaryRaceId: 'arcane',
+    metrics,
+    summaryLines: [
+      `Arcane secondary Rune generated ${metrics.runeGenerated}, spent ${metrics.runeSpent}, progress +${metrics.unitProgressFromRune}`,
+      ...buildPhaseTelemetrySummary(state).lines,
     ],
     warnings,
   };

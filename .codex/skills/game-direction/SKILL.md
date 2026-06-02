@@ -5,12 +5,13 @@ description: "Game direction review from producer/creative director perspective.
 
 ## Codex/macOS Adaptation
 
-This skill is migrated from `/Users/yang/Projects/gstack-game/skills/game-direction`. Preserve the original gstack-game design method and rubrics, but run it as a Codex project skill on macOS:
+This skill is migrated from `/Users/yang/Projects/gstack-game/skills/game-direction`. Preserve the original gstack-game method, rubrics, and game-domain judgment, but run it as a Codex project skill on macOS:
 
-- Use repository-local files and macOS shell commands such as `rg`, `find`, `sed`, and `ls`.
-- Ask the user directly when the original skill calls for an interactive decision point.
-- Do not use legacy generated automation, external artifact stores, or platform-specific paths.
-- Keep outputs inside this repository when an artifact is requested.
+- Use repository-local files and Codex tools. Prefer `rg`, `find`, `sed`, `ls`, and direct file reads.
+- Resolve this skill's bundled material relative to `.codex/skills/game-direction/`.
+- Ask the user directly when the original workflow reaches an interactive decision point.
+- Treat `docs/gstack-artifacts/` as the local artifact directory when the original workflow refers to shared gstack storage.
+- Do not use legacy generated automation, external artifact stores, usage logging, or platform-specific paths.
 
 ## User Sovereignty
 
@@ -23,6 +24,7 @@ direction is the default unless you explicitly change it.
 
 DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT.
 Escalation after 3 failed attempts.
+
 
 ## Voice
 
@@ -61,9 +63,9 @@ When you encounter high-stakes ambiguity during a review:
 
 **STOP.** Name the ambiguity in one sentence. Present 2-3 options with tradeoffs. Ask the user. Do not guess on game design or economy decisions.
 
-## ask the user directly Format (Game Design)
+## Direct User Question Format (Game Design)
 
-**ALWAYS follow this structure for every ask the user directly call:**
+**ALWAYS follow this structure for every direct user question call:**
 1. **Re-ground:** Project, branch, what game/feature is being reviewed. (1-2 sentences)
 2. **Simplify:** Plain language a smart 16-year-old gamer could follow. Use game examples they'd know (Minecraft, Genshin, Among Us, etc.) as analogies.
 3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — include `Player Impact: X/10` for each option. Calibration: 10 = fundamentally changes player experience, 7 = noticeable improvement, 3 = cosmetic/marginal.
@@ -132,17 +134,41 @@ Next Step:
   (if condition): /alternate-skill — reason
 ```
 
+
 ## Document Check
 
-```text
-Codex/macOS note: old generated shell automation removed. Use repository-local file reads and ask the user directly when a decision is needed.
+```bash
+SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+GDD=$(ls -t docs/*GDD* docs/*game-design* docs/*design-doc* docs/*concept* *.gdd.md 2>/dev/null | head -1)
+[ -z "$GDD" ] && GDD=$(ls -t docs/gstack-artifacts/*-design-*.md docs/gstack-artifacts/*-concept-*.md 2>/dev/null | head -1)
+PILLARS=$(ls -t docs/*pillar* 2>/dev/null | head -1)
+ROADMAP=$(ls -t docs/*roadmap* docs/*milestone* docs/*timeline* 2>/dev/null | head -1)
+[ -n "$GDD" ] && echo "GDD: $GDD" || echo "No GDD found"
+[ -n "$PILLARS" ] && echo "Pillars: $PILLARS" || echo "No pillars doc found"
+[ -n "$ROADMAP" ] && echo "Roadmap: $ROADMAP" || echo "No roadmap found"
 ```
 
 If no GDD or concept doc found, suggest `/game-ideation` first. Direction review without a concept is premature.
 
 ## Artifact Discovery
 
-Use macOS/Codex-friendly repository search. Prefer `rg --files`, `find`, and direct reads inside the current repository. Look for local docs such as `docs/gdd.md`, concept notes, prior reviews, playtest notes, screenshots, and build notes. Do not read outside the repository unless the user explicitly provides a path.
+Use `rg --files`, `find`, and direct repository reads to locate local docs, prior reviews, playtest notes, screenshots, build notes, and artifacts under `docs/gstack-artifacts/`. Do not read outside this repository unless the user explicitly provides a path.
+
+```bash
+echo "=== Checking for prior work ==="
+PREV_DIRECTION=$(ls -t docs/gstack-artifacts/*-direction-review-*.md 2>/dev/null | head -1)
+[ -n "$PREV_DIRECTION" ] && echo "Prior direction review: $PREV_DIRECTION"
+PREV_CONCEPT=$(ls -t docs/gstack-artifacts/*-concept-*.md 2>/dev/null | head -1)
+[ -n "$PREV_CONCEPT" ] && echo "Prior concept: $PREV_CONCEPT"
+PREV_GAME_REVIEW=$(ls -t docs/gstack-artifacts/*-game-review-*.md 2>/dev/null | head -1)
+[ -n "$PREV_GAME_REVIEW" ] && echo "Prior game review: $PREV_GAME_REVIEW"
+PREV_PITCH=$(ls -t docs/gstack-artifacts/*-pitch-review-*.md 2>/dev/null | head -1)
+[ -n "$PREV_PITCH" ] && echo "Prior pitch review: $PREV_PITCH"
+echo "---"
+```
+
+If a prior direction review exists, read it. Note previous findings — check if flagged issues have been addressed since last review.
+
 # /game-direction: Game Direction Review
 
 Review game direction from a producer/creative director perspective. Challenge premises, evaluate scope against capacity, assess market positioning, and ensure strategic alignment. Work through each section one issue at a time by asking the user directly.
@@ -180,7 +206,7 @@ Before reviewing any details, challenge the premise itself. This is the most imp
 
 ### 0A. The "Why This, Why Now" Question
 
-**ask the user directly:**
+**direct user question:**
 
 > **[Re-ground]** Direction review for `[game title]` on `[branch]`.
 >
@@ -201,7 +227,7 @@ Before reviewing any details, challenge the premise itself. This is the most imp
 
 The designer just told you "why this game, why now." Before accepting or challenging that answer, check what the market actually says.
 
-**Privacy gate — ask the user directly:**
+**Privacy gate — direct user question:**
 
 > **[Re-ground]** You said: *"{summary of 0A answer — their strategic rationale}"*. I want to verify the market timing claim with current data.
 >
@@ -265,7 +291,7 @@ Proceed to 0B. No separate STOP needed here — this is an informational push-ba
 
 ### 0B. Existing Asset Leverage
 
-**ask the user directly:**
+**direct user question:**
 
 > What do you ALREADY have that this game can use? Check all that apply:
 >
@@ -282,7 +308,7 @@ Proceed to 0B. No separate STOP needed here — this is an informational push-ba
 
 ### 0C. Dream State Mapping
 
-**ask the user directly:**
+**direct user question:**
 
 > Let me map where you are, where this plan takes you, and where you want to be in 12 months:
 >
@@ -324,7 +350,7 @@ After reading the answers to 0A-0C, generate 2-3 alternatives yourself, then pre
 
 ---
 
-**ask the user directly:**
+**direct user question:**
 
 > Based on the premise challenge, which review mode fits your situation?
 >
@@ -474,7 +500,7 @@ Scope gap = total scope - (available capacity - buffer)
 ```
 If scope gap > 0, cuts are mandatory, not optional. Present the math, then ask what gets cut.
 
-**STOP.** One ask the user directly per scope decision. Do not batch — each cut deserves its own consideration.
+**STOP.** One direct user question per scope decision. Do not batch — each cut deserves its own consideration.
 
 ---
 
@@ -522,7 +548,7 @@ For each risk:
 
 **Detection must be concrete.** "We'll know" is not detection. "If D1 retention is below 25% in closed alpha with 50+ players, the core loop has a problem" is detection.
 
-**STOP.** One ask the user directly per high/critical risk. Medium/low risks can be presented in batches.
+**STOP.** One direct user question per high/critical risk. Medium/low risks can be presented in batches.
 
 ---
 
@@ -564,7 +590,7 @@ Flag any gates being skipped. Skipping gates is the #1 cause of troubled game pr
 
 Identify it. Everything on the critical path gets priority. Everything NOT on the critical path can slip without affecting launch date.
 
-**STOP.** One ask the user directly per major planning issue.
+**STOP.** One direct user question per major planning issue.
 
 ---
 
@@ -627,7 +653,7 @@ Full risk matrix as documented in Section 3.
 - **Premise challenge comes first.** Do NOT review scope, risk, or milestones before the premise is challenged. If the premise is wrong, everything else is wasted.
 - **Mode shapes everything.** AMBITIOUS, FOCUSED, PIVOT, SHELVE — the tone, questions, and recommendations all change. Don't use AMBITIOUS language in FOCUSED mode.
 - **The scope math is non-negotiable.** Present the numbers (total scope vs. available capacity), then ask what gets cut. Don't let scope exceed capacity without an explicit plan.
-- **ONE scope decision per ask the user directly.** Each cut/defer/keep deserves its own consideration. Don't batch.
+- **ONE scope decision per direct user question.** Each cut/defer/keep deserves its own consideration. Don't batch.
 - **Cognitive patterns: smart-route, don't dump.** Apply the mode-relevant subset, not all 10.
 - **Phase transitions require check-in.** After Section 1, ask before moving to Section 2. After Section 2, ask before Section 3.
 - **Escape hatch:** If user says "just give me the summary":
@@ -637,4 +663,15 @@ Full risk matrix as documented in Section 3.
 
 ## Save Artifact
 
-If the user wants a persistent artifact, write it inside this repository, usually under `docs/gstack-artifacts/game-direction/` or the canonical path named by the workflow, such as `docs/gdd.md` for game-import. Do not write to `docs/gstack-artifacts`, `.codex`, or any platform-specific path.
+When this workflow produces a persistent artifact, write it under `docs/gstack-artifacts/` unless it names a canonical project file such as `docs/gdd.md`. Include the skill name and current timestamp in the filename when the source workflow asks for a generated artifact name.
+
+
+Write the Direction Review report (Completion Summary + Scope Change Log + Risk Register) to `docs/gstack-artifacts/{user}-{branch}-direction-review-{datetime}.md`. If a prior direction review exists, include `Supersedes: {prior filename}` at the top.
+
+This artifact is discoverable by:
+- `/game-review` — reads scope decisions and risk findings
+- `/game-eng-review` — reads technical risk flags and scope constraints
+- `/pitch-review` — reads strategic alignment and market positioning
+- `/game-ship` — checks direction review status as a release gate
+
+## Review Log

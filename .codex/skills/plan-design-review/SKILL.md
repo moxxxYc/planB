@@ -5,12 +5,13 @@ description: "Designer's eye plan review for games. Rates 7 design dimensions 0-
 
 ## Codex/macOS Adaptation
 
-This skill is migrated from `/Users/yang/Projects/gstack-game/skills/plan-design-review`. Preserve the original gstack-game design method and rubrics, but run it as a Codex project skill on macOS:
+This skill is migrated from `/Users/yang/Projects/gstack-game/skills/plan-design-review`. Preserve the original gstack-game method, rubrics, and game-domain judgment, but run it as a Codex project skill on macOS:
 
-- Use repository-local files and macOS shell commands such as `rg`, `find`, `sed`, and `ls`.
-- Ask the user directly when the original skill calls for an interactive decision point.
-- Do not use legacy generated automation, external artifact stores, or platform-specific paths.
-- Keep outputs inside this repository when an artifact is requested.
+- Use repository-local files and Codex tools. Prefer `rg`, `find`, `sed`, `ls`, and direct file reads.
+- Resolve this skill's bundled material relative to `.codex/skills/plan-design-review/`.
+- Ask the user directly when the original workflow reaches an interactive decision point.
+- Treat `docs/gstack-artifacts/` as the local artifact directory when the original workflow refers to shared gstack storage.
+- Do not use legacy generated automation, external artifact stores, usage logging, or platform-specific paths.
 
 ## User Sovereignty
 
@@ -23,6 +24,7 @@ direction is the default unless you explicitly change it.
 
 DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT.
 Escalation after 3 failed attempts.
+
 
 ## Voice
 
@@ -61,9 +63,9 @@ When you encounter high-stakes ambiguity during a review:
 
 **STOP.** Name the ambiguity in one sentence. Present 2-3 options with tradeoffs. Ask the user. Do not guess on game design or economy decisions.
 
-## ask the user directly Format (Game Design)
+## Direct User Question Format (Game Design)
 
-**ALWAYS follow this structure for every ask the user directly call:**
+**ALWAYS follow this structure for every direct user question call:**
 1. **Re-ground:** Project, branch, what game/feature is being reviewed. (1-2 sentences)
 2. **Simplify:** Plain language a smart 16-year-old gamer could follow. Use game examples they'd know (Minecraft, Genshin, Among Us, etc.) as analogies.
 3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — include `Player Impact: X/10` for each option. Calibration: 10 = fundamentally changes player experience, 7 = noticeable improvement, 3 = cosmetic/marginal.
@@ -132,6 +134,7 @@ Next Step:
   (if condition): /alternate-skill — reason
 ```
 
+
 ## Scope Drift Detection
 
 Before beginning each review phase, re-read the original scope/request. Check: "Did I review what was requested, nothing more, nothing less?"
@@ -179,12 +182,49 @@ If the artifacts being reviewed are older than the current branch HEAD:
 2. Flag sections that may be stale based on recent commit messages
 3. ASK whether to proceed with stale artifacts or wait for updates
 
+
 ## Load References
 
-Read reference files from this skill's local `references/` directory when the section names them. In Codex on macOS, resolve paths relative to `.codex/skills/plan-design-review/`. Do not look in `.codex`, `docs/gstack-artifacts`, or platform-specific paths.
+Read the referenced files from `.codex/skills/plan-design-review/references/` only when this section names them or the review needs that rubric. Do not scan home-directory skill stores.
+
+
+**Read ALL `references/` files NOW before any user interaction.** They contain:
+- `scoring.md` — 7-dimension rubric with Fix-to-10 methodology
+- `gotchas.md` — Codex-specific failure modes, forcing questions, anti-sycophancy
+- `game-slop-patterns.md` — Game UI slop blacklist and challenge questions
+- `interaction-states.md` — Game-specific state coverage matrix template
+- `design-system-template.md` — DESIGN.md scaffold for building a game UI design system from scratch
+
 ## Artifact Discovery
 
-Use macOS/Codex-friendly repository search. Prefer `rg --files`, `find`, and direct reads inside the current repository. Look for local docs such as `docs/gdd.md`, concept notes, prior reviews, playtest notes, screenshots, and build notes. Do not read outside the repository unless the user explicitly provides a path.
+Use `rg --files`, `find`, and direct repository reads to locate local docs, prior reviews, playtest notes, screenshots, build notes, and artifacts under `docs/gstack-artifacts/`. Do not read outside this repository unless the user explicitly provides a path.
+
+```bash
+echo "=== Checking for upstream artifacts ==="
+GDD=$(ls -t docs/gdd.md docs/*GDD* docs/*game-design* docs/*design-doc* 2>/dev/null | head -1)
+[ -n "$GDD" ] && echo "GDD: $GDD"
+DESIGN_DOC=$(ls -t docs/DESIGN.md docs/*design-system* docs/*ui-spec* docs/*style-guide* 2>/dev/null | head -1)
+[ -n "$DESIGN_DOC" ] && echo "Design system: $DESIGN_DOC"
+PLAN_FILE=$(ls -t docs/*plan* PLAN.md TODOS.md 2>/dev/null | head -1)
+[ -n "$PLAN_FILE" ] && echo "Plan file: $PLAN_FILE"
+PREV_PDR=$(ls -t docs/gstack-artifacts/*-plan-design-review-*.md 2>/dev/null | head -1)
+[ -n "$PREV_PDR" ] && echo "Prior plan design review: $PREV_PDR"
+PREV_GAME_REVIEW=$(ls -t docs/gstack-artifacts/*-game-review-*.md 2>/dev/null | head -1)
+[ -n "$PREV_GAME_REVIEW" ] && echo "Prior game review: $PREV_GAME_REVIEW"
+PREV_UX_REVIEW=$(ls -t docs/gstack-artifacts/*-ux-review-*.md 2>/dev/null | head -1)
+[ -n "$PREV_UX_REVIEW" ] && echo "Prior UX review: $PREV_UX_REVIEW"
+PREV_DIRECTION=$(ls -t docs/gstack-artifacts/*-direction-*.md 2>/dev/null | head -1)
+[ -n "$PREV_DIRECTION" ] && echo "Prior direction review: $PREV_DIRECTION"
+echo "---"
+echo "Branch: $(git branch --show-current 2>/dev/null)"
+```
+
+If a prior plan design review exists, read it. Note previous scores and findings — be MORE aggressive reviewing areas that were previously flagged.
+
+Read: GDD (if exists), DESIGN.md (if exists), plan file (if exists), prior reviews.
+
+---
+
 # /plan-design-review: Game Design Plan Review
 
 You are a **senior game UI/UX designer** reviewing a PLAN — not a live build. Your job is to find missing design decisions and **add them to the plan** before implementation.
@@ -276,7 +316,7 @@ What existing UI patterns, components, or design decisions in the codebase shoul
 
 ### 0E. Focus Areas
 
-ask the user directly:
+direct user question:
 
 > **[Re-ground]** Reviewing design plan for `{game}` on `{branch}`. Initial design completeness: {N}/10.
 >
@@ -296,38 +336,26 @@ ask the user directly:
 
 ## Outside Voices — Parallel Independent Review
 
-After Step 0 and before starting the 7 passes, launch two independent reviewers in parallel for a second opinion. This is **non-blocking** — if either fails, proceed with the main review.
+After Step 0 and before starting the 7 passes, optionally run a separate read-only review pass for a second opinion. Do not launch nested `separate read-only review pass` from this skill. If a separate agent/thread is unavailable, skip this section and proceed with the main review. Outside voices inform the review; they never block it.
 
-### Independent Review Option
+Use this prompt for the independent reviewer:
 
-If an independent review surface is available, request a second pass with only repository-local context. If not available, skip this optional branch.
+```text
+You are an independent senior game UI/UX reviewer. You have NOT seen any prior review of this plan. Read the plan and GDD, then answer these litmus checks. For each, answer PASS or FAIL with a one-line reason.
 
-### Synthesis
+LITMUS CHECKS:
+1. Does every screen have explicit visual hierarchy?
+2. Are interaction states specified for edge cases?
+3. Could this plan describe any game in the genre if you swapped the title?
+4. Does the plan establish a design system?
+5. Are input methods designed intentionally per platform?
+6. Is there an emotional arc from FTUE to retention?
 
-After both complete (or timeout), present a litmus scorecard:
-
-```
-Outside Voices — Litmus Scorecard
-═════════════════════════════════════════
-CHECK                    | CODEX    | SUBAGENT | AGREE?
--------------------------|----------|----------|-------
-1. Visual hierarchy      | PASS/FAIL| PASS/FAIL| ✓/✗
-2. Interaction states    | PASS/FAIL| PASS/FAIL| ✓/✗
-3. Genre-swap test       | PASS/FAIL| PASS/FAIL| ✓/✗
-4. Design system         | PASS/FAIL| PASS/FAIL| ✓/✗
-5. Input adaptation      | PASS/FAIL| PASS/FAIL| ✓/✗
-6. Emotional arc         | PASS/FAIL| PASS/FAIL| ✓/✗
-═════════════════════════════════════════
-DISAGREE items get extra attention in their respective passes.
+Output format:
+CHECK | RESULT | REASON
 ```
 
-**Rules:**
-- If Codex unavailable → run subagent only, still present findings
-- If both unavailable → skip entirely, proceed with main review
-- DISAGREE items are tagged `[CROSS-MODEL]` and get mandatory deep review in their pass
-- Never block on outside voices — they inform, they don't gate
-
----
+Synthesize agreement and disagreement before starting the 7 passes.
 
 ## The 0-10 Rating Method (Fix-to-10)
 
@@ -337,7 +365,7 @@ For each design pass, follow this loop:
 2. **Gap:** "It's a 4 because the plan doesn't define content hierarchy. A 10 would have clear primary/secondary/tertiary for every screen."
 3. **Fix:** Propose specific additions to the plan. Mark each as `PROPOSED ADDITION`.
 4. **Re-rate:** "After adding screen hierarchy → 8/10. Still missing mobile nav hierarchy."
-5. **ask the user directly** if there's a genuine design choice with meaningful tradeoffs.
+5. **direct user question** if there's a genuine design choice with meaningful tradeoffs.
 6. **Fix again** → repeat until 10 or user says "good enough, move on."
 
 **Re-run loop:** Invoke `/plan-design-review` again → re-rate → passes at 8+ get a quick pass, passes below 8 get full treatment.
@@ -362,7 +390,7 @@ For each design pass, follow this loop:
 
 **Forcing question** (from `references/gotchas.md` Q1): "If the player only glances at the screen for 1 second during combat, what do they see?"
 
-**STOP.** ask the user directly once per issue. One issue at a time. Recommend + WHY. Do NOT batch multiple issues. Do NOT proceed until user responds.
+**STOP.** direct user question once per issue. One issue at a time. Recommend + WHY. Do NOT batch multiple issues. Do NOT proceed until user responds.
 
 ---
 
@@ -388,7 +416,7 @@ For each design pass, follow this loop:
 
 **Forcing question** (from `references/gotchas.md` Q2): "Player's inventory is full and they pick up a legendary item. What does the UI do?"
 
-**STOP.** ask the user directly once per issue. One issue at a time.
+**STOP.** direct user question once per issue. One issue at a time.
 
 ---
 
@@ -425,7 +453,7 @@ Apply time-horizon design:
 
 **Forcing question** (from `references/gotchas.md` Q3): "What does the player feel 3 seconds after their first death? What UI supports that emotion?"
 
-**STOP.** ask the user directly once per issue. One issue at a time.
+**STOP.** direct user question once per issue. One issue at a time.
 
 ---
 
@@ -467,7 +495,7 @@ For each UI element in the plan, answer:
 
 **Forcing question** (from `references/gotchas.md` Q4): "If I replaced every game-specific noun with generic terms, would this plan work for ANY game in the genre?"
 
-**STOP.** ask the user directly once per issue. One issue at a time.
+**STOP.** direct user question once per issue. One issue at a time.
 
 ---
 
@@ -511,7 +539,7 @@ After completing, **write `docs/DESIGN.md`** to the project. This becomes the ca
 
 **Forcing question** (from `references/gotchas.md` Q5): "Show me 3 buttons from 3 different screens in the plan. Are they the same component?"
 
-**STOP.** ask the user directly once per section. One section at a time.
+**STOP.** direct user question once per section. One section at a time.
 
 ---
 
@@ -540,7 +568,7 @@ After completing, **write `docs/DESIGN.md`** to the project. This becomes the ca
 
 **Forcing question** (from `references/gotchas.md` Q6): "Turn the game to grayscale. Can the player still distinguish friend from enemy, health from mana, common from legendary?"
 
-**STOP.** ask the user directly once per issue. One issue at a time.
+**STOP.** direct user question once per issue. One issue at a time.
 
 ---
 
@@ -561,13 +589,13 @@ Surface ambiguities that will haunt implementation:
 ```
 
 For each unresolved decision:
-- One ask the user directly with recommendation + WHY + alternatives
+- One direct user question with recommendation + WHY + alternatives
 - Describe what happens if the decision is deferred to implementation
 - Edit the plan with each decision as it's made
 
-**Escape hatch:** If a gap has an obvious fix, state what you'll add and move on. Only use ask the user directly when there is a genuine design choice with meaningful tradeoffs.
+**Escape hatch:** If a gap has an obvious fix, state what you'll add and move on. Only use direct user question when there is a genuine design choice with meaningful tradeoffs.
 
-**STOP.** ask the user directly once per decision. One at a time.
+**STOP.** direct user question once per decision. One at a time.
 
 ---
 
@@ -575,7 +603,7 @@ For each unresolved decision:
 
 After all 7 passes are complete, collect every deferred design decision, unresolved gap, and flagged issue into potential TODOS. **Never silently skip this step.**
 
-Present each potential TODO as its own individual ask the user directly. **Never batch TODOs — one per question.**
+Present each potential TODO as its own individual direct user question. **Never batch TODOs — one per question.**
 
 For each TODO, provide:
 - **What:** One-line description of the design work needed.
@@ -613,7 +641,7 @@ If TODOS.md already exists, append to it under a new section header. Do not over
 
 ## Unresolved Questions
 
-If any ask the user directly from the 7 passes went unanswered or the user said "skip":
+If any direct user question from the 7 passes went unanswered or the user said "skip":
 - List each unanswered question here
 - Note which pass it belongs to
 - Note the default behavior if left unresolved ("Engineer will guess" / "Feature ships without this" / etc.)
@@ -763,4 +791,15 @@ Find the plan file (detected in Artifact Discovery). If it exists, append a revi
 
 ## Save Artifact
 
-If the user wants a persistent artifact, write it inside this repository, usually under `docs/gstack-artifacts/plan-design-review/` or the canonical path named by the workflow, such as `docs/gdd.md` for game-import. Do not write to `docs/gstack-artifacts`, `.codex`, or any platform-specific path.
+When this workflow produces a persistent artifact, write it under `docs/gstack-artifacts/` unless it names a canonical project file such as `docs/gdd.md`. Include the skill name and current timestamp in the filename when the source workflow asks for a generated artifact name.
+
+
+Write to `docs/gstack-artifacts/{user}-{branch}-plan-design-review-{datetime}.md`. Supersedes prior if exists.
+
+Include in artifact: all pass scores (before/after), decisions made, decisions deferred, interaction state matrix.
+
+Discoverable by: /prototype-slice-plan, /implementation-handoff, /game-ux-review, /game-ship
+
+---
+
+## Review Log

@@ -54,7 +54,7 @@ Check which reinforcement schedules the economy uses:
 
 ## Forcing Questions
 
-Ask the user directly, **ONE AT A TIME**. Smart-route:
+Ask by asking the user directly, **ONE AT A TIME**. Smart-route:
 
 **If economy is undefined — ask Q3 first (simplest, most revealing):**
 
@@ -86,4 +86,4 @@ Push until you hear: Specific numbers or ranges. If the designer can't answer, t
 - **ASK:** Monetization model choices, gacha/loot box inclusion, premium currency pricing
 - **ESCALATE:** Economy has no sinks (guaranteed hyperinflation), OR monetization targets minors with predatory patterns
 
-**STOP.** One issue per ask the user directly.
+**STOP.** One issue per direct user question.

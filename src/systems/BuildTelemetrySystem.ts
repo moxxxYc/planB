@@ -3,6 +3,7 @@ import { doctrineTechDefs } from '../data/doctrineTechs';
 import { raceDefs } from '../data/races';
 import { relicDefs } from '../data/relics';
 import { unitDefs } from '../data/units';
+import { buildRunePhaseSummary } from './ArcaneSecondarySystem';
 import type { BuildingChamber, GameState, PhaseStats } from '../types/game';
 
 export interface BuildTelemetrySummary {
@@ -79,6 +80,7 @@ export function buildPhaseTelemetrySummary(state: GameState, stats: PhaseStats =
   const resourceReturnRate = getResourceReturnRate(stats);
   const archetype = inferBuildArchetype(state);
   const dominantLabel = chamberLabels[dominant];
+  const runeSummary = buildRunePhaseSummary(state);
 
   return {
     dominantChamber: dominantLabel,
@@ -88,6 +90,7 @@ export function buildPhaseTelemetrySummary(state: GameState, stats: PhaseStats =
       `构筑 ${archetype}  主仓 ${dominantLabel}`,
       `发球 战备${stats.launchOutcomes.standby} 分裂${stats.launchOutcomes.split} 发兵${stats.launchOutcomes.spawn} 丢失${stats.launchOutcomes.miss}  战备 金${stats.slotTriggers.gold} 法${stats.slotTriggers.magic} 升${stats.slotTriggers.upgrade}  发兵${stats.slotTriggers.spawn}`,
       `回流工具 ${stats.phaseToolsPurchased}  标记 ${stats.spawnMarksCreated}/${stats.spawnMarksConsumed}  复制 ${stats.spawnCopiesCreated}  遗物 ${stats.relicTriggers}  研究 ${state.researchPoints}(${state.doctrineEvents.researchReturnProgress}/4)  保底 ${state.doctrineEvents.nonSpawnStreak}/3  回流效率 ${formatPercent(resourceReturnRate)}  最长非出兵 ${stats.nonSpawnStreakMax}  首次回流 ${formatRecoveryLatency(stats.timeToRecoverySpawnMs)}  来源 ${formatRecoverySources(stats.recoverySources)}`,
+      ...(runeSummary ? [runeSummary] : []),
       `入队 ${formatUnitCounts(stats.unitsQueuedById)}  部署 ${formatUnitCounts(stats.unitsDeployedById)}  高阶 ${stats.advancedUnitsQueued}/${stats.unitsQueued}`,
       `建筑贡献 发${stats.buildingContributions.launch} 备${stats.buildingContributions.decision} 出${stats.buildingContributions.unit}  溢流${stats.overflowProgressGranted} 开门${stats.gateAccelerationEvents} 挡回 ${stats.gateBlockedEvents} 爆发${stats.queueBurstEvents}`,
     ],

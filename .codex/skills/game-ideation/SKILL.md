@@ -5,12 +5,13 @@ description: "Interactive game concept brainstorming. Structures raw ideas into 
 
 ## Codex/macOS Adaptation
 
-This skill is migrated from `/Users/yang/Projects/gstack-game/skills/game-ideation`. Preserve the original gstack-game design method and rubrics, but run it as a Codex project skill on macOS:
+This skill is migrated from `/Users/yang/Projects/gstack-game/skills/game-ideation`. Preserve the original gstack-game method, rubrics, and game-domain judgment, but run it as a Codex project skill on macOS:
 
-- Use repository-local files and macOS shell commands such as `rg`, `find`, `sed`, and `ls`.
-- Ask the user directly when the original skill calls for an interactive decision point.
-- Do not use legacy generated automation, external artifact stores, or platform-specific paths.
-- Keep outputs inside this repository when an artifact is requested.
+- Use repository-local files and Codex tools. Prefer `rg`, `find`, `sed`, `ls`, and direct file reads.
+- Resolve this skill's bundled material relative to `.codex/skills/game-ideation/`.
+- Ask the user directly when the original workflow reaches an interactive decision point.
+- Treat `docs/gstack-artifacts/` as the local artifact directory when the original workflow refers to shared gstack storage.
+- Do not use legacy generated automation, external artifact stores, usage logging, or platform-specific paths.
 
 ## User Sovereignty
 
@@ -23,6 +24,7 @@ direction is the default unless you explicitly change it.
 
 DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT.
 Escalation after 3 failed attempts.
+
 
 ## Voice
 
@@ -61,9 +63,9 @@ When you encounter high-stakes ambiguity during a review:
 
 **STOP.** Name the ambiguity in one sentence. Present 2-3 options with tradeoffs. Ask the user. Do not guess on game design or economy decisions.
 
-## ask the user directly Format (Game Design)
+## Direct User Question Format (Game Design)
 
-**ALWAYS follow this structure for every ask the user directly call:**
+**ALWAYS follow this structure for every direct user question call:**
 1. **Re-ground:** Project, branch, what game/feature is being reviewed. (1-2 sentences)
 2. **Simplify:** Plain language a smart 16-year-old gamer could follow. Use game examples they'd know (Minecraft, Genshin, Among Us, etc.) as analogies.
 3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — include `Player Impact: X/10` for each option. Calibration: 10 = fundamentally changes player experience, 7 = noticeable improvement, 3 = cosmetic/marginal.
@@ -132,9 +134,13 @@ Next Step:
   (if condition): /alternate-skill — reason
 ```
 
+
 ## Artifact Discovery
 
-Use macOS/Codex-friendly repository search. Prefer `rg --files`, `find`, and direct reads inside the current repository. Look for local docs such as `docs/gdd.md`, concept notes, prior reviews, playtest notes, screenshots, and build notes. Do not read outside the repository unless the user explicitly provides a path.
+Use `rg --files`, `find`, and direct repository reads to locate local docs, prior reviews, playtest notes, screenshots, build notes, and artifacts under `docs/gstack-artifacts/`. Do not read outside this repository unless the user explicitly provides a path.
+
+```bash
+echo "=== Checking for prior work ==="
 # Local docs
 CONCEPT=$(ls -t docs/*concept* docs/*idea* docs/*pitch* *.concept.md 2>/dev/null | head -1)
 [ -n "$CONCEPT" ] && echo "Local concept: $CONCEPT"
@@ -183,9 +189,9 @@ Structure raw game ideas into a validated concept through interactive questionin
 
 ## Phase 0: Context & Maturity Assessment
 
-Read existing concept docs (if the bash check found any). Read `AGENTS.md` for project context.
+Read existing concept docs (if the bash check found any). Read `CODEX.md` for project context.
 
-**ask the user directly:**
+**direct user question:**
 
 > **[Re-ground]** Starting game concept brainstorming for `[project]` on `[branch]`.
 >
@@ -236,7 +242,7 @@ Use MDA backward — start from Aesthetics, not Mechanics:
 - "You described what the player DOES. What do they FEEL while doing it? Those are different things."
 - "Minecraft's fantasy isn't 'place blocks.' It's 'I built this entire world and it's MINE.' What's yours?"
 
-**STOP.** One ask the user directly per topic. Keep pushing until the fantasy is a FEELING, not a feature list.
+**STOP.** One direct user question per topic. Keep pushing until the fantasy is a FEELING, not a feature list.
 
 **After Fantasy is extracted, confirm before moving on by asking the user directly:**
 
@@ -261,7 +267,7 @@ Use MDA backward — start from Aesthetics, not Mechanics:
 
 Now that the fantasy is defined, check what the market looks like for this genre before designing the core loop. This is NOT full market research (that's Phase 5, Layer 3). This is a quick sanity check: how crowded is this space, and what are competitors doing?
 
-**Privacy gate — ask the user directly:**
+**Privacy gate — direct user question:**
 
 > **[Re-ground]** Your fantasy is: *"{fantasy statement from Phase 1}"*. Before designing the core loop, I want to check the current landscape for games in this space.
 >
@@ -401,7 +407,7 @@ Name the 3 games most similar to this concept. For each:
 
 If the user cannot name 3 comparable games, they either don't know the genre well enough (→ ESCALATE: play competitors first) or the concept is genuinely novel (rare — probe harder).
 
-**STOP.** One ask the user directly. The twist must be articulated in one sentence.
+**STOP.** One direct user question. The twist must be articulated in one sentence.
 
 **After Twist is defined, present the concept so far by asking the user directly:**
 
@@ -444,7 +450,7 @@ Start from the desired player emotion. Work backward:
 1. Target aesthetic → 2. Required dynamics → 3. Enabling mechanics
 This is the most rigorous approach but requires clarity on the fantasy (Phase 1).
 
-**ask the user directly:**
+**direct user question:**
 
 > Which approach appeals to you?
 > A) **Verb-First** — start with a satisfying action, build outward
@@ -524,7 +530,7 @@ The gap between "this is cool" and "I must play this" is where most games die.
 | 4 | Closed alpha with 10-20 players, track session length and return rate |
 | 5 | Analyze playtest data: where do players quit? What do they replay? |
 
-**STOP.** One ask the user directly per layer. Flag gaps honestly.
+**STOP.** One direct user question per layer. Flag gaps honestly.
 
 ---
 
@@ -696,6 +702,23 @@ Game Ideation Session:
 - **Escape hatch:** Respect on second request. Note skipped questions. Produce output from what exists.
 - **End with the assignment.** Every session must produce one concrete action for the user to take NEXT — not "go build it" but "play these 3 competitor games and write down what frustrates you" or "build a paper prototype of the core loop and test it with 3 people."
 
-## Save Artifact
+## Save Artifacts
 
-If the user wants a persistent artifact, write it inside this repository, usually under `docs/gstack-artifacts/game-ideation/` or the canonical path named by the workflow, such as `docs/gdd.md` for game-import. Do not write to `docs/gstack-artifacts`, `.codex`, or any platform-specific path.
+Save the Concept One-Pager to both local and shared locations:
+
+1. **Local:** Write to `docs/concept.md` in the project repo (for version control)
+2. **Shared:** Write to `docs/gstack-artifacts/{user}-{branch}-concept-{datetime}.md` (for cross-session discovery)
+
+```bash
+_DATETIME=$(date +%Y%m%d-%H%M%S)
+echo "Saving concept to: docs/gstack-artifacts/${_USER}-${_BRANCH}-concept-${_DATETIME}.md"
+```
+
+If a prior concept exists in shared storage, the new one includes:
+```markdown
+Supersedes: {prior filename}
+```
+
+This creates a revision chain — you can trace how a concept evolved across ideation sessions.
+
+## Review Log

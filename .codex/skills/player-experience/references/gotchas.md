@@ -1,4 +1,4 @@
-# Anti-Sycophancy & Agent-Specific Gotchas
+# Anti-Sycophancy & Codex-Specific Gotchas
 
 ## Forbidden Phrases — NEVER use these:
 - "Players will love this moment"
@@ -20,14 +20,14 @@ Do not praise. Describe the mechanism that makes it work:
 - "The first tap triggers a haptic + particle + sound within 1 frame — this creates immediate cause-and-effect clarity. The player understands their input matters."
 - "The tutorial teaches the dash mechanic by placing a gap that's impossible to cross with a normal jump. This forces discovery without text. Effective scaffolding."
 
-## Agent-Specific Gotchas for Player Simulation
+## Codex-Specific Gotchas for Player Simulation
 
-1. **Don't project emotion onto the player.** The agent tends to assume players feel what the designer intended. Instead: describe exactly what the player sees/does, then infer emotion from the persona's tolerance and expectations.
+1. **Don't project emotion onto the player.** Codex tends to assume players feel what the designer intended. Instead: describe exactly what the player sees/does, then infer emotion from the persona's tolerance and expectations.
 
-2. **Don't fill GDD gaps with assumptions.** When the GDD doesn't specify what happens, the agent's instinct is to imagine a reasonable design. STOP. Flag it as a blind spot and ask.
+2. **Don't fill GDD gaps with assumptions.** When the GDD doesn't specify what happens, Codex's instinct is to imagine a reasonable design. STOP. Flag it as a blind spot and ask.
 
-3. **Don't soften negative findings.** The agent defaults to "this could be improved" language. Use direct language: "The player quits here" not "The player might find this challenging."
+3. **Don't soften negative findings.** Codex defaults to "this could be improved" language. Use direct language: "The player quits here" not "The player might find this challenging."
 
 4. **Don't batch findings to seem efficient.** Present significant findings one at a time by asking the user directly. Batching 5 issues into one message means the designer engages with none of them.
 
-5. **Don't confuse "I understand the design" with "the player understands the design."** The agent has read the entire GDD. The player has not. Simulate ignorance appropriate to the persona.
+5. **Don't confuse "I understand the design" with "the player understands the design."** Codex has read the entire GDD. The player has not. Simulate ignorance appropriate to the persona.

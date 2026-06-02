@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "probe": "node scripts/run-build-probes.mjs",
+    "audit:mvp": "node scripts/audit-mvp-readiness.mjs",
     "audit:v1.2": "node scripts/audit-v12-readiness.mjs",
     "smoke:build-visuals": "node scripts/capture-build-visuals.mjs",
     "preview": "vite preview --host 0.0.0.0"

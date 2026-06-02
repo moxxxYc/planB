@@ -1,4 +1,4 @@
-# Anti-Sycophancy & Agent-Specific Gotchas
+# Anti-Sycophancy & Codex-Specific Gotchas
 
 ## Forbidden Phrases — NEVER use these:
 - "This playtest plan is comprehensive"
@@ -21,7 +21,7 @@ Do not praise. Describe what makes it methodologically sound:
 - "Hypothesis is testable: it specifies the metric (time-to-first-action) and the threshold (<15s). Observer can confirm or refute in a single session."
 - "Question 3 uses open phrasing ('Tell me about the combat') not leading ('Did you like the combat?'). This avoids priming the tester toward positive responses."
 
-## Agent-Specific Gotchas for Playtest Design
+## Codex-Specific Gotchas for Playtest Design
 
 1. **Don't assume testers will follow the protocol as written.** Build in observer prompts for when testers go off-script, skip steps, or get stuck in unexpected places.
 

@@ -2,9 +2,21 @@ import { raceDefs } from '../data/races';
 import { buildPhaseToolStock } from '../data/phaseTools';
 import { createSlotState } from '../data/slots';
 import { createPhaseStats } from './StatsSystem';
-import type { BallTagId, BuildingInstance, GameState, PersistentRunItem, RaceId, UnitSlotState } from '../types/game';
+import type { BallTagId, BuildingInstance, GameState, PersistentRunItem, RaceId, SecondaryRaceId, UnitSlotState } from '../types/game';
 
-export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameState {
+export interface CreateInitialGameStateOptions {
+  secondaryRaceId?: SecondaryRaceId;
+}
+
+export function createDefaultPrototypeGameState(seed = 24391): GameState {
+  return createInitialGameState('hive', seed, { secondaryRaceId: 'arcane' });
+}
+
+export function createInitialGameState(
+  raceId: RaceId = 'hive',
+  seed = 1,
+  options: CreateInitialGameStateOptions = {},
+): GameState {
   const unitLevels: Record<string, number> = {};
   for (const unitId of [...raceDefs.hive.unitPool, ...raceDefs.mech.unitPool]) {
     unitLevels[unitId] = 1;
@@ -22,6 +34,7 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
   return {
     seed,
     currentRaceId: raceId,
+    secondaryRaceId: options.secondaryRaceId,
     speedMultiplier: 1,
     phaseIndex: 0,
     phaseActive: false,
@@ -48,6 +61,16 @@ export function createInitialGameState(raceId: RaceId = 'hive', seed = 1): GameS
       launchLosses: 0,
       researchReturnProgress: 0,
       nonSpawnStreak: 0,
+    },
+    arcaneRune: {
+      current: 0,
+      cap: 5,
+      totalGenerated: 0,
+      totalSpent: 0,
+      totalProgressGranted: 0,
+      cappedHits: 0,
+      noSocketTriggers: 0,
+      socketChargeProgress: 0,
     },
     researchPoints: 0,
     nextUnitId: 1,

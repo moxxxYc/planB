@@ -3,6 +3,7 @@ import { activePacingPreset } from '../data/pacing';
 import { raceDefs } from '../data/races';
 import { unitDefs } from '../data/units';
 import { addToSpawnQueue } from './SpawnQueueSystem';
+import { consumeRunesForUnitSpawnProgress } from './ArcaneSecondarySystem';
 import { getDoctrineUpgradeCarry } from './DoctrineSystem';
 import { getUpgradeCacheCarry, recordRelicGateBlocked, recordUpgradeCacheCarry } from './RelicSystem';
 import {
@@ -21,6 +22,8 @@ export type UnitBallResolution =
     slotIndex: number;
     spawnedCount: number;
     remainingProgress: number;
+    runeProgressSpent: number;
+    progressAdded: number;
   }
   | {
     status: 'blocked';
@@ -28,6 +31,8 @@ export type UnitBallResolution =
     redirectSlotIndex: number;
     blockedGateHits: number;
   };
+
+export type ResolvedUnitBallResolution = Extract<UnitBallResolution, { status: 'resolved' }>;
 
 export function getUnitGateOpenBoundaryRatio(elapsedMs: number, durationMs: number): number {
   return getUnitGateState(elapsedMs, durationMs).openBoundaryRatio;
@@ -98,14 +103,25 @@ export function resolveUnitBallToSlot(
   }
 
   const slot = state.unitSlotStates[state.currentRaceId][clamp(slotIndex, 0, race.unitSlots.length - 1)];
-  const spawnedCount = addUnitSlotProgress(state, slot.unitId, ballValue);
+  const runeSpend = consumeRunesForUnitSpawnProgress(state);
+  const progressAdded = ballValue + runeSpend.amount;
+  const spawnedCount = addUnitSlotProgress(state, slot.unitId, progressAdded);
   return {
     status: 'resolved',
     unitId: slot.unitId,
     slotIndex: slot.index,
     spawnedCount,
     remainingProgress: slot.progress,
+    runeProgressSpent: runeSpend.amount,
+    progressAdded,
   };
+}
+
+export function formatUnitProgressOutcomeLabel(result: ResolvedUnitBallResolution, requirement: number): string {
+  if (result.spawnedCount > 0) {
+    return `进度+${result.progressAdded} 入队x${result.spawnedCount} 剩${result.remainingProgress}/${requirement}`;
+  }
+  return `进度+${result.progressAdded} ${result.remainingProgress}/${requirement}`;
 }
 
 export function getCurrentRaceUnitSlots(state: GameState): UnitSlotDef[] {

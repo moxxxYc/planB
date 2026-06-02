@@ -5,12 +5,13 @@ description: "Low-pressure creative spark facilitation for early game ideas. Use
 
 ## Codex/macOS Adaptation
 
-This skill is migrated from `/Users/yang/Projects/gstack-game/skills/spark-lens`. Preserve the original gstack-game design method and rubrics, but run it as a Codex project skill on macOS:
+This skill is migrated from `/Users/yang/Projects/gstack-game/skills/spark-lens`. Preserve the original gstack-game method, rubrics, and game-domain judgment, but run it as a Codex project skill on macOS:
 
-- Use repository-local files and macOS shell commands such as `rg`, `find`, `sed`, and `ls`.
-- Ask the user directly when the original skill calls for an interactive decision point.
-- Do not use legacy generated automation, external artifact stores, or platform-specific paths.
-- Keep outputs inside this repository when an artifact is requested.
+- Use repository-local files and Codex tools. Prefer `rg`, `find`, `sed`, `ls`, and direct file reads.
+- Resolve this skill's bundled material relative to `.codex/skills/spark-lens/`.
+- Ask the user directly when the original workflow reaches an interactive decision point.
+- Treat `docs/gstack-artifacts/` as the local artifact directory when the original workflow refers to shared gstack storage.
+- Do not use legacy generated automation, external artifact stores, usage logging, or platform-specific paths.
 
 ## User Sovereignty
 
@@ -23,6 +24,7 @@ direction is the default unless you explicitly change it.
 
 DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT.
 Escalation after 3 failed attempts.
+
 
 # /spark-lens: Creative Spark Companion
 
@@ -237,8 +239,15 @@ Say something like:
 
 If prior concept artifacts exist, you may read them, but do not treat them as requirements. Treat them as compost.
 
-```text
-Codex/macOS note: old generated shell automation removed. Use repository-local file reads and ask the user directly when a decision is needed.
+```bash
+echo "=== Spark context ==="
+CONCEPT=$(ls -t docs/*concept* docs/*idea* docs/*pitch* *.concept.md 2>/dev/null | head -1)
+[ -n "$CONCEPT" ] && echo "Local concept fragment: $CONCEPT"
+PREV_SPARK=$(ls -t docs/gstack-artifacts/*-spark-*.md 2>/dev/null | head -1)
+[ -n "$PREV_SPARK" ] && echo "Previous spark trace: $PREV_SPARK"
+PREV_CONCEPT=$(ls -t docs/gstack-artifacts/*-concept-*.md 2>/dev/null | head -1)
+[ -n "$PREV_CONCEPT" ] && echo "Prior concept: $PREV_CONCEPT"
+echo "---"
 ```
 
 If a prior spark trace exists, ask whether to continue from that trace or start with a new fragment.
@@ -448,3 +457,4 @@ Spark Lens:
 
 Do not use DONE_WITH_CONCERNS for this skill. Concerns belong to review skills. Here, a living fragment is enough.
 
+## Review Log

@@ -5,12 +5,13 @@ description: "Use when a prototype or playable build exists and you need to know
 
 ## Codex/macOS Adaptation
 
-This skill is migrated from `/Users/yang/Projects/gstack-game/skills/feel-pass`. Preserve the original gstack-game design method and rubrics, but run it as a Codex project skill on macOS:
+This skill is migrated from `/Users/yang/Projects/gstack-game/skills/feel-pass`. Preserve the original gstack-game method, rubrics, and game-domain judgment, but run it as a Codex project skill on macOS:
 
-- Use repository-local files and macOS shell commands such as `rg`, `find`, `sed`, and `ls`.
-- Ask the user directly when the original skill calls for an interactive decision point.
-- Do not use legacy generated automation, external artifact stores, or platform-specific paths.
-- Keep outputs inside this repository when an artifact is requested.
+- Use repository-local files and Codex tools. Prefer `rg`, `find`, `sed`, `ls`, and direct file reads.
+- Resolve this skill's bundled material relative to `.codex/skills/feel-pass/`.
+- Ask the user directly when the original workflow reaches an interactive decision point.
+- Treat `docs/gstack-artifacts/` as the local artifact directory when the original workflow refers to shared gstack storage.
+- Do not use legacy generated automation, external artifact stores, usage logging, or platform-specific paths.
 
 ## User Sovereignty
 
@@ -23,6 +24,7 @@ direction is the default unless you explicitly change it.
 
 DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT.
 Escalation after 3 failed attempts.
+
 
 ## Voice
 
@@ -61,9 +63,9 @@ When you encounter high-stakes ambiguity during a review:
 
 **STOP.** Name the ambiguity in one sentence. Present 2-3 options with tradeoffs. Ask the user. Do not guess on game design or economy decisions.
 
-## ask the user directly Format (Game Design)
+## Direct User Question Format (Game Design)
 
-**ALWAYS follow this structure for every ask the user directly call:**
+**ALWAYS follow this structure for every direct user question call:**
 1. **Re-ground:** Project, branch, what game/feature is being reviewed. (1-2 sentences)
 2. **Simplify:** Plain language a smart 16-year-old gamer could follow. Use game examples they'd know (Minecraft, Genshin, Among Us, etc.) as analogies.
 3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — include `Player Impact: X/10` for each option. Calibration: 10 = fundamentally changes player experience, 7 = noticeable improvement, 3 = cosmetic/marginal.
@@ -132,12 +134,40 @@ Next Step:
   (if condition): /alternate-skill — reason
 ```
 
-## Load References
 
-Read reference files from this skill's local `references/` directory when the section names them. In Codex on macOS, resolve paths relative to `.codex/skills/feel-pass/`. Do not look in `.codex`, `docs/gstack-artifacts`, or platform-specific paths.
+## Load References (BEFORE any interaction)
+
+Read the referenced files from `.codex/skills/feel-pass/references/` only when this section names them or the review needs that rubric. Do not scan home-directory skill stores.
+
+
+Read ALL reference files now:
+- `references/gotchas.md` — Codex-specific mistakes, anti-sycophancy, 4 forcing questions
+- `references/feedback-chains.md` — 4-beat model, 5 common chains (melee, ranged, jump, pickup, damage taken), dead time analysis
+- `references/scoring.md` — 7-dimension rubric (/14), feel verdict thresholds
+- `references/feel-vocabulary.md` — standardized terms for responsiveness, impact, rhythm, clarity, energy
+
 ## Artifact Discovery
 
-Use macOS/Codex-friendly repository search. Prefer `rg --files`, `find`, and direct reads inside the current repository. Look for local docs such as `docs/gdd.md`, concept notes, prior reviews, playtest notes, screenshots, and build notes. Do not read outside the repository unless the user explicitly provides a path.
+Use `rg --files`, `find`, and direct repository reads to locate local docs, prior reviews, playtest notes, screenshots, build notes, and artifacts under `docs/gstack-artifacts/`. Do not read outside this repository unless the user explicitly provides a path.
+
+```bash
+echo "=== Checking for upstream artifacts ==="
+HANDOFF=$(ls -t docs/gstack-artifacts/*-handoff-*.md 2>/dev/null | head -1)
+[ -n "$HANDOFF" ] && echo "Handoff: $HANDOFF"
+SLICE_PLAN=$(ls -t docs/gstack-artifacts/*-slice-plan-*.md 2>/dev/null | head -1)
+[ -n "$SLICE_PLAN" ] && echo "Slice plan: $SLICE_PLAN"
+PREV_FEEL=$(ls -t docs/gstack-artifacts/*-feel-pass-*.md 2>/dev/null | head -1)
+[ -n "$PREV_FEEL" ] && echo "Prior feel pass: $PREV_FEEL"
+GDD=$(ls -t docs/gdd.md docs/*GDD* 2>/dev/null | head -1)
+[ -n "$GDD" ] && echo "GDD: $GDD"
+echo "---"
+```
+
+If handoff exists, read it for: target feel, soul identification, gameplay requirements.
+If prior feel pass exists, read it for: previous score, unresolved blockers.
+
+---
+
 # /feel-pass: Is This Mechanic Alive?
 
 You are a **game feel doctor**. You diagnose why a mechanic feels dead, muddy, or lifeless — and name specific fixes. You care about milliseconds, frames, and feedback chains, not features or architecture.
@@ -363,4 +393,11 @@ Next Step:
 
 ## Save Artifact
 
-If the user wants a persistent artifact, write it inside this repository, usually under `docs/gstack-artifacts/feel-pass/` or the canonical path named by the workflow, such as `docs/gdd.md` for game-import. Do not write to `docs/gstack-artifacts`, `.codex`, or any platform-specific path.
+When this workflow produces a persistent artifact, write it under `docs/gstack-artifacts/` unless it names a canonical project file such as `docs/gdd.md`. Include the skill name and current timestamp in the filename when the source workflow asks for a generated artifact name.
+
+
+Write to `docs/gstack-artifacts/{user}-{branch}-feel-pass-{datetime}.md`. Supersedes prior if exists.
+
+Discoverable by: /build-playability-review, /game-qa, /game-debug, /game-ship
+
+## Review Log

@@ -34,7 +34,7 @@ Design must flow BACKWARD from Aesthetics:
 
 ## Forcing Questions
 
-Ask the user directly, **ONE AT A TIME**. Smart-route based on GDD state:
+Ask by asking the user directly, **ONE AT A TIME**. Smart-route based on GDD state:
 
 **If GDD is early / core loop unclear — ask Q1 first:**
 

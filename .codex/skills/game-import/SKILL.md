@@ -5,12 +5,13 @@ description: "Import and standardize game design documents from any format (PDF,
 
 ## Codex/macOS Adaptation
 
-This skill is migrated from `/Users/yang/Projects/gstack-game/skills/game-import`. Preserve the original gstack-game design method and rubrics, but run it as a Codex project skill on macOS:
+This skill is migrated from `/Users/yang/Projects/gstack-game/skills/game-import`. Preserve the original gstack-game method, rubrics, and game-domain judgment, but run it as a Codex project skill on macOS:
 
-- Use repository-local files and macOS shell commands such as `rg`, `find`, `sed`, and `ls`.
-- Ask the user directly when the original skill calls for an interactive decision point.
-- Do not use legacy generated automation, external artifact stores, or platform-specific paths.
-- Keep outputs inside this repository when an artifact is requested.
+- Use repository-local files and Codex tools. Prefer `rg`, `find`, `sed`, `ls`, and direct file reads.
+- Resolve this skill's bundled material relative to `.codex/skills/game-import/`.
+- Ask the user directly when the original workflow reaches an interactive decision point.
+- Treat `docs/gstack-artifacts/` as the local artifact directory when the original workflow refers to shared gstack storage.
+- Do not use legacy generated automation, external artifact stores, usage logging, or platform-specific paths.
 
 ## User Sovereignty
 
@@ -23,6 +24,7 @@ direction is the default unless you explicitly change it.
 
 DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT.
 Escalation after 3 failed attempts.
+
 
 ## Voice
 
@@ -61,9 +63,9 @@ When you encounter high-stakes ambiguity during a review:
 
 **STOP.** Name the ambiguity in one sentence. Present 2-3 options with tradeoffs. Ask the user. Do not guess on game design or economy decisions.
 
-## ask the user directly Format (Game Design)
+## Direct User Question Format (Game Design)
 
-**ALWAYS follow this structure for every ask the user directly call:**
+**ALWAYS follow this structure for every direct user question call:**
 1. **Re-ground:** Project, branch, what game/feature is being reviewed. (1-2 sentences)
 2. **Simplify:** Plain language a smart 16-year-old gamer could follow. Use game examples they'd know (Minecraft, Genshin, Among Us, etc.) as analogies.
 3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — include `Player Impact: X/10` for each option. Calibration: 10 = fundamentally changes player experience, 7 = noticeable improvement, 3 = cosmetic/marginal.
@@ -132,13 +134,14 @@ Next Step:
   (if condition): /alternate-skill — reason
 ```
 
+
 # /game-import: Import & Standardize Game Design Documents
 
 You are a **game design document specialist**. Your job is to take whatever messy, partial, or scattered game design material the user has and transform it into a clean, audited, standardized GDD that all downstream gstack-game skills can consume.
 
 **HARD GATE:** Do NOT review, critique, or redesign the game. This skill **imports and audits**. Design critique happens in `/game-review`. If you find problems, note them as gaps — don't fix them.
 
-**INTERACTION RULE:** Every decision point uses ask the user directly. One question at a time. Never batch. Never assume. Never skip ahead without the user's explicit go-ahead.
+**INTERACTION RULE:** Every decision point uses direct user question. One question at a time. Never batch. Never assume. Never skip ahead without the user's explicit go-ahead.
 
 ---
 
@@ -146,13 +149,41 @@ You are a **game design document specialist**. Your job is to take whatever mess
 
 Understand what the user has and what they need.
 
-```text
-Codex/macOS note: old generated shell automation removed. Use repository-local file reads and ask the user directly when a decision is needed.
+```bash
+echo "=== Checking existing docs ==="
+_GDD_FOUND=0
+for f in docs/gdd.md docs/game-design.md docs/GDD.md docs/concept.md *.gdd.md; do
+  [ -f "$f" ] && echo "FOUND: $f ($(wc -l < "$f") lines)" && _GDD_FOUND=$((_GDD_FOUND + 1))
+done
+[ -d "design/gdd" ] && for f in design/gdd/*.md; do
+  [ -f "$f" ] && echo "FOUND: $f ($(wc -l < "$f") lines)" && _GDD_FOUND=$((_GDD_FOUND + 1))
+done
+[ "$_GDD_FOUND" -eq 0 ] && echo "No GDD markdown files found in repo"
+echo "---"
+echo "=== Checking shared storage ==="
+PREV_IMPORT=$(ls -t docs/gstack-artifacts/*-gdd-import-*.md 2>/dev/null | head -1)
+[ -n "$PREV_IMPORT" ] && echo "Prior GDD import: $PREV_IMPORT"
+PREV_CONCEPT=$(ls -t docs/gstack-artifacts/*-concept-*.md 2>/dev/null | head -1)
+[ -n "$PREV_CONCEPT" ] && echo "Prior concept: $PREV_CONCEPT"
+PREV_GAME_REVIEW=$(ls -t docs/gstack-artifacts/*-game-review-*.md 2>/dev/null | head -1)
+[ -n "$PREV_GAME_REVIEW" ] && echo "Prior game review: $PREV_GAME_REVIEW"
+echo "---"
+echo "=== Checking for importable source files ==="
+_SRC_FOUND=0
+for ext in pdf docx txt rtf html; do
+  while IFS= read -r f; do
+    [ -n "$f" ] && echo "SOURCE: $f" && _SRC_FOUND=$((_SRC_FOUND + 1))
+  done < <(find . -maxdepth 3 -name "*.${ext}" -not -path "./.codex/*" -not -path "./node_modules/*" 2>/dev/null | head -5)
+done
+[ "$_SRC_FOUND" -eq 0 ] && echo "No importable source files found"
+echo "---"
+echo "GDD_FOUND=$_GDD_FOUND"
+echo "SRC_FOUND=$_SRC_FOUND"
 ```
 
-Read `AGENTS.md` if it exists — check for project context, existing game description, team info.
+Read `CODEX.md` if it exists — check for project context, existing game description, team info.
 
-**Now ask the first question.** By asking the user directly:
+**Now ask the first question.** Via direct user question:
 
 ### If GDD_FOUND=0 and SRC_FOUND=0:
 
@@ -496,7 +527,7 @@ echo "=== GDD written ==="
 wc -l docs/gdd.md
 ```
 
-Update AGENTS.md if needed — add GDD location if not already there.
+Update CODEX.md if needed — add GDD location if not already there.
 
 ---
 
@@ -593,4 +624,16 @@ Game Import Summary:
 
 ## Save Artifact
 
-If the user wants a persistent artifact, write it inside this repository, usually under `docs/gstack-artifacts/game-import/` or the canonical path named by the workflow, such as `docs/gdd.md` for game-import. Do not write to `docs/gstack-artifacts`, `.codex`, or any platform-specific path.
+When this workflow produces a persistent artifact, write it under `docs/gstack-artifacts/` unless it names a canonical project file such as `docs/gdd.md`. Include the skill name and current timestamp in the filename when the source workflow asks for a generated artifact name.
+
+
+Write a copy of the GDD to `docs/gstack-artifacts/{user}-{branch}-gdd-import-{datetime}.md`. This is a snapshot of the imported GDD at the time of import (the canonical version lives at `docs/gdd.md`). If a prior GDD import exists, include `Supersedes: {prior filename}` at the top.
+
+This artifact is discoverable by:
+- `/game-review` — reads the GDD for design review
+- `/player-experience` — reads the GDD for walkthrough simulation
+- `/balance-review` — reads economy and progression sections
+- `/game-eng-review` — reads technical specs section
+- `/game-direction` — reads scope and milestones
+
+## Review Log

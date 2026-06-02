@@ -1,4 +1,5 @@
 export type RaceId = 'hive' | 'mech';
+export type SecondaryRaceId = 'arcane';
 export type Side = 'player' | 'enemy';
 export type SlotId = 'spawn' | 'gold' | 'magic' | 'upgrade' | 'special';
 export type UnitRole = 'frontline' | 'melee' | 'ranged' | 'caster' | 'siege' | 'giant';
@@ -177,6 +178,11 @@ export interface PhaseStats {
   slotTriggers: Record<SlotId, number>;
   launchOutcomes: Record<LaunchOutcomeId, number>;
   buildingContributions: Record<BuildingChamber, number>;
+  runeGenerated: number;
+  runeSpent: number;
+  runeProgressGranted: number;
+  runeCappedHits: number;
+  runeNoSocketTriggers: number;
   spawnMarksCreated: number;
   spawnMarksConsumed: number;
   spawnCopiesCreated: number;
@@ -207,6 +213,17 @@ export interface PhaseStats {
 export interface GameStats {
   currentPhase: PhaseStats;
   lastPhase?: PhaseStats;
+}
+
+export interface ArcaneRuneState {
+  current: number;
+  cap: number;
+  totalGenerated: number;
+  totalSpent: number;
+  totalProgressGranted: number;
+  cappedHits: number;
+  noSocketTriggers: number;
+  socketChargeProgress: number;
 }
 
 export interface PhaseChainHistoryEntry {
@@ -341,6 +358,7 @@ export interface GameSettings {
 export interface GameState {
   seed: number;
   currentRaceId: RaceId;
+  secondaryRaceId?: SecondaryRaceId;
   speedMultiplier: GameSpeedMultiplier;
   phaseIndex: number;
   phaseActive: boolean;
@@ -359,6 +377,7 @@ export interface GameState {
   buildingEvents: BuildingEventState;
   relicEvents: RelicEventState;
   doctrineEvents: DoctrineEventState;
+  arcaneRune: ArcaneRuneState;
   researchPoints: number;
   nextUnitId: number;
   nextBallId: number;

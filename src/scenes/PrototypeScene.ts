@@ -29,7 +29,13 @@ import {
   getPannedBattleCameraCenter,
   projectBattlePoint,
 } from '../systems/BattlefieldViewSystem';
-import { createInitialGameState } from '../systems/GameState';
+import {
+  buildRunEndSummary,
+  buildRunSetupSummary,
+  createPrototypeRunState,
+  type PrototypeRunConfig,
+  type RunOutcome,
+} from '../systems/RunFlowSystem';
 import { buildRightAlignedButtonRow, buildTopZoneLayout, PROTOTYPE_LAYOUT } from '../systems/PrototypeLayoutSystem';
 import {
   buildCompactHudBlocks,
@@ -72,10 +78,11 @@ import {
   normalizeBallTags,
 } from '../systems/BallTagSystem';
 import {
+  formatUnitProgressOutcomeLabel,
   getCurrentRaceUnitSlotStates,
   resolveUnitBallToSlot,
 } from '../systems/UnitSpawnProgressSystem';
-import type { BallStage, BallTagId, BattleUnit, BuildingChamber, DebugBuildPresetId, DoctrineTechDef, GameState, LaunchOutcomeId, PhaseToolId, RaceId, RewardDef, SlotId, UnitSlotState } from '../types/game';
+import type { BallStage, BallTagId, BattleUnit, BuildingChamber, DebugBuildPresetId, DoctrineTechDef, GameState, LaunchOutcomeId, PhaseToolId, RaceId, RewardDef, SecondaryRaceId, SlotId, UnitSlotState } from '../types/game';
 
 type PinballBall = {
   image: Phaser.Physics.Matter.Image;
@@ -186,6 +193,7 @@ export class PrototypeScene extends Phaser.Scene {
   private decisionVisuals: OutcomeVisual[] = [];
   private unitSlotVisuals: UnitSlotVisual[] = [];
   private floatingGroup!: Phaser.GameObjects.Group;
+  private startContainer?: Phaser.GameObjects.Container;
   private rewardContainer?: Phaser.GameObjects.Container;
   private currentRewardChoices: RewardDef[] = [];
   private rewardRerollUsed = false;
@@ -244,13 +252,15 @@ export class PrototypeScene extends Phaser.Scene {
   private slotFlashUntil = new Map<string, number>();
   private lastRecentTextIndex = 0;
   private gameOver = false;
+  private selectedMainRaceId: RaceId = 'hive';
+  private selectedSecondaryRaceId: SecondaryRaceId | undefined = 'arcane';
 
   constructor() {
     super('PrototypeScene');
   }
 
   create() {
-    this.state = createInitialGameState('hive', 24391);
+    this.state = createPrototypeRunState(this.getSelectedRunConfig());
     this.floatingGroup = this.add.group();
     this.matter.world.setBounds(0, 0, GAME_W, TOP_Y + TOP_H, 28, true, true, true, true);
     this.cameras.main.setBackgroundColor('#111827');
@@ -263,8 +273,7 @@ export class PrototypeScene extends Phaser.Scene {
     this.syncUiDensity();
     this.applyGameSpeedToRuntime();
     this.bindDomControls();
-    startPhase(this.state);
-    this.spawnLaunchBall();
+    this.showStartScreen();
     this.matter.world.on('collisionstart', (event: any) => this.handleMatterCollision(event));
   }
 
@@ -986,12 +995,15 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private createHud() {
-    const labels = ['战况', '基地', '资源', '部队', '下次出兵', '战备'];
+    const labels = buildCompactHudBlocks(this.state).map((block) => block.label);
+    const columnStep = labels.length > 6 ? 174 : 202;
+    const wrapWidth = labels.length > 6 ? 156 : 184;
     for (let index = 0; index < labels.length; index += 1) {
-      const x = 22 + index * 202;
+      const x = 22 + index * columnStep;
       this.add.text(x, HUD_TOP + 10, labels[index], this.textStyle(11, '#94a3b8'));
-      this.hudTexts.push(this.add.text(x, HUD_TOP + 29, '', this.textStyle(index === 5 ? 13 : 14, '#f8fafc')).setWordWrapWidth(184));
-      this.hudDetailTexts.push(this.add.text(x, HUD_TOP + 49, '', this.textStyle(10, '#cbd5e1')).setWordWrapWidth(184));
+      const valueFontSize = labels[index] === '战备' ? 13 : 14;
+      this.hudTexts.push(this.add.text(x, HUD_TOP + 29, '', this.textStyle(valueFontSize, '#f8fafc')).setWordWrapWidth(wrapWidth));
+      this.hudDetailTexts.push(this.add.text(x, HUD_TOP + 49, '', this.textStyle(10, '#cbd5e1')).setWordWrapWidth(wrapWidth));
     }
 
     const surfaceLabels = ['当前遗物', '科技节点', '工事摘要'];
@@ -1026,6 +1038,111 @@ export class PrototypeScene extends Phaser.Scene {
       item.setDepth(7999).setInteractive({ useHandCursor: true }).on('pointerdown', onClick);
     }
     return { plate, text };
+  }
+
+  private getSelectedRunConfig(): PrototypeRunConfig {
+    return {
+      mainRaceId: this.selectedMainRaceId,
+      secondaryRaceId: this.selectedSecondaryRaceId,
+      seed: 24391,
+    };
+  }
+
+  private showStartScreen() {
+    this.startContainer?.destroy(true);
+    this.rewardContainer?.destroy(true);
+    this.rewardContainer = undefined;
+    this.summaryContainer?.destroy(true);
+    this.summaryContainer = undefined;
+    this.gameOver = false;
+    this.state = createPrototypeRunState(this.getSelectedRunConfig());
+    this.resetRuntimeVisualState();
+    this.createUnitSlots();
+    this.createDecisionSlots();
+    this.syncDebugUnitButtons();
+    this.createPhaseToolButtons();
+    this.createResearchTechButtons();
+    this.createUnitStructureButtons();
+    this.updateHud();
+
+    const panel = this.add.container(GAME_W / 2, BATTLE_Y + 205).setDepth(9000);
+    panel.add(this.add.rectangle(0, 0, 540, 300, 0x07111f, 0.96).setStrokeStyle(3, 0x93c5fd, 0.72));
+    panel.add(this.add.text(-230, -122, '开始原型 Run', this.textStyle(24, '#f8fafc')));
+    panel.add(this.add.text(-230, -90, '选择主族和副族，然后完成 6 个阶段。', this.textStyle(13, '#cbd5e1')));
+
+    buildRunSetupSummary(this.getSelectedRunConfig()).forEach((line, index) => {
+      panel.add(this.add.text(-230, -56 + index * 22, line, this.textStyle(13, '#dbeafe')));
+    });
+
+    panel.add(this.createSetupButton(-230, 30, 132, `虫群${this.selectedMainRaceId === 'hive' ? ' ✓' : ''}`, () => {
+      this.selectedMainRaceId = 'hive';
+      this.showStartScreen();
+    }, this.selectedMainRaceId === 'hive'));
+    panel.add(this.createSetupButton(-84, 30, 132, `机械${this.selectedMainRaceId === 'mech' ? ' ✓' : ''}`, () => {
+      this.selectedMainRaceId = 'mech';
+      this.showStartScreen();
+    }, this.selectedMainRaceId === 'mech'));
+    panel.add(this.createSetupButton(62, 30, 168, `Arcane ${this.selectedSecondaryRaceId === 'arcane' ? '开' : '关'}`, () => {
+      this.selectedSecondaryRaceId = this.selectedSecondaryRaceId === 'arcane' ? undefined : 'arcane';
+      this.showStartScreen();
+    }, this.selectedSecondaryRaceId === 'arcane'));
+    panel.add(this.createSetupButton(-70, 90, 180, '开始', () => this.startSelectedRun(), true));
+
+    this.startContainer = panel;
+  }
+
+  private createSetupButton(x: number, y: number, width: number, label: string, onClick: () => void, selected = false) {
+    const container = this.add.container(x, y);
+    const plate = this.add.rectangle(0, 0, width, 34, selected ? 0x1e3a5f : 0x1f2937, 0.96)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(2, selected ? 0xbfdbfe : 0x64748b, selected ? 0.9 : 0.72);
+    const text = this.add.text(width / 2, 0, label, this.textStyle(13, selected ? '#f8fafc' : '#cbd5e1')).setOrigin(0.5);
+    for (const item of [plate, text]) {
+      item.setInteractive({ useHandCursor: true }).on('pointerdown', onClick);
+    }
+    container.add([plate, text]);
+    return container;
+  }
+
+  private startSelectedRun() {
+    this.startContainer?.destroy(true);
+    this.startContainer = undefined;
+    this.summaryContainer?.destroy(true);
+    this.summaryContainer = undefined;
+    this.rewardContainer?.destroy(true);
+    this.rewardContainer = undefined;
+    this.gameOver = false;
+    this.state = createPrototypeRunState(this.getSelectedRunConfig());
+    this.resetRuntimeVisualState();
+    this.createUnitSlots();
+    this.createDecisionSlots();
+    this.syncDebugUnitButtons();
+    this.createPhaseToolButtons();
+    this.createResearchTechButtons();
+    this.createUnitStructureButtons();
+    this.updateHud();
+    startPhase(this.state);
+    this.spawnLaunchBall();
+  }
+
+  private resetRuntimeVisualState() {
+    for (const ball of this.balls.values()) ball.image.destroy();
+    this.balls.clear();
+    this.launchSplitCounts.clear();
+    for (const visual of this.unitVisuals.values()) {
+      visual.outline.destroy();
+      visual.sprite.destroy();
+      visual.sideRing.destroy();
+      visual.shadow.destroy();
+      visual.hpBack.destroy();
+      visual.hpFill.destroy();
+      visual.hpText.destroy();
+    }
+    this.unitVisuals.clear();
+    this.renderedEffectIds.clear();
+    this.slotFlashUntil.clear();
+    this.lastRecentTextIndex = 0;
+    this.localEventFeedIndex = 0;
   }
 
   private createBuildShopPanel() {
@@ -1325,6 +1442,18 @@ export class PrototypeScene extends Phaser.Scene {
         this.cycleGameSpeedFromUi();
         return;
       }
+      if (action === 'start') {
+        this.startSelectedRun();
+        return;
+      }
+      if (action === 'restart') {
+        this.startSelectedRun();
+        return;
+      }
+      if (action === 'setup') {
+        this.showStartScreen();
+        return;
+      }
       if (action.startsWith('tool-')) {
         this.buyPhaseToolFromUi(action.slice(5) as PhaseToolId);
         return;
@@ -1342,7 +1471,6 @@ export class PrototypeScene extends Phaser.Scene {
       if (action === 'decision') this.spawnDecisionBall();
       if (action === 'spawn') this.spawnUnitBall();
       if (action === 'race') this.toggleRace();
-      if (action === 'start') this.startPhaseFromDebug();
       if (action === 'skip') this.skipPhase();
       if (action === 'frontline') this.restoreBattleCameraFollow();
       if (action === 'magic') this.toggleMagic();
@@ -1353,6 +1481,9 @@ export class PrototypeScene extends Phaser.Scene {
   private applyDebugPreset(id: DebugBuildPresetId) {
     const result = applyDebugBuildPreset(this.state, id);
     if (result.status !== 'applied') return;
+    this.startContainer?.destroy(true);
+    this.startContainer = undefined;
+    this.gameOver = false;
     this.rewardContainer?.destroy(true);
     this.rewardContainer = undefined;
     this.summaryContainer?.destroy(true);
@@ -1642,12 +1773,11 @@ export class PrototypeScene extends Phaser.Scene {
 
     this.destroyBall(label);
     const slot = this.unitSlotVisuals[result.slotIndex];
-    const unit = unitDefs[result.unitId];
-    const recentQueueText = this.state.recentFloatingTexts.at(-1)?.label;
-    const labelText = result.spawnedCount > 0 && recentQueueText?.includes('入队')
-      ? recentQueueText
-      : result.spawnedCount > 0 ? `${unit.name} 入队` : `${result.remainingProgress}/${slot.slot.requirement}`;
+    const labelText = formatUnitProgressOutcomeLabel(result, slot.slot.requirement);
     this.spawnFloatingText(slot.plate.x, slot.plate.y - 50, labelText, raceDefs[this.state.currentRaceId].color);
+    if (result.runeProgressSpent > 0) {
+      this.spawnFloatingText(slot.plate.x, slot.plate.y - 72, `Rune spent +${result.runeProgressSpent}`, 0xa78bfa);
+    }
   }
 
   private destroyBall(label: string) {
@@ -1749,6 +1879,10 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private startPhaseFromDebug() {
+    if (this.startContainer) {
+      this.startSelectedRun();
+      return;
+    }
     if (this.state.phaseActive || this.rewardContainer || this.gameOver) return;
     startPhase(this.state);
     this.spawnLaunchBall();
@@ -1756,10 +1890,10 @@ export class PrototypeScene extends Phaser.Scene {
 
   private endPhase() {
     completePhase(this.state, this.state.battle.bases.enemy.hp <= 0 ? 'objective' : 'timer');
-    const won = this.state.battle.bases.player.hp > 0;
-    if (!won || isFinalPhaseComplete(this.state)) {
+    const playerAlive = this.state.battle.bases.player.hp > 0;
+    if (!playerAlive || isFinalPhaseComplete(this.state)) {
       this.gameOver = true;
-      this.showSummary(won ? '原型通关：核心已摧毁' : '失败：我方基地被摧毁');
+      this.showRunEndSummary(playerAlive ? 'victory' : 'defeat');
       return;
     }
     this.showSummary(`阶段完成：${phaseDefs[this.state.phaseIndex].name}`);
@@ -1780,6 +1914,30 @@ export class PrototypeScene extends Phaser.Scene {
       ...buildSummary.lines,
     ];
     lines.forEach((line, index) => panel.add(this.add.text(-190, -78 + index * 24, line, this.textStyle(13, index >= 3 ? '#dbeafe' : '#cbd5e1'))));
+    this.summaryContainer = panel;
+  }
+
+  private showRunEndSummary(outcome: RunOutcome) {
+    this.summaryContainer?.destroy(true);
+    this.rewardContainer?.destroy(true);
+    this.rewardContainer = undefined;
+    const summary = buildRunEndSummary(this.state, outcome);
+    const panel = this.add.container(GAME_W / 2, BATTLE_Y + 220).setDepth(9200);
+    panel.add(this.add.rectangle(0, 0, 660, 360, 0x07111f, 0.97).setStrokeStyle(3, outcome === 'victory' ? 0x86efac : 0xfca5a5, 0.82));
+    panel.add(this.add.text(-292, -152, summary.title, this.textStyle(25, outcome === 'victory' ? '#dcfce7' : '#fee2e2')));
+    panel.add(this.add.text(-292, -118, summary.subtitle, this.textStyle(13, '#cbd5e1')).setWordWrapWidth(580));
+
+    summary.primaryLines.forEach((line, index) => {
+      panel.add(this.add.text(-292, -80 + index * 22, line, this.textStyle(13, '#e0f2fe')));
+    });
+    panel.add(this.add.text(-292, 20, `诊断：${summary.diagnosisTags.join(' / ')}`, this.textStyle(14, outcome === 'victory' ? '#bbf7d0' : '#fecaca')).setWordWrapWidth(580));
+    panel.add(this.add.text(-292, 48, summary.nextRunHint, this.textStyle(13, '#fef3c7')).setWordWrapWidth(580));
+    summary.chainLines.slice(0, 4).forEach((line, index) => {
+      panel.add(this.add.text(-292, 86 + index * 20, line, this.textStyle(11, '#cbd5e1')).setWordWrapWidth(580));
+    });
+
+    panel.add(this.createSetupButton(-112, 150, 144, '重新开始', () => this.startSelectedRun(), true));
+    panel.add(this.createSetupButton(48, 150, 144, '换配置', () => this.showStartScreen(), false));
     this.summaryContainer = panel;
   }
 
@@ -2566,8 +2724,8 @@ export class PrototypeScene extends Phaser.Scene {
   }
 
   private updateHud() {
-    if (this.hudTexts.length < 6) return;
     const blocks = buildCompactHudBlocks(this.state);
+    if (this.hudTexts.length < blocks.length) return;
     blocks.forEach((block, index) => {
       this.hudTexts[index]
         .setText(block.value)

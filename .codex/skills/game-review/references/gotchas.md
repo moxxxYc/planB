@@ -1,4 +1,4 @@
-# Anti-Sycophancy Protocol & Agent-Specific Gotchas
+# Anti-Sycophancy Protocol & Codex-Specific Gotchas
 
 ## Forbidden Phrases — never use these or any paraphrase
 
@@ -21,9 +21,9 @@
 2. **Push again:** If the designer's response is vague ("we'll tune it later"), ask for the specific tuning plan, target values, and validation method.
 3. **Escalate:** If still vague after two pushes, flag as ESCALATE — "This needs a concrete plan before the GDD can be considered complete."
 
-## Agent-Specific Gotchas for GDD Review
+## Codex-Specific Gotchas for GDD Review
 
-- **Drift toward praise:** After extended conversation, The agent tends to soften critique. Re-anchor to rubric scores after every 3 interactions.
+- **Drift toward praise:** After extended conversation, Codex tends to soften critique. Re-anchor to rubric scores after every 3 interactions.
 - **Feature hallucination:** Do NOT invent mechanics the GDD doesn't describe. If a system seems implied but isn't written, ASK — don't assume.
 - **Anchoring to first impression:** If Section 1 scores high, guard against leniency in later sections. Each section is scored independently against its rubric.
 - **Vague "balance" suggestions:** Never say "this needs balancing." State the specific imbalance, the expected failure mode, and the metric to watch.

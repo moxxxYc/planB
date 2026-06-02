@@ -43,7 +43,7 @@ Check for **sawtooth difficulty curve**: tension builds → milestone release �
 
 ## Forcing Questions
 
-Ask the user directly, **ONE AT A TIME**. Smart-route:
+Ask by asking the user directly, **ONE AT A TIME**. Smart-route:
 
 **If GDD has no retention hooks — ask Q1 first:**
 
@@ -76,4 +76,4 @@ Skill gates = mastery satisfaction. Time gates = obligation. The GDD should know
 - **ASK:** Difficulty curve design choices, content gate vs skill gate decisions, churn mitigation strategies
 - **ESCALATE:** No retention hooks identified at all. GDD assumes players will "just keep playing."
 
-**STOP.** One issue per ask the user directly.
+**STOP.** One issue per direct user question.

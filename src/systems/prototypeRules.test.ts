@@ -10,7 +10,7 @@ import { decisionSlotDefs, slotDefs } from '../data/slots';
 import { unitDefs } from '../data/units';
 import { svgAssets } from '../rendering/assets';
 import { createRewardDescriptionTextStyle, REWARD_CARD_DESCRIPTION_WRAP_WIDTH } from '../rendering/rewardTextLayout';
-import { createInitialGameState } from './GameState';
+import { createDefaultPrototypeGameState, createInitialGameState } from './GameState';
 import { triggerSlot } from './SlotTriggerSystem';
 import { getBattleContactRatio, getBattleFrontlineRatio, getBattleLaneOffset, spawnBattleUnit, spawnDebugRaceUnit, updateBattle } from './BattleSystem';
 import { applyReward, buildRewardChoices, rerollRewardChoices } from './RewardSystem';
@@ -38,11 +38,16 @@ import {
 import { applyDebugBuildPreset, debugBuildPresets } from './DebugPresetSystem';
 import { buildChamberPanelSummaries, buildIdentityVisualSummary, buildPhaseTelemetrySummary, getDominantBuildChamber } from './BuildTelemetrySystem';
 import * as BuildTelemetrySystem from './BuildTelemetrySystem';
-import { runAllBuildProbes, runBuildProbe, runNaturalBlueprintRewardProbe } from './BuildProbeSystem';
+import { runAllBuildProbes, runBuildProbe, runNaturalBlueprintRewardProbe, runArcaneSecondaryRuneProbe } from './BuildProbeSystem';
 import { buildProbeValidationReport, formatBuildProbeValidationReport } from './BuildProbeValidationSystem';
 import { buildIdentitySmokePlan } from './BuildVisualSmokeSystem';
-import { buildV12ReadinessReport, formatV12ReadinessReport } from './V12ReadinessSystem';
+import { buildMvpReadinessReport, formatMvpReadinessReport } from './MvpReadinessSystem';
 import { buildRuntimeVisualTimingReport } from './RuntimeVisualTimingSystem';
+import {
+  buildRunEndSummary,
+  buildRunSetupSummary,
+  createPrototypeRunState,
+} from './RunFlowSystem';
 import {
   buildCompactHudBlocks,
   getEventFeedSlot,
@@ -78,6 +83,7 @@ import {
   getUnitGateState,
   getUnitGateOpenBoundaryRatio,
   getUnlockedUnitSlotCount,
+  formatUnitProgressOutcomeLabel,
   resolveUnitBallToSlot,
 } from './UnitSpawnProgressSystem';
 import {
@@ -358,6 +364,165 @@ describe('pinball machine rules', () => {
 });
 
 describe('unit spawn progress rules', () => {
+  describe('arcane secondary rune state', () => {
+    it('starts the playable prototype with Arcane secondary visible in the HUD', () => {
+      const state = createDefaultPrototypeGameState();
+      const blocks = buildCompactHudBlocks(state);
+      const secondaryBlock = blocks.find((block) => block.label === '副族');
+      const nextSpawnBlock = blocks.find((block) => block.label === '下次出兵');
+
+      expect(state.currentRaceId).toBe('hive');
+      expect(state.secondaryRaceId).toBe('arcane');
+      expect(secondaryBlock).toMatchObject({
+        value: '秘仪议会',
+        detail: 'Rune 0/5',
+      });
+      expect(nextSpawnBlock?.value).toContain('Rune 0/5');
+    });
+
+    it('keeps Arcane secondary separate from the Hive or Mech main race', () => {
+      const state = createInitialGameState('hive', 201, { secondaryRaceId: 'arcane' });
+
+      expect(state.currentRaceId).toBe('hive');
+      expect(state.secondaryRaceId).toBe('arcane');
+      expect(Object.keys(state.unitSlotStates)).toEqual(['hive', 'mech']);
+      expect(state.arcaneRune).toMatchObject({
+        current: 0,
+        cap: 5,
+        totalGenerated: 0,
+        totalSpent: 0,
+        totalProgressGranted: 0,
+        cappedHits: 0,
+        noSocketTriggers: 0,
+        socketChargeProgress: 0,
+      });
+    });
+
+    it('does not activate Arcane secondary by default', () => {
+      const state = createInitialGameState('mech', 202);
+
+      expect(state.currentRaceId).toBe('mech');
+      expect(state.secondaryRaceId).toBeUndefined();
+      expect(state.arcaneRune.current).toBe(0);
+      expect(state.arcaneRune.cap).toBe(5);
+    });
+  });
+
+  describe('secondary race data', () => {
+    it('defines Arcane as a support package, not as a second full race', async () => {
+      const { secondaryRaceDefs } = await import('../data/secondaryRaces');
+      const arcane = secondaryRaceDefs.arcane;
+
+      expect(arcane.id).toBe('arcane');
+      expect(arcane.name).toBe('秘仪议会');
+      expect(arcane.supportUnits.map((unit) => unit.id)).toEqual(['arcane_rune_acolyte', 'arcane_refraction_guard']);
+      expect(arcane.coreTrait.id).toBe('rune_conversion');
+      expect(arcane.machineModifier.id).toBe('standby_rune_conversion');
+      expect(arcane.forbiddenAsSecondary).toEqual([
+        'guardian_hero_pool',
+        'building_pool',
+        'second_unit_spawn_board',
+        'manual_rune_button',
+      ]);
+    });
+  });
+
+  describe('arcane secondary rune rules', () => {
+    it('creates Rune from Magic and Upgrade, never from Gold', () => {
+      const state = createInitialGameState('hive', 203, { secondaryRaceId: 'arcane' });
+
+      triggerSlot(state, 'magic');
+      triggerSlot(state, 'gold');
+      triggerSlot(state, 'upgrade');
+
+      expect(state.arcaneRune.current).toBe(2);
+      expect(state.arcaneRune.totalGenerated).toBe(2);
+      expect(state.stats.currentPhase.runeGenerated).toBe(2);
+      expect(state.recentFloatingTexts.map((item) => item.label)).toEqual(expect.arrayContaining([
+        'Rune +1: Magic',
+        '金币 +15',
+        'Rune +1: Upgrade',
+      ]));
+    });
+
+    it('does not create Rune when Arcane is not selected as secondary', () => {
+      const state = createInitialGameState('hive', 204);
+
+      triggerSlot(state, 'magic');
+      triggerSlot(state, 'upgrade');
+
+      expect(state.arcaneRune.current).toBe(0);
+      expect(state.stats.currentPhase.runeGenerated).toBe(0);
+    });
+
+    it('caps Rune at 5 and records capped Magic or Upgrade hits', () => {
+      const state = createInitialGameState('hive', 205, { secondaryRaceId: 'arcane' });
+
+      for (let index = 0; index < 7; index += 1) triggerSlot(state, 'magic');
+
+      expect(state.arcaneRune.current).toBe(5);
+      expect(state.arcaneRune.totalGenerated).toBe(5);
+      expect(state.arcaneRune.cappedHits).toBe(2);
+      expect(state.stats.currentPhase.runeCappedHits).toBe(2);
+    });
+
+    it('spends all stored Rune on the next resolved Unit Spawn as main-race slot progress', () => {
+      const state = createInitialGameState('hive', 206, { secondaryRaceId: 'arcane' });
+      state.arcaneRune.current = 3;
+      const spitterSlot = raceDefs.hive.unitSlots[1];
+
+      const result = resolveUnitBallToSlot(state, 1, 1, {
+        elapsedMs: 1000,
+        durationMs: 60000,
+      });
+
+      expect(result).toMatchObject({
+        status: 'resolved',
+        unitId: spitterSlot.unitId,
+        slotIndex: 1,
+        runeProgressSpent: 3,
+        progressAdded: 4,
+      });
+      expect(state.arcaneRune.current).toBe(0);
+      expect(state.arcaneRune.totalSpent).toBe(3);
+      expect(state.arcaneRune.totalProgressGranted).toBe(3);
+      expect(state.stats.currentPhase.runeSpent).toBe(3);
+      expect(state.stats.currentPhase.runeProgressGranted).toBe(3);
+      expect(getCurrentRaceUnitSlotStates(state)[1].progress).toBe(1);
+      expect(state.spawnQueue.some((item) => item.unitId === spitterSlot.unitId)).toBe(true);
+    });
+
+    it('labels Rune-driven wraparound as total progress, queued units, and remaining progress', () => {
+      const state = createInitialGameState('hive', 212, { secondaryRaceId: 'arcane' });
+      state.arcaneRune.current = 3;
+      const spitterSlot = raceDefs.hive.unitSlots[1];
+
+      const result = resolveUnitBallToSlot(state, 1, 1, {
+        elapsedMs: 1000,
+        durationMs: 60000,
+      });
+
+      expect(result.status).toBe('resolved');
+      expect(result.status === 'resolved'
+        ? formatUnitProgressOutcomeLabel(result, spitterSlot.requirement)
+        : '').toBe('进度+4 入队x1 剩1/3');
+    });
+
+    it('does not spend Rune when a high-tier Unit Spawn is blocked by the gate', () => {
+      const state = createInitialGameState('mech', 207, { secondaryRaceId: 'arcane' });
+      state.arcaneRune.current = 2;
+
+      const result = resolveUnitBallToSlot(state, 4, 1, {
+        elapsedMs: 0,
+        durationMs: 60000,
+      });
+
+      expect(result.status).toBe('blocked');
+      expect(state.arcaneRune.current).toBe(2);
+      expect(state.stats.currentPhase.runeSpent).toBe(0);
+    });
+  });
+
   it('stores race unit slots as data-driven state with requirements and progress', () => {
     const state = createInitialGameState('hive', 12);
 
@@ -908,6 +1073,82 @@ describe('battlefield view rules', () => {
 
     expect(bands).toHaveLength(16);
     expect(bands.every((band) => band.player === 0 && band.enemy === 0)).toBe(true);
+  });
+});
+
+describe('run shell rules', () => {
+  it('builds a configured prototype run from main race and optional Arcane secondary', () => {
+    const hiveArcane = createPrototypeRunState({ mainRaceId: 'hive', secondaryRaceId: 'arcane', seed: 301 });
+    const mechOnly = createPrototypeRunState({ mainRaceId: 'mech', seed: 302 });
+
+    expect(hiveArcane.currentRaceId).toBe('hive');
+    expect(hiveArcane.secondaryRaceId).toBe('arcane');
+    expect(hiveArcane.phaseActive).toBe(false);
+    expect(hiveArcane.phaseIndex).toBe(0);
+
+    expect(mechOnly.currentRaceId).toBe('mech');
+    expect(mechOnly.secondaryRaceId).toBeUndefined();
+    expect(buildRunSetupSummary({ mainRaceId: 'mech' })).toEqual([
+      '主族：机械',
+      '副族：无',
+      '目标：完成 6 个阶段并守住基地',
+    ]);
+  });
+
+  it('summarizes a full-run victory with chain identity and run totals', () => {
+    const state = createPrototypeRunState({ mainRaceId: 'hive', secondaryRaceId: 'arcane', seed: 303 });
+    state.phaseIndex = phaseDefs.length - 1;
+    state.buildArchetypeHint = '虫群爆兵';
+    state.selectedRewards = ['launch_recycle_buffer', 'decision_arc_coil'];
+    state.chainHistory.push({
+      phaseIndex: 0,
+      phaseId: 'outer_gate',
+      phaseName: '外门',
+      reason: 'objective',
+      archetype: '虫群爆兵',
+      dominantChamber: '出兵区',
+      resourceReturnRate: 0.5,
+      summaryLines: ['构筑 虫群爆兵 主仓 出兵区'],
+      completedAtMs: 42000,
+      unitsQueued: 4,
+      unitsDeployed: 3,
+      advancedUnitsQueued: 1,
+      gateBlockedEvents: 0,
+    });
+
+    const summary = buildRunEndSummary(state, 'victory');
+
+    expect(summary.title).toBe('原型通关');
+    expect(summary.primaryLines).toEqual(expect.arrayContaining([
+      '主族 虫群 / 副族 秘仪议会',
+      '阶段 6/6  奖励 2  构筑 虫群爆兵',
+      '总入队 4  总部署 3  高阶入队 1  挡回 0',
+    ]));
+    expect(summary.diagnosisTags).toEqual(['构筑成型', '六阶段完成']);
+  });
+
+  it('diagnoses a failed run from machine-chain bottlenecks', () => {
+    const state = createPrototypeRunState({ mainRaceId: 'mech', seed: 304 });
+    state.battle.bases.player.hp = 0;
+    state.stats.currentPhase.slotTriggers.gold = 4;
+    state.stats.currentPhase.slotTriggers.magic = 3;
+    state.stats.currentPhase.slotTriggers.upgrade = 2;
+    state.stats.currentPhase.slotTriggers.spawn = 0;
+    state.stats.currentPhase.unitsQueued = 0;
+    state.stats.currentPhase.playerBaseDamage = 180;
+    state.stats.currentPhase.enemyBaseDamage = 20;
+    state.stats.currentPhase.gateBlockedEvents = 3;
+
+    const summary = buildRunEndSummary(state, 'defeat');
+
+    expect(summary.title).toBe('运行失败');
+    expect(summary.diagnosisTags).toEqual([
+      '出兵链断档',
+      '战备回流弱',
+      '高阶挡板卡顿',
+      '前线承压',
+    ]);
+    expect(summary.nextRunHint).toBe('下局优先修复：让非出兵收益更快回到 Unit Spawn，并降低早期高阶挡板依赖。');
   });
 });
 
@@ -1470,7 +1711,7 @@ describe('build telemetry rules', () => {
     expect(getEventFeedSlot(3)).toEqual({ x: 1242, y: 242, row: 0, align: 'right' });
   });
 
-  it('compresses the bottom HUD into six readable status blocks', () => {
+  it('compresses the bottom HUD into stable readable status blocks', () => {
     const state = createInitialGameState('hive', 79);
     state.gold = 91;
     state.researchPoints = 20;
@@ -1483,12 +1724,37 @@ describe('build telemetry rules', () => {
 
     const blocks = buildCompactHudBlocks(state);
 
-    expect(blocks.map((block) => block.label)).toEqual(['战况', '基地', '资源', '部队', '下次出兵', '战备']);
-    expect(blocks).toHaveLength(6);
+    expect(blocks.map((block) => block.label)).toEqual(['战况', '副族', '基地', '资源', '部队', '下次出兵', '战备']);
+    expect(blocks).toHaveLength(7);
     expect(blocks[0]).toMatchObject({ value: '虫群 1/6', detail: '推进中' });
-    expect(blocks[2].value).toBe('金 91 / 研 20');
-    expect(blocks[4].value).toBe('Lv+1');
-    expect(blocks[5].value).toBe('金7 法3 出5 升2');
+    expect(blocks[1]).toMatchObject({ value: '无' });
+    expect(blocks[3].value).toBe('金 91 / 研 20');
+    expect(blocks[5].value).toBe('Lv+1');
+    expect(blocks[6].value).toBe('金7 法3 出5 升2');
+  });
+
+  describe('arcane secondary UI summaries', () => {
+    it('adds compact Rune state to the next-spawn HUD block only when Arcane is secondary', () => {
+      const plain = createInitialGameState('hive', 208);
+      const arcane = createInitialGameState('hive', 209, { secondaryRaceId: 'arcane' });
+      arcane.arcaneRune.current = 3;
+      arcane.pendingSpawnLevelBonus = 1;
+
+      expect(buildCompactHudBlocks(plain).find((block) => block.label === '下次出兵')?.value).toBe('Lv+0');
+      expect(buildCompactHudBlocks(arcane).find((block) => block.label === '副族')?.detail).toBe('Rune 3/5');
+      expect(buildCompactHudBlocks(arcane).find((block) => block.label === '下次出兵')?.value).toBe('Lv+1 / Rune 3/5');
+    });
+
+    it('adds Rune telemetry only for Arcane secondary runs', () => {
+      const plain = createInitialGameState('hive', 210);
+      const arcane = createInitialGameState('hive', 211, { secondaryRaceId: 'arcane' });
+
+      triggerSlot(arcane, 'magic');
+      resolveUnitBallToSlot(arcane, 0, 1, { elapsedMs: 0, durationMs: 60000 });
+
+      expect(buildPhaseTelemetrySummary(plain).lines.some((line) => line.includes('秘仪 Rune'))).toBe(false);
+      expect(buildPhaseTelemetrySummary(arcane).lines.some((line) => line.includes('秘仪 Rune 生成1 消耗1 进度+1'))).toBe(true);
+    });
   });
 
   it('keeps top-row chamber summaries compact for structure art readability', () => {
@@ -1590,9 +1856,9 @@ describe('build telemetry rules', () => {
     expect(plan.every((item) => item.displayName.length > 0)).toBe(true);
   });
 
-  it('builds a requirement-by-requirement v1.2 readiness report with evidence states', () => {
-    const report = buildV12ReadinessReport(170);
-    const output = formatV12ReadinessReport(report);
+  it('builds a requirement-by-requirement MVP readiness report with evidence states', () => {
+    const report = buildMvpReadinessReport(170);
+    const output = formatMvpReadinessReport(report);
 
     expect(report.items.map((item) => item.id)).toEqual([
       'three_surface_layers',
@@ -1611,7 +1877,7 @@ describe('build telemetry rules', () => {
     expect(report.counts.partial).toBe(0);
     expect(report.counts.missing).toBe(0);
     expect(report.readyForCompletion).toBe(true);
-    expect(output).toContain('V1.2 READINESS');
+    expect(output).toContain('MVP READINESS');
     expect(output).toContain('READY');
     expect(output).toContain('runtime_visual_timing');
   });
@@ -1859,6 +2125,21 @@ describe('build probe rules', () => {
     expect(result.metrics.unitsQueued).toBeGreaterThan(0);
     expect(result.metrics.unitsDeployed).toBeGreaterThan(0);
     expect(result.warnings).toEqual([]);
+  });
+
+  it('proves Arcane secondary converts Magic and Upgrade into the next Unit Spawn progress', () => {
+    const result = runArcaneSecondaryRuneProbe();
+
+    expect(result.probeId).toBe('arcane_secondary_rune_probe');
+    expect(result.debugPresetUsed).toBe(false);
+    expect(result.ok).toBe(true);
+    expect(result.mainRaceId).toBe('hive');
+    expect(result.secondaryRaceId).toBe('arcane');
+    expect(result.metrics.runeGenerated).toBe(2);
+    expect(result.metrics.runeSpent).toBe(2);
+    expect(result.metrics.goldGeneratedRune).toBe(false);
+    expect(result.metrics.unitProgressFromRune).toBe(2);
+    expect(result.summaryLines.some((line) => line.includes('Arcane secondary Rune'))).toBe(true);
   });
 
   it('reports the v1.2 scenario metrics needed to compare build identities', () => {

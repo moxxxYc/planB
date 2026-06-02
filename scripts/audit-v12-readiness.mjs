@@ -8,11 +8,11 @@ const server = await createServer({
 
 try {
   const {
-    buildV12ReadinessReport,
-    formatV12ReadinessReport,
-  } = await server.ssrLoadModule('/src/systems/V12ReadinessSystem.ts');
-  const report = buildV12ReadinessReport(170);
-  console.log(formatV12ReadinessReport(report));
+    buildMvpReadinessReport,
+    formatMvpReadinessReport,
+  } = await server.ssrLoadModule('/src/systems/MvpReadinessSystem.ts');
+  const report = buildMvpReadinessReport(170);
+  console.log(formatMvpReadinessReport(report));
   process.exitCode = report.readyForCompletion ? 0 : 1;
 } finally {
   await server.close();

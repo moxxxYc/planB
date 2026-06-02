@@ -63,7 +63,7 @@ Where is the most likely point where players quit and never return?
 
 ## Forcing Questions
 
-Ask the user directly, **ONE AT A TIME**. Smart-route:
+Ask by asking the user directly, **ONE AT A TIME**. Smart-route:
 
 **Always ask Q1 (scope is the #1 indie game killer):**
 
@@ -95,4 +95,4 @@ Push until you hear: An honest contradiction. Every real GDD has at least one te
 - **ASK:** Risk mitigation strategies, scope reduction decisions, pillar violation trade-offs
 - **ESCALATE:** Ocean-sized scope with no cut plan AND no stated MVP, OR critical risks with zero mitigation
 
-**STOP.** One issue per ask the user directly.
+**STOP.** One issue per direct user question.

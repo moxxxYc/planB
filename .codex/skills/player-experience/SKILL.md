@@ -5,12 +5,13 @@ description: "First-person player experience walkthrough — simulates playing t
 
 ## Codex/macOS Adaptation
 
-This skill is migrated from `/Users/yang/Projects/gstack-game/skills/player-experience`. Preserve the original gstack-game design method and rubrics, but run it as a Codex project skill on macOS:
+This skill is migrated from `/Users/yang/Projects/gstack-game/skills/player-experience`. Preserve the original gstack-game method, rubrics, and game-domain judgment, but run it as a Codex project skill on macOS:
 
-- Use repository-local files and macOS shell commands such as `rg`, `find`, `sed`, and `ls`.
-- Ask the user directly when the original skill calls for an interactive decision point.
-- Do not use legacy generated automation, external artifact stores, or platform-specific paths.
-- Keep outputs inside this repository when an artifact is requested.
+- Use repository-local files and Codex tools. Prefer `rg`, `find`, `sed`, `ls`, and direct file reads.
+- Resolve this skill's bundled material relative to `.codex/skills/player-experience/`.
+- Ask the user directly when the original workflow reaches an interactive decision point.
+- Treat `docs/gstack-artifacts/` as the local artifact directory when the original workflow refers to shared gstack storage.
+- Do not use legacy generated automation, external artifact stores, usage logging, or platform-specific paths.
 
 ## User Sovereignty
 
@@ -23,6 +24,7 @@ direction is the default unless you explicitly change it.
 
 DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT.
 Escalation after 3 failed attempts.
+
 
 ## Voice
 
@@ -61,9 +63,9 @@ When you encounter high-stakes ambiguity during a review:
 
 **STOP.** Name the ambiguity in one sentence. Present 2-3 options with tradeoffs. Ask the user. Do not guess on game design or economy decisions.
 
-## ask the user directly Format (Game Design)
+## Direct User Question Format (Game Design)
 
-**ALWAYS follow this structure for every ask the user directly call:**
+**ALWAYS follow this structure for every direct user question call:**
 1. **Re-ground:** Project, branch, what game/feature is being reviewed. (1-2 sentences)
 2. **Simplify:** Plain language a smart 16-year-old gamer could follow. Use game examples they'd know (Minecraft, Genshin, Among Us, etc.) as analogies.
 3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — include `Player Impact: X/10` for each option. Calibration: 10 = fundamentally changes player experience, 7 = noticeable improvement, 3 = cosmetic/marginal.
@@ -132,12 +134,44 @@ Next Step:
   (if condition): /alternate-skill — reason
 ```
 
+
 ## Load References
 
-Read reference files from this skill's local `references/` directory when the section names them. In Codex on macOS, resolve paths relative to `.codex/skills/player-experience/`. Do not look in `.codex`, `docs/gstack-artifacts`, or platform-specific paths.
+Read the referenced files from `.codex/skills/player-experience/references/` only when this section names them or the review needs that rubric. Do not scan home-directory skill stores.
+
+
+**Read ALL files in `references/` before any user interaction (zero interruptions):**
+- `gotchas.md` — anti-sycophancy, forbidden phrases, Codex-specific pitfalls
+- `personas.md` — 6 persona definitions + custom template
+- `emotion-vocabulary.md` — fixed emotion terms, healthy/unhealthy patterns with severity
+- `walkthrough-phases.md` — Phase 1-5 content, checkpoints, AUTO-FLAG rules, transition format
+- `scoring.md` — scoring formula, phase weights, repeat play simulation (Session 1/3/10)
+
+---
+
 ## Artifact Discovery
 
-Use macOS/Codex-friendly repository search. Prefer `rg --files`, `find`, and direct reads inside the current repository. Look for local docs such as `docs/gdd.md`, concept notes, prior reviews, playtest notes, screenshots, and build notes. Do not read outside the repository unless the user explicitly provides a path.
+Use `rg --files`, `find`, and direct repository reads to locate local docs, prior reviews, playtest notes, screenshots, build notes, and artifacts under `docs/gstack-artifacts/`. Do not read outside this repository unless the user explicitly provides a path.
+
+```bash
+echo "=== Checking for prior work ==="
+PREV_WALKTHROUGH=$(ls -t docs/gstack-artifacts/*-player-walkthrough-*.md 2>/dev/null | head -1)
+[ -n "$PREV_WALKTHROUGH" ] && echo "Prior player walkthrough: $PREV_WALKTHROUGH"
+PREV_GAME_REVIEW=$(ls -t docs/gstack-artifacts/*-game-review-*.md 2>/dev/null | head -1)
+[ -n "$PREV_GAME_REVIEW" ] && echo "Prior game review: $PREV_GAME_REVIEW"
+PREV_BALANCE=$(ls -t docs/gstack-artifacts/*-balance-report-*.md 2>/dev/null | head -1)
+[ -n "$PREV_BALANCE" ] && echo "Prior balance review: $PREV_BALANCE"
+LOCAL_GDD=$(ls -t docs/gdd.md docs/*GDD* docs/*game-design* 2>/dev/null | head -1)
+[ -n "$LOCAL_GDD" ] && echo "Local GDD: $LOCAL_GDD"
+echo "---"
+```
+
+If a prior player walkthrough exists, read it. Note which personas were used and what churn points were identified — compare against this walkthrough.
+
+If a prior game review exists, read it for known design issues and churn risk areas to pay special attention to during the walkthrough.
+
+---
+
 # /player-experience: Player Experience Walkthrough
 
 This skill **role-plays as a player** — not a reviewer. Walk through the game moment-by-moment in first person, narrating what the player sees, feels, thinks, and does. Flag where the experience breaks down. Let the designer draw conclusions.
@@ -148,15 +182,18 @@ This skill **role-plays as a player** — not a reviewer. Walk through the game 
 
 ### 0A. Read the GDD
 
-```text
-Codex/macOS note: old generated shell automation removed. Use repository-local file reads and ask the user directly when a decision is needed.
+```bash
+SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+GDD=$(ls -t docs/*GDD* docs/*game-design* docs/*design-doc* *.gdd.md design/gdd/*.md 2>/dev/null | head -1)
+[ -z "$GDD" ] && GDD=$(ls -t docs/gstack-artifacts/*-design-*.md 2>/dev/null | head -1)
+[ -n "$GDD" ] && echo "GDD found: $GDD" || echo "No GDD found"
 ```
 
 If no GDD found, ask the user to provide a game design document, spec, or description of the game to walk through.
 
 Read the entire design document. Extract these 6 elements and present what you found:
 
-**ask the user directly:**
+**direct user question:**
 
 > **[Re-ground]** Starting player experience walkthrough for `[game title]` on `[branch]`.
 >
@@ -183,7 +220,7 @@ Read the entire design document. Extract these 6 elements and present what you f
 
 Present personas from `references/personas.md`. Use this format:
 
-**ask the user directly:**
+**direct user question:**
 
 > Now I need to know **who** I'm pretending to be. Each persona has different patience, expectations, and behaviors — the same game can score 9/10 for one persona and 3/10 for another.
 >
@@ -236,7 +273,7 @@ These are non-negotiable evaluation points. If the GDD doesn't address one, flag
 ### AUTO-FLAG (report without asking)
 Dead time >5s with no input/visual, no affordance on UI elements, missing feedback after action, text wall >3 lines (mobile), loading with no indicator, forced wait with no skip/entertainment.
 
-### ASK (present as ask the user directly)
+### ASK (present as direct user question)
 Subjective experience judgments, ambiguous design intent, persona-dependent severity calls, monetization timing questions.
 
 ### ESCALATE (stop walkthrough, report blocker)
@@ -251,8 +288,8 @@ No core loop identifiable, player stuck with no path forward, tutorial impossibl
 - **Narrate the moment-by-moment experience.** Think out loud as the player:
   > "I spawned in. First thing I see is a huge text box. I skip it. Now I'm in a field. Nothing tells me what to do. I press WASD... I move. 5 seconds in, still no objective. I wander left. Oh, there's a glowing thing. I walk into it. Nothing happens. I press E. A menu opens. Now I get it."
 - **Phase transitions mandatory.** After EVERY phase, present findings and ask before continuing.
-- **GDD blind spots trigger ask the user directly.** Don't silently flag — ask the designer.
-- **One finding per ask the user directly** for significant findings. No batching.
+- **GDD blind spots trigger direct user question.** Don't silently flag — ask the designer.
+- **One finding per direct user question** for significant findings. No batching.
 - **Escape hatch:** Respect on second request. Generate partial journey map.
 - **Never suggest fixes.** Observe and report only. Fixes belong in `/game-review` or `/game-ux-review`.
 - **Calibrate severity to persona.** Casual quitting at 2-min = CRITICAL. Hardcore at 2-min = EXPECTED.
@@ -355,4 +392,11 @@ Next Step:
 
 ## Save Artifact
 
-If the user wants a persistent artifact, write it inside this repository, usually under `docs/gstack-artifacts/player-experience/` or the canonical path named by the workflow, such as `docs/gdd.md` for game-import. Do not write to `docs/gstack-artifacts`, `.codex`, or any platform-specific path.
+When this workflow produces a persistent artifact, write it under `docs/gstack-artifacts/` unless it names a canonical project file such as `docs/gdd.md`. Include the skill name and current timestamp in the filename when the source workflow asks for a generated artifact name.
+
+
+Write the Player Journey Map + Score + Completion Summary to `docs/gstack-artifacts/{user}-{branch}-player-walkthrough-{datetime}.md`. If a prior walkthrough exists, include `Supersedes: {prior filename}` at the top.
+
+Discoverable by: `/balance-review`, `/game-review`, `/game-direction`, `/game-ux-review`.
+
+## Review Log

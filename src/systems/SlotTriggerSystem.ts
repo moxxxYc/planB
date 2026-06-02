@@ -2,6 +2,7 @@ import { raceDefs } from '../data/races';
 import { unitDefs } from '../data/units';
 import { pickWeighted, randomInt } from '../utils/random';
 import { dealMagicDamage } from './BattleSystem';
+import { grantRuneFromStandby } from './ArcaneSecondarySystem';
 import { recordGoldHitForBuildings, recordMagicHitForBuildings } from './BuildingSystem';
 import {
   recordBaselineNonSpawnDecision,
@@ -65,6 +66,7 @@ function triggerUpgrade(state: GameState) {
   recordBaselineNonSpawnDecision(state);
   recordBaselineResearchHit(state, '升级');
   recordDoctrineNonSpawnDecision(state);
+  grantRuneFromStandby(state, 'upgrade');
 }
 
 function triggerGold(state: GameState) {
@@ -89,6 +91,7 @@ function triggerMagic(state: GameState) {
   recordRelicMagicHit(state);
   recordBaselineResearchHit(state, '法术');
   recordDoctrineNonSpawnDecision(state);
+  grantRuneFromStandby(state, 'magic');
 }
 
 function triggerSpecial(state: GameState) {

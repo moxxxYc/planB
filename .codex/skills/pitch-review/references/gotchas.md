@@ -36,7 +36,7 @@ The reviewer SHOULD say:
 
 ## Forcing Questions（逼問清單）
 
-Ask the user directly, **ONE AT A TIME**. Smart-route based on pitch stage:
+Ask by asking the user directly, **ONE AT A TIME**. Smart-route based on pitch stage:
 
 | Stage | Ask these (minimum 3) | Why |
 |-------|----------------------|-----|

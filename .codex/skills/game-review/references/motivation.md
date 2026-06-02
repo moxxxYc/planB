@@ -62,7 +62,7 @@ Do the mechanics reinforce the narrative, or contradict it?
 
 ## Forcing Questions
 
-Ask the user directly, **ONE AT A TIME**. Smart-route:
+Ask by asking the user directly, **ONE AT A TIME**. Smart-route:
 
 **If player motivation is undefined — ask Q1 (most accessible):**
 
@@ -94,4 +94,4 @@ Push until you hear: A concrete mechanic-narrative alignment. If the designer ca
 - **ASK:** Which player types to target, emotional arc design, SDT trade-offs between systems
 - **ESCALATE:** GDD has no concept of target player motivation — mechanics exist without any stated purpose for WHY a player would engage
 
-**STOP.** One issue per ask the user directly.
+**STOP.** One issue per direct user question.

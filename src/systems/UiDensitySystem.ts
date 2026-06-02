@@ -1,6 +1,8 @@
 import { phaseDefs } from '../data/phases';
 import { raceDefs } from '../data/races';
+import { secondaryRaceDefs } from '../data/secondaryRaces';
 import { unitDefs } from '../data/units';
+import { buildRuneHudValue } from './ArcaneSecondarySystem';
 import type { GameState } from '../types/game';
 
 export type UiMode = 'play' | 'debug';
@@ -95,6 +97,11 @@ export function buildCompactHudBlocks(state: GameState): CompactHudBlock[] {
         ? '构筑暂停'
         : '暂停';
   const playerUnits = state.battle.units.filter((unit) => unit.side === 'player' && unit.hp > 0).length;
+  const runeHud = buildRuneHudValue(state);
+  const secondaryRace = state.secondaryRaceId ? secondaryRaceDefs[state.secondaryRaceId] : undefined;
+  const nextSpawnValue = runeHud
+    ? `Lv+${state.pendingSpawnLevelBonus} / ${runeHud}`
+    : `Lv+${state.pendingSpawnLevelBonus}`;
 
   return [
     {
@@ -102,6 +109,12 @@ export function buildCompactHudBlocks(state: GameState): CompactHudBlock[] {
       value: `${race.name} ${Math.min(state.phaseIndex + 1, phaseDefs.length)}/${phaseDefs.length}`,
       detail: phaseState,
       color: toCssHex(race.color),
+    },
+    {
+      label: '副族',
+      value: secondaryRace?.name ?? '无',
+      detail: runeHud,
+      color: secondaryRace ? '#c4b5fd' : '#cbd5e1',
     },
     {
       label: '基地',
@@ -118,7 +131,7 @@ export function buildCompactHudBlocks(state: GameState): CompactHudBlock[] {
     },
     {
       label: '下次出兵',
-      value: `Lv+${state.pendingSpawnLevelBonus}`,
+      value: nextSpawnValue,
     },
     {
       label: '战备',

@@ -1,9 +1,9 @@
 # Plan Design Review — Gotchas & Forcing Questions
 
-## Agent-Specific Failure Modes
+## Codex-Specific Failure Modes
 
 ### Gotcha #1: Reviewing Implementation Instead of Plan
-**Symptom:** The agent starts suggesting code changes, component implementations, or CSS.
+**Symptom:** Codex starts suggesting code changes, component implementations, or CSS.
 **Rule:** This skill reviews and EDITS THE PLAN. No code. No implementation. If you're writing code, stop.
 
 ### Gotcha #2: Rubber-Stamping Vague Plans
@@ -11,15 +11,15 @@
 **Rule:** Vague descriptions score 0-3 on that dimension. "Clean UI" is not a design decision. Name the font, the spacing scale, the interaction pattern.
 
 ### Gotcha #3: Inventing Design Decisions for the User
-**Symptom:** The agent fills in missing design details and presents them as the plan's content.
+**Symptom:** Codex fills in missing design details and presents them as the plan's content.
 **Rule:** If the plan doesn't specify it, rate that dimension low. Propose additions clearly marked as "PROPOSED ADDITION" — do not silently fill gaps.
 
 ### Gotcha #4: Skipping Passes Because "The Plan Doesn't Have UI"
-**Symptom:** The agent skips passes because the plan focuses on gameplay mechanics.
+**Symptom:** Codex skips passes because the plan focuses on gameplay mechanics.
 **Rule:** If the plan has ANY player-facing feature, it has UI implications. A "crafting system" without UI specs means someone will ship a default grid. Flag the gap.
 
 ### Gotcha #5: Generic Design Recommendations
-**Symptom:** The agent recommends "add loading indicators" or "use consistent colors" without connecting to THIS game's identity.
+**Symptom:** Codex recommends "add loading indicators" or "use consistent colors" without connecting to THIS game's identity.
 **Rule:** Every recommendation must reference the specific game, its pillars, and its audience. "Add a loading indicator" → "Add a loading indicator that matches the game's hand-drawn art style — animated sketch of the protagonist, not a spinner."
 
 ### Gotcha #6: Treating All Passes as Equal Priority

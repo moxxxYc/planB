@@ -8,12 +8,13 @@ description: |
 
 ## Codex/macOS Adaptation
 
-This skill is migrated from `/Users/yang/Projects/gstack-game/skills/game-review`. Preserve the original gstack-game design method and rubrics, but run it as a Codex project skill on macOS:
+This skill is migrated from `/Users/yang/Projects/gstack-game/skills/game-review`. Preserve the original gstack-game method, rubrics, and game-domain judgment, but run it as a Codex project skill on macOS:
 
-- Use repository-local files and macOS shell commands such as `rg`, `find`, `sed`, and `ls`.
-- Ask the user directly when the original skill calls for an interactive decision point.
-- Do not use legacy generated automation, external artifact stores, or platform-specific paths.
-- Keep outputs inside this repository when an artifact is requested.
+- Use repository-local files and Codex tools. Prefer `rg`, `find`, `sed`, `ls`, and direct file reads.
+- Resolve this skill's bundled material relative to `.codex/skills/game-review/`.
+- Ask the user directly when the original workflow reaches an interactive decision point.
+- Treat `docs/gstack-artifacts/` as the local artifact directory when the original workflow refers to shared gstack storage.
+- Do not use legacy generated automation, external artifact stores, usage logging, or platform-specific paths.
 
 ## User Sovereignty
 
@@ -26,6 +27,7 @@ direction is the default unless you explicitly change it.
 
 DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT.
 Escalation after 3 failed attempts.
+
 
 ## Voice
 
@@ -64,9 +66,9 @@ When you encounter high-stakes ambiguity during a review:
 
 **STOP.** Name the ambiguity in one sentence. Present 2-3 options with tradeoffs. Ask the user. Do not guess on game design or economy decisions.
 
-## ask the user directly Format (Game Design)
+## Direct User Question Format (Game Design)
 
-**ALWAYS follow this structure for every ask the user directly call:**
+**ALWAYS follow this structure for every direct user question call:**
 1. **Re-ground:** Project, branch, what game/feature is being reviewed. (1-2 sentences)
 2. **Simplify:** Plain language a smart 16-year-old gamer could follow. Use game examples they'd know (Minecraft, Genshin, Among Us, etc.) as analogies.
 3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — include `Player Impact: X/10` for each option. Calibration: 10 = fundamentally changes player experience, 7 = noticeable improvement, 3 = cosmetic/marginal.
@@ -135,12 +137,22 @@ Next Step:
   (if condition): /alternate-skill — reason
 ```
 
+
 ## Load References
 
-Read reference files from this skill's local `references/` directory when the section names them. In Codex on macOS, resolve paths relative to `.codex/skills/game-review/`. Do not look in `.codex`, `docs/gstack-artifacts`, or platform-specific paths.
+Read the referenced files from `.codex/skills/game-review/references/` only when this section names them or the review needs that rubric. Do not scan home-directory skill stores.
+
+
+**Read ALL `references/` files NOW before any user interaction.** They contain rubrics, frameworks, forcing questions, and protocols. Zero interruption — load everything upfront.
+
+Key references: `scoring.md` (rubrics), `core-loop.md` / `progression.md` / `economy.md` / `motivation.md` / `risk.md` (section frameworks), `cross-section.md` (cross-validation), `design-consistency.md` (3-dimension consistency evaluator: voice, boundaries, storytelling density), `gotchas.md` (anti-sycophancy).
+
 ## Artifact Discovery
 
-Use macOS/Codex-friendly repository search. Prefer `rg --files`, `find`, and direct reads inside the current repository. Look for local docs such as `docs/gdd.md`, concept notes, prior reviews, playtest notes, screenshots, and build notes. Do not read outside the repository unless the user explicitly provides a path.
+Use `rg --files`, `find`, and direct repository reads to locate local docs, prior reviews, playtest notes, screenshots, build notes, and artifacts under `docs/gstack-artifacts/`. Do not read outside this repository unless the user explicitly provides a path.
+
+```bash
+echo "=== Checking for design docs and prior reviews ==="
 # Local GDD
 GDD=$(ls -t docs/gdd.md docs/*GDD* docs/*game-design* docs/*design-doc* *.gdd.md 2>/dev/null | head -1)
 [ -n "$GDD" ] && echo "GDD: $GDD ($(wc -l < "$GDD") lines)"
@@ -171,7 +183,7 @@ Read the GDD. Extract the 5 context anchors (Genre & Platform, Target Session Le
 
 After ALL anchors are established, ask the user to select a review mode:
 
-**ask the user directly:** Present 5 modes with RECOMMENDATION based on confirmed anchors:
+**direct user question:** Present 5 modes with RECOMMENDATION based on confirmed anchors:
 
 > - **A) Mobile / Casual** — retention, economy, session fit, monetization ethics
 > - **B) PC / Console** — core loop depth, mastery curve, narrative, session arc
@@ -214,7 +226,7 @@ Evaluate the nested loop model (micro/meso/macro/meta), MDA framework alignment,
 
 After Section 1 scoring, offer a cold-read second opinion on the core loop premise.
 
-**ask the user directly (gate):**
+**direct user question (gate):**
 
 > Section 1 scored the core loop at ___/10. Before moving to Progression, want an independent AI perspective on the core loop premise? It reads a structured summary without this conversation's context. Takes 2-5 minutes.
 > A) Yes, get a second opinion
@@ -273,15 +285,9 @@ Be specific. Reference the context. No praise. No preamble."
 
 **Route prompt by GDD state:** Use concept-stage if Section 1 had 2+ forcing questions asked (indicating gaps). Use post-playtest if Section 1 scored 7+ and GDD had detailed answers.
 
-### Independent Review Option
+### Independent Pass (Codex/macOS)
 
-If an independent review surface is available, request a second pass with only repository-local context. If not available, skip this optional branch and continue with the main review.
-
-### Independent Reviewer Fallback (if CODEX_NOT_AVAILABLE or Codex errored):
-
-Dispatch via the Agent tool with the same mode-appropriate prompt. The subagent has fresh context, providing genuine independence.
-
-If the subagent fails or times out: "Second opinion unavailable. Continuing to Section 2."
+Do not launch nested `separate read-only review pass` from this skill. If the user chooses a second opinion, run a separate read-only review pass in the current session or a dedicated thread with the assembled prompt. If no independent pass is available, say so and continue. The second opinion is informational, never a gate.
 
 ### Presentation:
 
@@ -293,9 +299,9 @@ SECOND OPINION (Codex):
 ════════════════════════════════════════════════════════════
 ```
 
-If independent reviewer ran:
+If Codex subagent ran:
 ```
-SECOND OPINION (independent reviewer):
+SECOND OPINION (Codex subagent):
 ════════════════════════════════════════════════════════════
 <full subagent output, verbatim — do not truncate or summarize>
 ════════════════════════════════════════════════════════════
@@ -326,7 +332,7 @@ Then 3-5 bullet synthesis — present both perspectives neutrally:
 
 If the second opinion challenged an assumption from Phase 0 or Section 1:
 
-**ask the user directly:**
+**direct user question:**
 
 > The second opinion challenged: "{premise text}". Their argument: "{reasoning}".
 > A) Revise this premise — re-score Section 1 with the revision
@@ -514,4 +520,11 @@ Write a playtest observation guide: key moments to watch (FTUE, first fail, firs
 
 ## Save Artifact
 
-If the user wants a persistent artifact, write it inside this repository, usually under `docs/gstack-artifacts/game-review/` or the canonical path named by the workflow, such as `docs/gdd.md` for game-import. Do not write to `docs/gstack-artifacts`, `.codex`, or any platform-specific path.
+When this workflow produces a persistent artifact, write it under `docs/gstack-artifacts/` unless it names a canonical project file such as `docs/gdd.md`. Include the skill name and current timestamp in the filename when the source workflow asks for a generated artifact name.
+
+
+Write Completion Summary + GDD Health Score + Playtest Protocol to that path. If prior review exists, include `Supersedes: {prior filename}`.
+
+Discoverable by: `/balance-review` (economy issues), `/player-experience` (churn points), `/game-direction` (risk/scope), `/game-ship` (release gate).
+
+## Review Log

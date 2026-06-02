@@ -8,13 +8,13 @@ After persona selection, walk through the game experience phase by phase. Narrat
 
 1. **Describe EXACTLY what happens, not what you hope happens.** If the GDD doesn't specify, say "The GDD doesn't specify what happens here — this is a blind spot."
 
-2. **At every GDD blind spot, ASK the designer.** Don't just flag it — use ask the user directly:
+2. **At every GDD blind spot, ASK the designer.** Don't just flag it — use direct user question:
    > The GDD doesn't specify what happens when {situation}. As [Persona], I'd expect {X}. What's your intent?
    > A) {option based on the persona's expectation}
    > B) {alternative}
    > C) It's not designed yet — mark as blind spot and continue
 
-3. **After each phase, STOP and present findings.** Use ask the user directly:
+3. **After each phase, STOP and present findings.** Use direct user question:
    > **Phase {N} — {name}: {summary in 1 sentence}**
    >
    > Findings: {N} friction points, {N} churn risks, {N} blind spots

@@ -1,14 +1,14 @@
 # Build Playability Review — Gotchas
 
-## Agent-Specific Gotchas
+## Codex-Specific Gotchas
 
-1. **Confuses "it runs" with "it's playable."** A build that compiles, doesn't crash, and passes automated tests is NOT playable. Playable = someone can sit down, play for 5 minutes, and want to continue. The agent defaults to engineering criteria.
+1. **Confuses "it runs" with "it's playable."** A build that compiles, doesn't crash, and passes automated tests is NOT playable. Playable = someone can sit down, play for 5 minutes, and want to continue. Codex defaults to engineering criteria.
 
 2. **Reviews features instead of experience.** Codex lists what features exist instead of evaluating whether the player experience is coherent. "Combat system works, shop works, inventory works" is a feature checklist. Playability = "a player can fight → earn gold → buy a sword → fight better, and this loop FEELS complete."
 
 3. **Can't detect boredom.** Codex doesn't get bored. It reads code and design docs with infinite patience. But a player WILL get bored if the first 5 minutes have no variation. Force the question: "Would a human play this for 5 more minutes voluntarily?"
 
-4. **Skips the 'one more try' test.** The ultimate playability signal: does the player, upon failing or finishing a session, immediately want to try again? The agent cannot feel this. Use proxy metrics: is the retry path fast? Does failure teach something? Is there a visible "almost made it" signal?
+4. **Skips the 'one more try' test.** The ultimate playability signal: does the player, upon failing or finishing a session, immediately want to try again? Codex can't feel this. Use proxy metrics: is the retry path fast? Does failure teach something? Is there a visible "almost made it" signal?
 
 5. **Evaluates at final quality expectations.** A prototype is NOT supposed to be polished. Codex will dock points for placeholder art, missing audio, debug UI. Playability review evaluates the EXPERIENCE at the current build stage, not against launch quality.
 

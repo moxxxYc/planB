@@ -5,12 +5,13 @@ description: "Game pitch/proposal review — triggered when user has a game conc
 
 ## Codex/macOS Adaptation
 
-This skill is migrated from `/Users/yang/Projects/gstack-game/skills/pitch-review`. Preserve the original gstack-game design method and rubrics, but run it as a Codex project skill on macOS:
+This skill is migrated from `/Users/yang/Projects/gstack-game/skills/pitch-review`. Preserve the original gstack-game method, rubrics, and game-domain judgment, but run it as a Codex project skill on macOS:
 
-- Use repository-local files and macOS shell commands such as `rg`, `find`, `sed`, and `ls`.
-- Ask the user directly when the original skill calls for an interactive decision point.
-- Do not use legacy generated automation, external artifact stores, or platform-specific paths.
-- Keep outputs inside this repository when an artifact is requested.
+- Use repository-local files and Codex tools. Prefer `rg`, `find`, `sed`, `ls`, and direct file reads.
+- Resolve this skill's bundled material relative to `.codex/skills/pitch-review/`.
+- Ask the user directly when the original workflow reaches an interactive decision point.
+- Treat `docs/gstack-artifacts/` as the local artifact directory when the original workflow refers to shared gstack storage.
+- Do not use legacy generated automation, external artifact stores, usage logging, or platform-specific paths.
 
 ## User Sovereignty
 
@@ -23,6 +24,7 @@ direction is the default unless you explicitly change it.
 
 DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT.
 Escalation after 3 failed attempts.
+
 
 ## Voice
 
@@ -61,9 +63,9 @@ When you encounter high-stakes ambiguity during a review:
 
 **STOP.** Name the ambiguity in one sentence. Present 2-3 options with tradeoffs. Ask the user. Do not guess on game design or economy decisions.
 
-## ask the user directly Format (Game Design)
+## Direct User Question Format (Game Design)
 
-**ALWAYS follow this structure for every ask the user directly call:**
+**ALWAYS follow this structure for every direct user question call:**
 1. **Re-ground:** Project, branch, what game/feature is being reviewed. (1-2 sentences)
 2. **Simplify:** Plain language a smart 16-year-old gamer could follow. Use game examples they'd know (Minecraft, Genshin, Among Us, etc.) as analogies.
 3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — include `Player Impact: X/10` for each option. Calibration: 10 = fundamentally changes player experience, 7 = noticeable improvement, 3 = cosmetic/marginal.
@@ -132,14 +134,46 @@ Next Step:
   (if condition): /alternate-skill — reason
 ```
 
+
 # /pitch-review: Game Pitch Review
 
 ## Load References
 
-Read reference files from this skill's local `references/` directory when the section names them. In Codex on macOS, resolve paths relative to `.codex/skills/pitch-review/`. Do not look in `.codex`, `docs/gstack-artifacts`, or platform-specific paths.
+Read the referenced files from `.codex/skills/pitch-review/references/` only when this section names them or the review needs that rubric. Do not scan home-directory skill stores.
+
+
+**Read ALL files in `references/` NOW — before any user interaction.** Internalize the full content of every reference file. Zero interruptions for loading mid-review.
+
+---
+
 ## Artifact Discovery
 
-Use macOS/Codex-friendly repository search. Prefer `rg --files`, `find`, and direct reads inside the current repository. Look for local docs such as `docs/gdd.md`, concept notes, prior reviews, playtest notes, screenshots, and build notes. Do not read outside the repository unless the user explicitly provides a path.
+Use `rg --files`, `find`, and direct repository reads to locate local docs, prior reviews, playtest notes, screenshots, build notes, and artifacts under `docs/gstack-artifacts/`. Do not read outside this repository unless the user explicitly provides a path.
+
+```bash
+echo "=== Checking for prior work ==="
+SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+PITCH=$(ls -t docs/*pitch* docs/*proposal* docs/*concept* *.pitch.md 2>/dev/null | head -1)
+[ -z "$PITCH" ] && PITCH=$(ls -t docs/*GDD* docs/*game-design* 2>/dev/null | head -1)
+[ -z "$PITCH" ] && PITCH=$(ls -t docs/gstack-artifacts/*-pitch-*.md 2>/dev/null | head -1)
+[ -n "$PITCH" ] && echo "Pitch doc found: $PITCH" || echo "No pitch doc found — will review verbally"
+DECK=$(ls -t docs/*deck* *.pptx *.key *.pdf 2>/dev/null | head -1)
+[ -n "$DECK" ] && echo "Deck found: $DECK" || echo "No deck found"
+PREV_PITCH=$(ls -t docs/gstack-artifacts/*-pitch-review-*.md 2>/dev/null | head -1)
+[ -n "$PREV_PITCH" ] && echo "Prior pitch review: $PREV_PITCH"
+PREV_CONCEPT=$(ls -t docs/gstack-artifacts/*-concept-*.md 2>/dev/null | head -1)
+[ -n "$PREV_CONCEPT" ] && echo "Prior concept: $PREV_CONCEPT"
+PREV_DIRECTION=$(ls -t docs/gstack-artifacts/*-direction-review-*.md 2>/dev/null | head -1)
+[ -n "$PREV_DIRECTION" ] && echo "Prior direction review: $PREV_DIRECTION"
+LOCAL_PITCH=$(ls -t docs/*pitch* docs/*proposal* docs/*concept* 2>/dev/null | head -1)
+[ -n "$LOCAL_PITCH" ] && echo "Local pitch doc: $LOCAL_PITCH"
+echo "---"
+```
+
+If a prior pitch review exists, read it. Note previous Pitch Health Score and recommendation — check if flagged issues have been addressed since last review. If no materials found, proceed with verbal review — a pitch review is valuable even for napkin ideas.
+
+---
+
 ## Role & Operating Posture
 
 You are a game pitch reviewer. Direct to point of discomfort. Push once, then push again — the first answer is rehearsed. Calibrated acknowledgment only (never unearned praise). Name common failure patterns. End each section with a concrete next step.
@@ -150,7 +184,7 @@ You are a game pitch reviewer. Direct to point of discomfort. Push once, then pu
 
 ## Step 0: Pitch Context（提案背景）
 
-Before reviewing, establish these three things. If any are unclear, ask by asking the user directly before proceeding.
+Before reviewing, establish these three things. If any are unclear, ask the user directly before proceeding.
 
 1. **Stage — how baked is this?**
    - Napkin idea / Concept doc / Has prototype / Has playtest data
@@ -417,4 +451,14 @@ Pitch Score Delta:
 
 ## Save Artifact
 
-If the user wants a persistent artifact, write it inside this repository, usually under `docs/gstack-artifacts/pitch-review/` or the canonical path named by the workflow, such as `docs/gdd.md` for game-import. Do not write to `docs/gstack-artifacts`, `.codex`, or any platform-specific path.
+When this workflow produces a persistent artifact, write it under `docs/gstack-artifacts/` unless it names a canonical project file such as `docs/gdd.md`. Include the skill name and current timestamp in the filename when the source workflow asks for a generated artifact name.
+
+
+Write the Pitch Health Score + Completion Summary + Forcing Question answers to `docs/gstack-artifacts/{user}-{branch}-pitch-review-{datetime}.md`. If a prior pitch review exists, include `Supersedes: {prior filename}` at the top.
+
+This artifact is discoverable by:
+- `/game-direction` — reads market positioning and feasibility assessment
+- `/game-review` — reads differentiation and comp set analysis
+- `/game-ideation` — reads pitch gaps for further concept development
+
+## Review Log

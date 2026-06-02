@@ -31,4 +31,4 @@ This section does NOT introduce new evaluation criteria. It cross-validates find
 - **ASK:** Cross-section design tensions that require a design decision to resolve
 - **ESCALATE:** Fundamental contradictions between core loop and economy, or between stated pillars and actual design
 
-**STOP.** One issue per ask the user directly.
+**STOP.** One issue per direct user question.

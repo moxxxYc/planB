@@ -1,8 +1,8 @@
 # Feel Pass — Gotchas & Anti-Sycophancy
 
-## Agent-Specific Gotchas
+## Codex-Specific Gotchas
 
-1. **Focuses on visual fidelity instead of feedback timing.** The agent defaults to evaluating how things LOOK rather than how they RESPOND. A beautiful attack animation with 5 frames of input lag feels worse than a white rectangle that responds instantly. Always start with timing, not visuals.
+1. **Focuses on visual fidelity instead of feedback timing.** Codex defaults to evaluating how things LOOK rather than how they RESPOND. A beautiful attack animation with 5 frames of input lag feels worse than a white rectangle that responds instantly. Always start with timing, not visuals.
 
 2. **Says "it feels good" without citing specific feedback channels.** Feel is not one thing — it's the sum of visual feedback + audio feedback + haptic feedback + camera response + timing. When Codex says "good feel," push: which channel? What specifically?
 
