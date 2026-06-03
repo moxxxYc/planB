@@ -4,6 +4,7 @@ const TEST_FILES := [
 	"res://tests/test_scope_guard.gd",
 	"res://tests/test_preset_defs.gd",
 	"res://tests/test_battle_sequence.gd",
+	"res://tests/test_machine_events.gd",
 ]
 
 var _filter := ""
