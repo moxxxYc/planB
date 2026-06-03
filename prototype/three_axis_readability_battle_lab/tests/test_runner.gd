@@ -2,6 +2,7 @@ extends SceneTree
 
 const TEST_FILES := [
 	"res://tests/test_scope_guard.gd",
+	"res://tests/test_preset_defs.gd",
 ]
 
 var _filter := ""
@@ -22,6 +23,7 @@ func _initialize() -> void:
 
 func _read_filter() -> String:
 	var args := OS.get_cmdline_args()
+	args.append_array(OS.get_cmdline_user_args())
 	for i in range(args.size()):
 		if args[i] == "--filter" and i + 1 < args.size():
 			return args[i + 1]
@@ -32,7 +34,7 @@ func _run_file(path: String) -> void:
 		return
 
 	var script := load(path)
-	if script == null:
+	if script == null or not script.can_instantiate():
 		_failures += 1
 		push_error("Could not load test file: %s" % path)
 		return
@@ -51,4 +53,3 @@ func _run_file(path: String) -> void:
 		else:
 			_failures += 1
 			push_error("FAIL %s::%s" % [path, method_name])
-
