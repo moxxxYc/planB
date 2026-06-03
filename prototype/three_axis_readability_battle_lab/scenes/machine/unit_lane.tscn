@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/unit_lane_view.gd" id="1_unit"]
+
+[node name="UnitLane" type="Control"]
+custom_minimum_size = Vector2(240, 480)
+script = ExtResource("1_unit")
+

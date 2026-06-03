@@ -8,9 +8,9 @@ config_version=5
 config/name="Three-Axis Readability Battle Lab"
 config/description="Scoped readability prototype for planB Launch/Tuning/Unit causal traces."
 config/features=PackedStringArray("4.6")
+run/main_scene="res://scenes/battle_lab.tscn"
 
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-
