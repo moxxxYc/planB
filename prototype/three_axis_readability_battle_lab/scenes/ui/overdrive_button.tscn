@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[node name="OverdriveButton" type="Button"]
+custom_minimum_size = Vector2(180, 42)
+text = "Axis Overdrive"
+tooltip_text = "Amplifies the current machine axis state."
+
