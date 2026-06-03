@@ -46,3 +46,15 @@ Run the prototype after a scene exists:
 godot --path prototype/three_axis_readability_battle_lab
 ```
 
+## Playtest Flow
+
+Use `playtest/guide.md` for the observer script and `playtest/scoring_guide.md` for correctness rules. Use `playtest/answer_sheet_template.csv` or the local result-screen export for records.
+
+Hard success criteria:
+
+- at least 3/5 players answer at least 3 of 4 questions correctly,
+- at least 3/5 players can name a non-`Unit` axis as meaningful,
+- at least 3/5 players can explain why `Launch` or `Tuning` changed the frontline without reducing it to "more units",
+- at least 3/5 players can describe one enemy counter disrupting a specific machine component,
+- at least 3/5 players describe `Overdrive` as amplification,
+- no more than 2/5 players describe `Overdrive` mainly as rescue or panic.
