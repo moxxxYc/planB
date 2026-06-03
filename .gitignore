@@ -1,0 +1,6 @@
+.DS_Store
+
+# Godot local/import cache
+.godot/
+*.import
+

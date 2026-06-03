@@ -1,0 +1,16 @@
+; Engine configuration file.
+; Edit through the Godot editor when project settings grow beyond this scaffold.
+
+config_version=5
+
+[application]
+
+config/name="Three-Axis Readability Battle Lab"
+config/description="Scoped readability prototype for planB Launch/Tuning/Unit causal traces."
+config/features=PackedStringArray("4.6")
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+
