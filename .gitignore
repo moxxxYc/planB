@@ -3,4 +3,4 @@
 # Godot local/import cache
 .godot/
 *.import
-
+*.translation

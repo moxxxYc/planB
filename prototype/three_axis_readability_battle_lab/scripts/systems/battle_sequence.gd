@@ -37,6 +37,11 @@ func current_preset_id() -> String:
 		return ""
 	return _order[_battle_index]
 
+func current_time_seconds() -> float:
+	if _clock == null:
+		return 0.0
+	return _clock.time_seconds
+
 func tick(delta_seconds: float) -> void:
 	if state != STATE_BATTLE_RUNNING:
 		return
@@ -65,4 +70,3 @@ func _start_current_battle() -> void:
 	_clock = BattleClock.new(preset.get("battle_duration_seconds", 75.0))
 	_clock.start()
 	state = STATE_BATTLE_RUNNING
-
