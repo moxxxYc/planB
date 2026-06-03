@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/event_strip_view.gd" id="1_event_strip"]
+
+[node name="EventStrip" type="Control"]
+custom_minimum_size = Vector2(900, 140)
+script = ExtResource("1_event_strip")
+
