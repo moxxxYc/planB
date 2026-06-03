@@ -4,6 +4,7 @@ const BattleSequence = preload("res://scripts/systems/battle_sequence.gd")
 const MachineSimulator = preload("res://scripts/systems/machine_simulator.gd")
 const CounterController = preload("res://scripts/systems/counter_controller.gd")
 const OverdriveController = preload("res://scripts/systems/overdrive_controller.gd")
+const ResultScreenScene = preload("res://scenes/ui/result_screen.tscn")
 
 var _sequence = BattleSequence.new()
 var _machine_simulator = MachineSimulator.new()
@@ -13,6 +14,8 @@ var _runtime_started := false
 var _scheduled_events: Array = []
 var _active_events: Array = []
 var _elapsed_events: Array = []
+var _result_screen: Control
+var _result_screen_started := false
 
 func _ready() -> void:
 	if has_node("CausalChain"):
@@ -39,18 +42,41 @@ func get_motion_snapshot() -> Dictionary:
 	_ensure_runtime_started()
 	var launch = find_child("LaunchLane", true, false)
 	var frontline = find_child("FrontlineView", true, false)
+	var counter_event := _active_counter_event()
+	var overdrive_event := _active_overdrive_event()
 	return {
 		"preset_id": _sequence.current_preset_id(),
 		"time_seconds": _sequence.current_time_seconds(),
 		"active_event_count": _active_events.size(),
 		"elapsed_event_count": _elapsed_events.size(),
+		"active_counter_state": counter_event.get("counter_state", ""),
+		"active_counter_target": counter_event.get("target_component", ""),
+		"overdrive_axis": overdrive_event.get("axis_id", ""),
+		"overdrive_component": overdrive_event.get("component_id", ""),
 		"launch_snapshot": launch.call("get_motion_snapshot") if launch != null and launch.has_method("get_motion_snapshot") else {},
 		"frontline_snapshot": frontline.call("get_motion_snapshot") if frontline != null and frontline.has_method("get_motion_snapshot") else {},
 	}
 
+func result_screen_is_visible() -> bool:
+	_ensure_runtime_started()
+	return _result_screen != null and _result_screen.visible
+
+func result_screen_question_count() -> int:
+	_ensure_runtime_started()
+	if _result_screen == null or not _result_screen.has_method("question_count"):
+		return 0
+	return _result_screen.call("question_count")
+
+func result_screen_confidence_count() -> int:
+	_ensure_runtime_started()
+	if _result_screen == null or not _result_screen.has_method("confidence_count"):
+		return 0
+	return _result_screen.call("confidence_count")
+
 func _ensure_runtime_started() -> void:
 	if _runtime_started:
 		return
+	_ensure_result_screen()
 	_sequence.start_internal_order()
 	_runtime_started = true
 	_rebuild_scheduled_events()
@@ -88,6 +114,37 @@ func _refresh_runtime_state() -> void:
 		var view = find_child(view_name, true, false)
 		if view != null and view.has_method("set_runtime_state"):
 			view.call("set_runtime_state", runtime_state)
+	_maybe_show_result_screen()
+
+func _ensure_result_screen() -> void:
+	if _result_screen != null:
+		return
+	_result_screen = ResultScreenScene.instantiate()
+	_result_screen.name = "ResultScreen"
+	_result_screen.visible = false
+	add_child(_result_screen)
+
+func _maybe_show_result_screen() -> void:
+	if _result_screen_started:
+		return
+	if _sequence.state != BattleSequence.STATE_RESULT_PENDING:
+		return
+	_ensure_result_screen()
+	_result_screen_started = true
+	if _result_screen.has_method("begin_result"):
+		_result_screen.call("begin_result", _sequence.current_preset_id(), 1, _elapsed_events)
+
+func _active_counter_event() -> Dictionary:
+	for event in _active_events:
+		if String(event.get("event_type", "")).begins_with("counter"):
+			return event
+	return {}
+
+func _active_overdrive_event() -> Dictionary:
+	for event in _active_events:
+		if event.get("event_type") == "overdrive_activation":
+			return event
+	return {}
 
 func _counter_for_preset(preset_id: String) -> String:
 	match preset_id:
