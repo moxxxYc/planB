@@ -3,6 +3,7 @@ extends SceneTree
 const TEST_FILES := [
 	"res://tests/test_scope_guard.gd",
 	"res://tests/test_preset_defs.gd",
+	"res://tests/test_battle_sequence.gd",
 ]
 
 var _filter := ""
