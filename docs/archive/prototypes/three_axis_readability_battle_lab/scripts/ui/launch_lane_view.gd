@@ -112,10 +112,10 @@ func _draw() -> void:
 		_draw_label("Junk 占位: 发射节奏被卡住", Vector2(18, 188), 11, Color(1.0, 0.62, 0.62))
 	if _active_overdrive():
 		var pulse := 1.0 + sin(time_seconds * 12.0) * 0.08
-		var overdrive_rect := Rect2(Vector2(18, 454), Vector2(190 * pulse, 28))
-		draw_rect(overdrive_rect, Color(0.95, 0.86, 0.40), true)
-		draw_rect(overdrive_rect, Color(1.0, 0.98, 0.70), false, 2.0)
-		_draw_label("Launch Overdrive 发球过载", overdrive_rect.position + Vector2(8, 19), 12, Color(0.12, 0.10, 0.05))
+		draw_circle(launcher_center, 30.0 * pulse, Color(1.0, 0.90, 0.35, 0.30))
+		draw_rect(Rect2(Vector2(18, 388), Vector2(196, 42)), Color(0.95, 0.86, 0.40, 0.28), true)
+		draw_rect(Rect2(Vector2(18, 388), Vector2(196, 42)), Color(1.0, 0.98, 0.70), false, 2.0)
+		_draw_label("Launch Overdrive: Return + Launcher", Vector2(24, 414), 11, Color(1.0, 0.96, 0.62))
 
 func _draw_arrow(from: Vector2, to: Vector2, color: Color, width: float) -> void:
 	draw_line(from, to, color, width)
@@ -141,6 +141,6 @@ func _active_counter_state() -> String:
 
 func _active_overdrive() -> bool:
 	for event in _runtime_state.get("active_events", []):
-		if event.get("event_type") == "overdrive_activation":
+		if event.get("event_type") == "overdrive_activation" and event.get("axis_id") == "launch":
 			return true
 	return false

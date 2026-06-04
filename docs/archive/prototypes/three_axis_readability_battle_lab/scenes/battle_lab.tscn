@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/battle_lab_controller.gd" id="1_controller"]
 [ext_resource type="Script" path="res://scripts/ui/launch_lane_view.gd" id="2_launch"]
 [ext_resource type="Script" path="res://scripts/ui/tuning_lane_view.gd" id="3_tuning"]
 [ext_resource type="Script" path="res://scripts/ui/unit_lane_view.gd" id="4_unit"]
 [ext_resource type="Script" path="res://scripts/ui/frontline_view.gd" id="5_frontline"]
+[ext_resource type="PackedScene" path="res://scenes/ui/overdrive_button.tscn" id="6_overdrive"]
 
 [node name="BattleLab" type="Control"]
 layout_mode = 3
@@ -30,6 +31,13 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("2_launch")
 
+[node name="OverdriveButton" parent="CausalChain/LaunchLane" instance=ExtResource("6_overdrive")]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 434.0
+offset_right = 214.0
+offset_bottom = 476.0
+
 [node name="TuningLane" type="Control" parent="CausalChain"]
 custom_minimum_size = Vector2(240, 480)
 layout_mode = 2
@@ -50,4 +58,3 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("5_frontline")
-

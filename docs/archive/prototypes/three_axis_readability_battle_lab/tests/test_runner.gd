@@ -10,6 +10,7 @@ const TEST_FILES := [
 	"res://tests/test_scene_smoke.gd",
 	"res://tests/test_answer_records.gd",
 	"res://tests/test_runtime_motion.gd",
+	"res://tests/test_feel_pass_blockers.gd",
 ]
 
 var _filter := ""

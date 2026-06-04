@@ -29,6 +29,9 @@ func start_playtest_order(seed_value: int) -> void:
 		order[swap_index] = previous
 	_start_with_order(order)
 
+func start_fixed_order(order: Array[String]) -> void:
+	_start_with_order(order)
+
 func get_order() -> Array[String]:
 	return _order.duplicate()
 

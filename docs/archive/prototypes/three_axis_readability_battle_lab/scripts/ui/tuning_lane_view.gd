@@ -43,6 +43,7 @@ func debug_label_is_primary() -> bool:
 func _draw() -> void:
 	var time_seconds := float(_runtime_state.get("time_seconds", 0.0))
 	var echo_phase := fmod(time_seconds * 0.35, 1.0)
+	var overdrive_active := _active_overdrive()
 	var lane_rect := Rect2(Vector2(8, 8), size - Vector2(16, 16))
 	draw_rect(lane_rect, Color(0.13, 0.12, 0.11), true)
 	draw_rect(lane_rect, Color(0.90, 0.86, 0.70), false, 2.0)
@@ -70,6 +71,11 @@ func _draw() -> void:
 			draw_circle(plate.position + Vector2(116 + echo_phase * 20.0, 21), 10.0, Color(0.78, 0.82, 1.0, 0.70))
 			draw_circle(plate.position + Vector2(140 + echo_phase * 12.0, 21), 10.0, Color(0.78, 0.82, 1.0, 0.35))
 			_draw_label("复写残影", plate.position + Vector2(92, 42), 10, Color(0.78, 0.82, 1.0))
+			if overdrive_active:
+				var pulse := 1.0 + sin(time_seconds * 12.0) * 0.08
+				draw_rect(plate.grow(8.0 * pulse), Color(1.0, 0.94, 0.42), false, 3.0)
+				draw_circle(plate.position + Vector2(156, 21), 12.0, Color(1.0, 0.94, 0.42, 0.55))
+				_draw_label("Tuning Overdrive: Echo persists", Vector2(24, 398), 11, Color(1.0, 0.94, 0.42))
 		if labels[i] == "Surge":
 			_draw_chevrons(plate.position + Vector2(108 + echo_phase * 10.0, 11))
 
@@ -81,3 +87,9 @@ func _draw_chevrons(origin: Vector2) -> void:
 
 func _draw_label(text: String, label_pos: Vector2, font_size: int, color: Color) -> void:
 	draw_string(get_theme_default_font(), label_pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, color)
+
+func _active_overdrive() -> bool:
+	for event in _runtime_state.get("active_events", []):
+		if event.get("event_type") == "overdrive_activation" and event.get("axis_id") == "tuning":
+			return true
+	return false

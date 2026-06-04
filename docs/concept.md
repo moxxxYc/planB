@@ -1,135 +1,68 @@
-# planB Concept One-Pager
+# planB 概念一页纸
 
-Date: 2026-06-02
-Branch: mvp
-Status: concept locked for validation, not an implementation plan
+**日期：** 2026-06-04
+**状态：** 当前概念方向，非实现计划。
 
-## Fantasy
+## 核心幻想
 
-The player chooses a machine direction, pushes one `Launch / Tuning / Unit` axis into overload, and sees that axis become a visible frontline pressure or burst pattern.
+玩家像调校一台会出兵的物理战争机器：本局逐步判断该放大 `Launch / Tuning / Unit` 哪条轴，然后在三路自动战斗中看到这个选择变成持续流、重复重击或批量冲锋。
 
-This is not a repair fantasy. Diagnosis exists, but it serves build commitment. The main feeling is "I found the direction this run wants, I kept doubling down, and the battlefield now clearly shows that choice."
+这不是直接操作单位的幻想，也不是单纯买数值的幻想。主要情绪是：
 
-## Core Loop
+> 我看懂了这局机器想走哪条路，我继续加码，然后战场真的变了。
 
-Observe amplification signals -> identify which machine axis can be polarized this run -> use node rewards, shop choices, and events to double down or pivot -> trigger 1-2 low-frequency Overdrives in battle to amplify the invested direction -> watch whether the frontline changes.
+## 核心循环
 
-## Twist
+观察球机和战场信号 -> 选择强化、转向或补洞 -> 用奖励、商店、事件和种族规则改变机器组件 -> 战斗中选择 `Deploy Lane` -> 看单位是否在目标路线上赢下接战并推进。
 
-Each run pushes a machine axis into overload and turns it into a readable frontline pressure shape.
+## 机械差异点
 
-The ball machine is not a score machine, damage roller, or background production table. It is the build engine that decides what kind of frontline pressure the run produces.
+球机不是分数机器，也不是背景生产表。它是构筑引擎：
 
-## Target Audience
+- `Launch` 决定输入量、发射节奏、路线倾向、回流和污染压力。
+- `Tuning` 决定球进入 Unit 前的转换质量。
+- `Unit` 决定槽位进度、队列、部署节奏和批量出兵。
 
-- Primary: systems roguelite players who like build commitment, route choices, failure learning, and run identity.
-- Primary: auto-battle optimizer players who like unit timing, pressure windows, and non-micro battlefield outcomes.
-- Secondary: casual physics players who enjoy ball routes and visible machine feedback, as long as the system remains readable.
-- Not for: players looking for high-frequency action control, RTS micro, PVP, matchmaking, live-service progression, or pure physics score chasing.
+同样是“前线变强”，三条轴应该读起来不同：
 
-## Platform & Session
+- `Launch` 像稳定补兵和持续压线。
+- `Tuning` 像少数高价值结算造成重复重击。
+- `Unit` 像蓄力后的成批冲锋。
 
-- Platform: PC/Desktop first.
-- Input: mouse-only should be possible.
-- Target session length: formal run target is 45-60 minutes.
-- Monetization: premium buy-to-play plus possible DLC. No F2P/IAP model in the current concept.
+## 目标玩家
 
-## Comp Set
+- 主要玩家：喜欢系统构筑、Roguelite 路线选择、自动战斗结果复盘的玩家。
+- 主要玩家：喜欢 Castle Fight 类自动出兵、兵线推进、宏观构筑而非微操的玩家。
+- 次要玩家：喜欢物理球路和可视化机器反馈的玩家。
+- 不服务：高频动作玩家、RTS 微操玩家、PVP / 排位玩家、纯物理分数玩家、长期在线服务型玩家。
 
-### Direct Market
+## 平台与商业模式
 
-1. Castle Fight / Warcraft 3 castle-war maps - similar because units spawn and fight automatically while players make macro production choices. Different because planB replaces static production buildings with a polarized ball-machine engine.
-2. Single-player roguelite auto-battlers - similar because players build an automatic battle engine across a run. Different because planB's engine is spatial, physical, and routed through `Launch / Tuning / Unit`, not only through units, items, or board slots.
+- 平台：PC / 桌面优先。
+- 输入：应能鼠标操作。
+- 正式单局目标：45-60 分钟。
+- 第一版 MVP：15-20 分钟短局。
+- 商业模式：买断制，可考虑 DLC。不做当前 F2P / IAP 设计。
 
-### Mechanic References
+## 当前核心系统
 
-1. Ballionaire - useful for board-building and pachinko-style reward readability. Not a direct competitor because its main promise is score/economy from a ball board, not frontline pressure.
-2. Nubby's Number Factory - useful for quota pressure and ball-output readability. Not a direct competitor because it does not validate machine-to-frontline conversion.
-3. Peglin / Roundguard - useful for ball-action feedback. Not a direct competitor because they convert a shot into direct combat output, while planB uses a continuous machine engine to shape auto-battle pressure.
+- 三仓机器：`Launch / Tuning / Unit`。
+- Tuning 槽：`Gate / Prime / Echo / Surge`。
+- 战场：两端基地圈、三条固定路径、自动单位接战。
+- 战中输入：选择当前 `Deploy Lane`，不操作已部署单位。
+- Guardian：固定基地对象，同时可作为开局构筑锚点。
+- 经济：`Gold / 金币` 主要来自战后结算。
 
-### Fantasy Reference
+## 当前最大风险
 
-1. Z Arcade-style stick battle videos - useful for readable battle escalation. Not a product competitor. The reference value is that viewers can see which side is winning and why a faction mechanic changes the fight.
+玩家可能看不出“机器轴改变了战场”。如果玩家只看到球和单位都在自动动，但说不出哪条轴起作用，项目会退化成噪音。
 
-## Nested Loops
+## 当前验证重点
 
-- 30s micro: observe which effect is amplifying, such as Launch flood, Echo repetition, Surge push, Unit queue burst, or enemy pressure disrupting the run axis.
-- 5min meso: node-room loop. Normal battle, reward, shop, event, and elite nodes each offer pressure or commitment around a machine axis.
-- Session macro: one run centers on 1-2 machine polarization directions. Boss or endpoint tests whether the chosen direction can turn into decisive frontline pressure. Meta unlocks support long-term return, but the run memory should be the machine axis that did or did not break through.
+先验证基础机制，不急着展开种族：
 
-## Overdrive Rule
-
-Battle remains auto-battle. The player does not aim, micro units, or cast high-frequency skills.
-
-Each battle may allow 1-2 low-frequency Overdrive choices. Overdrive only amplifies an already invested direction. It is not a universal panic button.
-
-Examples:
-
-- `Launch Overdrive`: launcher/pool throughput spikes for a short window. Strong in Launch flood builds, weak in unrelated builds.
-- `Tuning Overdrive`: the next few Unit hits receive amplified Prime/Echo/Surge behavior. Strong in Tuning builds.
-- `Unit Overdrive`: the next queued batch releases or merges into a frontline burst. Strong in queue/batch builds.
-- Special axis Overdrive: Junk conversion, tag copying, or other race/build-specific amplification only matters if the run has invested in that axis.
-
-## Iceberg Validation Status
-
-- Context: ADEQUATE. Castle Fight and Z Arcade inspirations are clear. Modern direct market research is partial, and ball-machine references are only mechanism references.
-- Skill: ADEQUATE. A prior self-played Web MVP validated a smaller battlefield slice, but that code was deleted and used obsolete terms.
-- Market Research: PARTIAL. Direct market should be researched as single-player roguelite auto-battler / tug-of-war, not as pinball roguelike alone.
-- External Validation: NONE. The prior prototype was self-play only.
-- Intuition: MEDIUM. The creator has self-play evidence that the minimal battlefield slice had some signal, but no blind player evidence yet.
-
-## Next Validation Step
-
-Build or specify a minimum validation slice:
-
-- 1 short node segment.
-- 3-5 battles.
-- 1 shop.
-- 1 event.
-- 1 elite.
-- 3 machine axes with real polarization choices.
-- 2-3 enemy pressure patterns.
-- 1 Overdrive per battle.
-
-Then run blind observation with 3-5 target players. Give only a 1-minute goal explanation. Do not explain optimal strategy.
-
-Watch for:
-
-- Can the player name the machine axis they are pursuing?
-- Can the player explain why a frontline burst happened?
-- Can the player tell when an enemy pressure pattern disrupts their build?
-- Does the player choose to double down, pivot, or patch, and can they explain why?
-- Does Overdrive feel like build amplification or a generic emergency button?
-
-## Biggest Risk
-
-Players may not read the link between machine-axis investment and frontline outcome. If they only see balls and units moving automatically, the concept collapses into noise.
-
-## Scope
-
-- Full vision: roughly 12-24 person-months for a shippable PC premium roguelite with multiple races, acts, shops, events, enemies, relics, and a polished interface.
-- Smallest meaningful validation version: roughly 1-2 person-months for the short node segment above.
-
-## Not In Scope For This Concept
-
-- PVP, networking, accounts, backend services, matchmaking, or Steam integration.
-- Free RTS map movement or complex RTS pathfinding.
-- High-frequency aiming, unit micro, or action-skill play.
-- Generic raw-stat shop as the main progression path.
-- Reviving deleted Web MVP implementation assumptions.
-
-## Completion Summary
-
-Game Ideation Session:
-  Maturity Level: 2 -> 2
-  Concept: planB Machine-to-frontline
-  Fantasy: push one machine axis into overload and see it become frontline pressure.
-  Core Loop: observe amplification signals, commit through nodes, amplify with Overdrive, validate through battle.
-  Twist: the ball machine shapes the visible auto-battle pressure pattern.
-  Forcing Questions: 5/6 covered
-  Iceberg Gaps: market research partial, external validation none
-  STATUS: DONE_WITH_CONCERNS
-
-Next Step:
-  PRIMARY: /game-review - update or review the GDD against the locked Machine-to-frontline concept
-  (if implementation restarts): /prototype-slice-plan - define the short node validation slice before writing code
+1. 三仓是否各自有清晰职责。
+2. 三路战场是否能读出推进、僵持、漏兵。
+3. Guardian 是否能作为基地目标和构筑锚点，但不变成英雄养成系统。
+4. 敌人反制是否攻击机器组件，而不是只加数值。
+5. 第一批中立机器修正是否能支持三条机器轴，而不是变成纯数值商店。

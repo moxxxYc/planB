@@ -1,5 +1,7 @@
 # Three-Axis Readability Battle Lab
 
+Archived status: this prototype is fully expired. Do not use it as current build evidence, validation source, routing signal, or implementation input.
+
 Fresh scoped Godot prototype for validating whether target players can read `Launch / Tuning / Unit` machine events as distinct frontline pressure patterns.
 
 ## Scope

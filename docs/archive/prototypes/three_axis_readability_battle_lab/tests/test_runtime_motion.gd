@@ -79,7 +79,8 @@ func test_counter_and_overdrive_are_component_local_in_runtime_snapshot() -> boo
 	var root = load("res://scenes/battle_lab.tscn").instantiate()
 	root.call("advance_for_test", 31.0)
 	var snapshot: Dictionary = root.call("get_motion_snapshot")
-	root.call("advance_for_test", 14.0)
+	root.call("press_overdrive_for_test")
+	root.call("advance_for_test", 0.1)
 	var overdrive_snapshot: Dictionary = root.call("get_motion_snapshot")
 	root.free()
 
@@ -90,7 +91,7 @@ func test_counter_and_overdrive_are_component_local_in_runtime_snapshot() -> boo
 		push_error("Counter state should be warning at 31s: %s" % snapshot)
 		return false
 	if overdrive_snapshot.get("overdrive_axis", "") != "launch":
-		push_error("Overdrive must be attached to Launch during Launch Flood: %s" % overdrive_snapshot)
+		push_error("Clicked Overdrive must be attached to Launch during Launch Flood: %s" % overdrive_snapshot)
 		return false
 	if overdrive_snapshot.get("overdrive_component", "") != "return_arrows":
 		push_error("Launch Overdrive must amplify return arrows: %s" % overdrive_snapshot)
