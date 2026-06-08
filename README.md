@@ -11,9 +11,15 @@ planB 是一个文档态项目。当前仓库只保存游戏设计文档，没�
 - `docs/enemy-rules.md`：敌人波次、机器反制预警和反制生效规则。
 - `docs/deploy-lane-ui.md`：`Deploy Lane` 直接点路、选中高亮和路线危险提示。
 - `docs/guardian-system.md`：Guardian 通用系统规则，不放具体种族 Guardian。
+- `docs/mvp-learning-checkpoints.md`：MVP 玩家学习检查点、验收信号和失败信号。
 - `docs/mvp-scope.md`：第一版完整 MVP 的内容边界。
 - `docs/PROGRESS.md`：近期决策日志与下一步。
 - `AGENTS.md`：协作规则和文档权威顺序。
+
+## 候选草案
+
+- `docs/neutral-modifiers.md`：记录已确认的中立奖励 / 商店结构、Gold faucet、价格带、职责带平衡口径和休整结果页口径。精确 playtest 后最终平衡未确认。
+- `docs/ball-machine-physical.md`：记录球机物理表现层候选草案（模型 A 真物理、三仓三块串联钉板结构，`Peglin` 仅作为结构参考、摆动炮台、override 物理化、左右分屏、同屏信息层级、物理反馈语法和灰阶可读规则）。具体物理参数和各效果物理表现未定，未 playtest，未最终锁定。
 
 ## 归档内容
 

@@ -1,6 +1,6 @@
 # 三仓机器规格
 
-**最后更新：** 2026-06-04
+**最后更新：** 2026-06-08
 **仓库状态：** 纯文档态，无当前正式实现。
 **权威范围：** `Launch / Tuning / Unit` 三仓机器规则。
 
@@ -29,9 +29,11 @@ flowchart LR
   D -->|"Waste"| F["无有效结算"]
   E -->|"Gate"| G["Unit slots"]
   E -->|"Prime / Echo / Surge"| G
-  G --> H["Unit progress"]
-  H -->|"填满"| I["Queue"]
-  I --> J["Deploy Lane 接口"]
+  G --> H["Unit slot exposure check"]
+  H -->|"已暴露"| I["Unit progress"]
+  H -->|"未暴露, 弹开继续运动"| G
+  I -->|"填满"| J["Queue"]
+  J --> K["Deploy Lane 接口"]
 ```
 
 设计锁：
@@ -40,10 +42,17 @@ flowchart LR
 - 有效 Unit 输入必须先经过 Tuning 路径。
 - `Gate / Prime / Echo / Surge` 是 Tuning 同级槽。
 - `Gate` 是最宽的普通入 Unit 槽。
-- `Unit` 当前基础方向使用 4 个中立激活槽。
+- `Unit` 当前基础方向使用 4 个独立单位槽。
 - 队列部署是独立节奏层，不是瞬间出兵。
 - `Deploy Lane` 是 `Unit.Deploy.route` 接口，不是第四仓。
 - `Overdrive` 不属于 MVP 基础按钮。
+- 三仓机器是跨种族通用规则，不随种族替换为另一套核心结构。
+- 种族必须通过球机的可见表现、反馈语言和明确的 Machine Contract 改写表达特色，但 `Launch / Tuning / Unit`、`Gate / Prime / Echo / Surge`、`Unit slot`、`Queue`、`Deploy Lane` 的通用标签必须保留可见。
+- 种族可以改变组件外壳、颜色、材质、图标风格、运动反馈和必要的效果命名；不能把三仓机器替换成另一套隐藏核心规则。命名包装不是每个种族的核心轴必需项。
+- 每个 `Unit slot` 是独立单位模板槽，不是部件槽、配方槽或跨槽合成槽。
+- `Unit.Slot.Exposure Gate` 是基础 Unit 组件，用于控制槽位从左到右逐步暴露。
+- `Unit.Slot.Exposure Gate` 的基础暴露节奏是跨种族通用 baseline，不按种族拥有隐藏的默认时间表。
+- 种族、Guardian、奖励、商店、遗物、事件或敌人若要改变闸门，必须作为命名规则通过 Machine Contract 声明，显示它改了初始遮挡、缩短速度、槽位优先级或短时暴露窗口。
 - Debug 工具可以临时加宽槽、指定结果或指定目标，但不构成玩家规则。
 
 ## 3. Machine Contract 1.0
@@ -185,7 +194,7 @@ Tuning 是 fired ball 进入 Unit 前的转换区。
 - `Gate` 与 `Prime / Echo / Surge` 平级。
 - `Gate` 是普通路径，必须比奖励槽更宽。
 - 如果每个球都拿奖励，奖励就不值钱。
-- Chain、偏向、复制增强、槽宽改写都属于命名构筑、种族、遗物或敌人规则，不是基础 Tuning。
+- Chain、偏向、复制增强、槽宽改写都属于命名构筑、种族、中立修正、遗物或敌人规则，不是基础 Tuning。
 
 ## 10. Unit
 
@@ -193,11 +202,13 @@ Unit 管槽位进度、队列和部署接口。
 
 基础规则：
 
-- 当前 MVP 方向使用 4 个中立激活槽。
-- 槽位本身不代表低级兵、高级兵、坦克、输出、流派或种族身份。
+- 当前 MVP 方向使用 4 个独立单位槽。
+- 4 个槽从左到右是低需求到高需求，通常也对应低承诺到高承诺单位模板。
 - 每个槽加载一个种族定义的单位模板。
-- 不同种族可以用不同单位模板解释同一个战场读法。
-- 槽位宽度当前基础相等。
+- 每个槽是独立出兵源，进度满后生成该槽加载单位的 queue entry。
+- 基础规则不做跨 slot 合成、跨 slot 部件装配或跨 slot 配方结算。
+- 不同种族可以用不同单位模板解释同一个低到高需求梯度。
+- 槽位的基础物理宽度可以相等，但有效命中区域受 `Unit.Slot.Exposure Gate` 影响。
 - Unit 队列是 FIFO。
 - 队列每 0.5s 最多部署 1 个条目。
 - 新入队条目等待下一个部署节拍，不瞬间出生。
@@ -210,9 +221,35 @@ Unit slot 字段：
 | `loaded_unit` | 当前种族定义的单位模板。 |
 | `progress_current` | 当前进度。 |
 | `progress_required` | 填满所需进度。 |
-| `slot_width` | 命中倾向。基础等宽。 |
+| `slot_width` | 槽位基础物理宽度。 |
+| `exposure_current` | 当前暴露比例或暴露范围。 |
+| `exposure_required` | 允许球落入该槽的暴露条件。 |
 | `queue_entry_rule` | 填满后生成什么队列条目。 |
 | `deployment_rule` | 条目如何进入战场，包含 `Deploy Lane` 接口。 |
+
+Slot Exposure Gate：
+
+- 基础每场战斗开始时，最左侧 slot 完整暴露。
+- 其余 slot 被 `Unit.Slot.Exposure Gate` 挡住未暴露区域。
+- 随战斗时间推进，闸门从左到右逐步缩短，逐步暴露更高需求 slot。
+- 球打到已暴露区域时，可以正常落入对应 slot 并结算 Unit progress。
+- 球打到未暴露区域时，会像碰到其他物理障碍一样弹开，不直接消失，也不立即转成 Waste。
+- 基础规则下，所有 slot 最终都会完整暴露。
+- 基础暴露时间表在同一战斗模板下跨种族一致，不做 Hive 或未来种族的隐藏默认分表。
+- 第一版 baseline：
+
+| Slot | 暴露开始 | 完全暴露 | `progress_required` |
+|---|---:|---:|---:|
+| Slot 1 | 0s | 0s | 3 |
+| Slot 2 | 12s | 24s | 5 |
+| Slot 3 | 36s | 54s | 8 |
+| Slot 4 | 72s | 96s | 12 |
+
+- 这组 baseline 的目标是让 Battle 1 前 30 秒看到 Slot 2 完整开放，让 35-70s 的路线压力阶段看到 Slot 3 进入舞台，让 70s 后的构筑兑现阶段看到 Slot 4 完整参与。
+- 暴露开始到完全暴露之间的插值方式仍属于实现调试项；当前只锁定开始时间、完全暴露时间和 `progress_required` 起点。
+- 命名构筑可以影响闸门参数，例如初始长度、缩短速度、特定 slot 的暴露优先级或短时暴露窗口。
+- 闸门参数改写必须可见、可命名、可复盘；玩家应该能把异常开放节奏归因到某个 Guardian、奖励、商店项、遗物、事件或敌人规则。
+- 命名构筑不能无代价地让所有高需求 slot 开局全开。
 
 Overflow：
 
@@ -254,7 +291,7 @@ Overflow：
 
 ## 13. 仍未定
 
-1. 第一批中立修正清单。
-2. 三个反制家族的第一版数值和预警时长。
-3. 具体种族单位模板。
+1. 三个反制家族的第一版数值和预警时长。
+2. 中立修正和 Hive 的精确 playtest 后最终平衡。
+3. 未来种族单位模板。
 4. 是否让未来 `Overdrive` 类效果以命名修正回归。

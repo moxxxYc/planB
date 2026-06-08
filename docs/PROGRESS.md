@@ -1,6 +1,6 @@
 # 进度与决策日志
 
-**最后更新：** 2026-06-04
+**最后更新：** 2026-06-08
 **仓库状态：** 纯文档态，无当前正式实现。
 
 ## 当前正式文档
@@ -14,8 +14,18 @@
 - `docs/enemy-rules.md`
 - `docs/deploy-lane-ui.md`
 - `docs/guardian-system.md`
+- `docs/mvp-learning-checkpoints.md`
 - `docs/mvp-scope.md`
 - `docs/PROGRESS.md`
+
+当前 MVP v0 实现前置文档：
+
+- `docs/DESIGN.md`：MVP v0 `/implementation-handoff` 前置设计系统，记录 art direction、color / shape tokens、HUD components、animation / audio vocabulary；它是实现假设，不是最终美术 canon。
+
+当前候选草案：
+
+- `docs/neutral-modifiers.md`：记录已确认的第一次奖励三轴锚点、第一次商店候选池、`Echo Latch` 位置、第二次奖励生成规则、Gold faucet、价格带、职责带平衡口径和休整结果页口径；精确 playtest 后最终平衡未确认。
+- `docs/ball-machine-physical.md`：记录球机物理表现层候选草案（模型 A 真物理、三仓三块串联钉板结构，`Peglin` 仅作为结构参考、摆动炮台、override 物理化、左右分屏、同屏信息层级、物理反馈语法和灰阶可读规则）；已确认作为 MVP v0 实现假设进入 `/implementation-handoff`，但不等于最终 canon，具体物理参数和各效果物理表现未定，未 playtest，未最终锁定。
 
 旧方向、过时计划、历史 artifacts 和旧 prototype 已归档到 `docs/archive/`，不作为当前正式规则。
 
@@ -23,11 +33,21 @@
 
 - 旧 Web MVP、旧脚本、旧验证命令和旧实现假设都不再作为当前设计依据。
 - 旧 Godot prototype 已归档到 `docs/archive/prototypes/`，完全过期，不再作为 build、验证、评审或路由信号。
-- 当前优先级是基础机制，不是具体种族内容。
+- 当前正在从基础机制整理转入 Hive 第一种族设计；`Caste Hive` 方向已确认，单位工作名、占位剪影、轻行为和第一版攻击几何已定，两个 Guardian 的身份、轴倾向、技能结构、技能方向、战术技能目标优先级和第一版战术技能范围已定，最终美术资源和最终数值仍未定。
 - 球机主系统是 `Launch / Tuning / Unit`。
 - Tuning 基础槽是 `Gate / Prime / Echo / Surge`。
+- 球机主题采用“通用规则 + 种族化球机表现”，不做每个种族一套隐藏核心规则。
+- Unit 基础规则已改为 4 个独立单位槽，左到右低需求到高需求，并使用 `Unit.Slot.Exposure Gate` 从左到右逐步暴露槽位。
+- `Unit.Slot.Exposure Gate` 的 baseline 暴露节奏跨种族通用；种族只能通过可见命名规则改写闸门参数，不能默认拥有隐藏专属时间表。
+- `Unit.Slot.Exposure Gate` 第一版 baseline 已确认：Slot 1-4 的 `progress_required = 3 / 5 / 8 / 12`，暴露开始时间为 `0s / 12s / 36s / 72s`，完全暴露时间为 `0s / 24s / 54s / 96s`。
 - 战场方向是两端基地圈、三条固定路径、自动单位接战。
 - 战中基础输入是 `Deploy Lane`。
+- MVP 学习检查点已拆成 6 个节点：Battle 1 前 30 秒、第一次奖励、第一次商店、第一次反制、第二次奖励、终点战。
+- MVP 第一轮 playtest 软阈值护栏已确认：10-20 局后观察 Guardian 选择率和成功率差距、Unit slot 关键队列贡献占比、以及连续空窗战斗。
+- Hive 第一种族数值采用职责带口径：先保住 4 个 Unit slot 和 2 个 `Player Guardian` 的战场职责，再用战斗时长、失败率和软阈值护栏修正强度。
+- 第一批中立机器修正已经完成 MVP 文档态口径收束：第一次奖励三轴锚点、第一次商店候选池、`Echo Latch` 位置、第二次奖励生成规则、Gold faucet、价格带、职责带平衡口径和休整结果页口径已确认；精确 playtest 后最终平衡仍未定。
+- 球机物理表现层已吸收 2026-06-08 `/plan-design-review` 的候选收口内容：战中 1 秒扫视信息层级、物理反馈状态语法、灰阶 / 色盲可读规则、`Peglin` 仅作为结构参考的视觉身份约束，以及 5 个候选决策。该文已确认作为 MVP v0 handoff 实现假设，仍是候选草案，不参与正式文档权威顺序。
+- `docs/DESIGN.md` 已创建为 MVP v0 `/implementation-handoff` 前置设计系统，约束第一版视觉、形状、HUD、动效和音频词汇；最终美术资源和最终音频资产仍未定。
 - `Overdrive` 不属于 MVP 基础按钮。
 - Guardian 是固定基地对象，也可以作为开局构筑锚点，但不是第四主系统。
 - Guardian 的战术技能和战略技能在单局开始后固定，不解锁、不升级、不换状态。
@@ -99,7 +119,7 @@
 - 确认 Guardian 通用构筑规则：
   - MVP 第一版使用 2 个可选 `Player Guardian`。
   - 两个 Guardian 都属于同一个正式种族。
-  - 具体身份、名称、技能和数值延后到第一种族设计阶段。
+  - 具体身份、名称、技能和数值在 2026-06-04 当时延后到第一种族设计阶段；后续 2026-06-05 / 2026-06-08 已确认身份、轴倾向、技能结构、first-pass 参数和职责带口径，最终美术资源和 playtest 后最终数值仍未定。
   - 战术技能固定。
   - 战略技能固定。
   - 战略技能必须走 Machine Contract。
@@ -157,16 +177,262 @@
 - 将根目录 `prototype/three_axis_readability_battle_lab/` 移入 `docs/archive/prototypes/`。
 - 确认该旧 prototype 完全过期，后续不再读取它来判断当前状态、设计方向或实现计划。
 
+## 2026-06-05
+
+- 新增 `docs/neutral-modifiers.md` 作为候选草案。
+- 撤回“第一批中立奖励 / 商店机器修正已整体锁定”的表述，改为只记录候选并等待 gstack-game 逐项确认：
+  - `Launch`：`Pool Pocket`、`Front Recycle`、`Junk Sieve`。
+  - `Tuning`：`Prime Charge`、`Echo Latch`、`Surge Buffer`。
+  - `Unit`：`Queue Brace`、`Muster Pair`、`Slot Primer`。
+- 确认候选阶段只服务 MVP 三轴读法，不展开具体 Hive 内容。
+- 确认第一批中立修正采用“轴锚点 + 补洞分层”结构：
+  - 第一次奖励教玩家识别 `Launch / Tuning / Unit` 三条机器轴。
+  - 商店优先提供对已公开危险和反制的补洞项。
+  - Battle 4 后的第二次奖励再根据玩家主轴提供加强项或补洞项。
+- 确认奖励池和商店池采用软分池：
+  - 每个修正有主来源。
+  - 少数修正可以同时进入奖励池和商店池。
+  - 第一次奖励必须保留三轴教学，商店必须保留补洞职责。
+- 确认第一次奖励三轴锚点：
+  - `Pool Pocket`：`Launch`，Pool 容量 `+1`。
+  - `Prime Charge`：`Tuning`，Prime 的 Unit hit 从 `value + 1` 改为 `value + 2`。
+  - `Slot Primer`：`Unit`，选择 1 个 Unit slot，整局 progress 下限为 `1`。
+- 确认 `Slot Primer` 不是每场战斗只触发一次，而是选定槽位整局始终领先一步；它不降低 `progress_required`，不允许多个 slot 同时获得 progress floor，也不能单独触发出兵。
+- 确认第一次奖励采用战场结果模型，而不是先做精确机器数学等价：
+  - `Pool Pocket` 观察 `Launch sustained flow`：Battle 2-3 主压路线是否减少可见断档。
+  - `Prime Charge` 观察 `Tuning high-value hit`：Prime 命中后 4-6s 内是否造成路线状态变化或关键队列结果。
+  - `Slot Primer` 观察 `Unit anchor slot`：被选 Unit slot 是否在 Battle 2-5 中形成可见战场锚点。
+  - 如果三项都只被玩家读成“兵更多”，第一次奖励失败。
+- 确认第一次商店候选池：
+  - `Front Recycle`：`Launch` 转向项，让 miss 回流更快进入 Pool 前半段。
+  - `Junk Sieve`：`Launch` 补洞项，处理 Pool 头部 Junk。
+  - `Surge Buffer`：`Tuning` 补洞 / 节奏项，让未立刻转成队列的 Surge 留下 slot charge。
+  - `Queue Brace`：`Unit` 补洞项，队列断档时补最低进度 slot。
+  - `Muster Pair`：`Unit` 转向 / 爆发项，同 slot 连续队列条目合并成双单位部署。
+- 确认第一次商店展示 3 个，其中至少 1 个是当前危险或已公开反制的补洞项。
+- 确认 `Echo Latch` 保留为第二次奖励的 Tuning 深化项，不进第一次商店，也不作为商店补洞项。
+- 确认第二次奖励采用主轴优先池：
+  - 展示 2-3 个候选。
+  - 至少 1 个强化当前主轴。
+  - 至少 1 个补洞或转向。
+  - `Launch` 主轴优先 `Front Recycle`，外加 `Junk Sieve` 或跨轴补洞 / 转向项。
+  - `Tuning` 主轴优先 `Echo Latch`，外加 `Surge Buffer` 或跨轴补洞 / 转向项。
+  - `Unit` 主轴优先 `Muster Pair`，外加 `Queue Brace` 或跨轴补洞 / 转向项。
+- 确认第二次奖励固定在 Battle 4 后出现，不开第二次商店，不消耗 Gold。
+- 确认 Gold faucet：
+  - 起始 Gold 为 0。
+  - MVP 第一版逐战斗 Gold faucet 为 `6 / 6 / 8 / 0 / 0 / 0`。
+  - Battle 1 胜利给 6 Gold。
+  - Battle 2 胜利给 6 Gold。
+  - Battle 3 强反制胜利给 8 Gold。
+  - Battle 4 / Battle 5 / Endpoint 不给 Gold。
+  - MVP 第一版不做失败后继续，因此不定义失败 Gold；失败不返还 Gold，不续关，不给下一局资源补偿。
+  - 不做击杀、破门、快胜、剩余 HP 或战中 Gold 槽奖励。
+- 确认商店价格带：
+  - 休整 3 Gold，只在 `Player Guardian` HP 受损后出现，MVP 第一版恢复 20 当前 HP，不提高最大 HP。
+  - 补洞项 4 Gold。
+  - 转向项 5 Gold。
+  - 主轴深化项 6 Gold。
+  - 每个商店项只卖 1 次，MVP 第一版不做同列重复购买涨价。
+- 确认第一次商店时机和 Gold 口径：
+  - Battle 1 后只给第一次奖励。
+  - Battle 2 后进入第一次商店。
+  - 若 Battle 1 和 Battle 2 都是普通胜利，第一次商店通常是 12 Gold。
+  - 第一次商店最多购买 1 个中立修正；剩余 Gold 用于休整或保留到后续节点。
+- 确认休整窗口：
+  - 第一次商店中，如果 `Player Guardian` HP 受损，可以休整 1 次。
+  - Battle 3 反制战胜利后，如果 `Player Guardian` HP 受损，可以休整 1 次。
+  - Battle 5 反制战胜利后进入 Endpoint 前整备窗口；如果 `Player Guardian` HP 受损，可以休整最多 2 次。
+  - 普通 Battle 1 / Battle 2 / Battle 4 后不单独开放休整窗口，Endpoint 后不开放休整窗口。
+  - Endpoint 前整备窗口不卖中立机器修正，不提供第二次商店，只允许休整和进入终点战。
+  - 失败直接结束本局，不进入休整窗口。
+- 新增 `docs/mvp-learning-checkpoints.md`。
+- 确认 MVP 6 个学习检查点：
+  - Battle 1 前 30 秒：读懂造球、调校、Unit progress 和 `Deploy Lane` 的边界。
+  - 第一次奖励：读懂 `Pool Pocket` / `Prime Charge` / `Slot Primer` 对应三条机器轴。
+  - 第一次商店：读懂商店是补洞或转向，不是买泛用强度。
+  - 第一次反制：读懂敌人在攻击某个机器弱点。
+  - 第二次奖励：读懂主轴深化和补洞的差别。
+  - 终点战：复盘胜负来自机器轴兑现或断裂，而不是只来自点路。
+- 确认每个检查点的 UI 最小反馈：
+  - Battle 1 前 30 秒：Pool、Forge、Launcher、Tuning、Unit slots、Queue、Deploy Lane 和 lane danger。
+  - 第一次奖励：奖励卡显示机器轴、目标组件、operation、玩家读法，选择后 HUD 持续标记。
+  - 第一次商店：Gold、价格、机器轴、补洞 / 转向标签、不足 Gold 状态、Sold 状态和休整项。
+  - 第一次反制：预警、被攻击组件、反制生效结果和补洞标签对应关系。
+  - 第二次奖励：当前主轴、`Deepen current axis`、`Patch / Pivot`、候选来源说明。
+  - 终点战：Telegraphed Sweep 预警、三路状态、机器兑现标签、Guardian HP 和结果页入口。
+- 确认每个检查点的结果页记录字段：
+  - Battle 1 前 30 秒：完整机器链路样例、Deploy Lane 选择、三路危险快照。
+  - 第一次奖励：选择项、机器轴、目标组件和操作。
+  - 第一次商店：购买前 Gold、购买项、购买角色、购买后 Gold。
+  - 第一次反制：反制家族、目标组件、可见效果、对应回应链路。
+  - 第二次奖励：当前主轴、候选列表、选择项、选择角色。
+  - 终点战：胜负、主轴兑现、主要断裂原因、Deploy Lane 影响、双方 Guardian 结束 HP。
+- 确认 MVP 信息恢复口径：
+  - 失败后本局结束。
+  - 失败恢复只通过结果页信息完成，不通过 Gold、续关或下局资源补偿完成。
+  - 结果页必须显示 `main_break_reason`，并在失败时显示 1 个 `next_run_watch_tag`。
+  - `next_run_watch_tag` 只提示下一局该观察什么，不保证下一局刷出对应奖励或商店项，也不隐藏提高候选权重。
+- 确认每个检查点的失败观察方式：
+  - 观察者只记录玩家行为、结果页字段和玩家原话，不能先解释规则再问。
+  - 每个检查点只问一个短复盘问题，避免把 playtest 变成口试。
+  - Battle 1 观察机器链路和 `Deploy Lane` 边界。
+  - 第一次奖励观察玩家是否能说出机器轴和预期战场表现。
+  - 第一次商店观察玩家是否理解 Gold 机会成本和购买角色。
+  - 第一次反制观察玩家是否能指出被攻击的机器组件和对应补洞。
+  - 第二次奖励观察玩家是否能区分主轴深化、补洞和转向。
+  - 终点战观察玩家是否能把胜负复盘到机器兑现或断裂，而不是只归因于点路。
+- 确认 MVP 第一轮 playtest 使用软阈值护栏，不作为最终平衡：
+  - 10-20 局后，任一 Guardian 选择率低于 30%，或另一个高于 70%，需要回查选择 UI、名称、剪影、轴倾向读法和实际强度。
+  - 两个 Guardian 的到达 Endpoint 率或通关率差距超过 15 个百分点，视为软平衡问题，但先查失败原因，不直接削弱。
+  - 非 `Slot Primer / Unit` 构筑下，单一 Unit slot 不应长期占据 60% 以上关键 queue entry。
+  - 每个 Unit slot 至少要在一种正常构筑或命名 Unit 构筑中产生可见贡献。
+  - 不允许连续 2 场战斗只有自动播放，没有新选择、反制、兑现提示或结果页复盘点。
+- 当时中立修正精确最终平衡仍未定；休整已确认使用 3 Gold 恢复 20 `Player Guardian` 当前 HP，不称为修理；Hive MVP 机器包装方向已定为视觉区分。2026-06-08 已补中立修正职责带平衡口径和休整结果页口径。
+- 确认游戏设计、GDD、玩法规则、经济、平衡、UI 手感、种族、Guardian、奖励、商店、敌人、战场规则相关工作必须优先使用 gstack-game 技能链路；未经用户确认，不得把候选内容写成正式规则。
+- 确认球机主题边界：
+  - 采用“通用规则 + 种族化球机表现”。
+  - `Launch / Tuning / Unit`、`Gate / Prime / Echo / Surge`、`Unit slot`、`Queue`、`Deploy Lane` 保持通用标签和通用语义。
+  - 种族必须通过球机的可见表现、反馈语言和明确的 Machine Contract 改写表达特色。
+  - 种族可以改变外壳、颜色、材质、图标风格、组件表现、反馈语言和必要的效果命名。
+  - 种族不能替换整台球机，不能拥有独立核心规则。
+  - 每个 `Unit slot` 是独立单位模板槽，不是部件槽、配方槽或跨槽合成槽。
+- 确认 `Unit.Slot.Exposure Gate` 节奏归属：
+  - 采用“通用 baseline + 命名改写”。
+  - baseline 暴露节奏跨种族通用，不做 Hive 或未来种族的隐藏默认时间表。
+  - 种族、Guardian、奖励、商店、遗物、事件或敌人若要改变闸门，必须作为命名规则通过 Machine Contract 声明。
+  - 可改写参数包括初始遮挡、缩短速度、特定 slot 暴露优先级或短时暴露窗口。
+- 确认第一版 MVP 第一种族方向为 Hive。
+- 确认 MVP Hive 采用 `Caste Hive` 方向：
+  - 巢群分工阶级，用 4 个 `Unit slot` 表达从低承诺到高承诺的单位职责梯度。
+  - `Infection Hive` / 感染、孵化、寄生方向不进入 MVP 第一种族 baseline，保留给未来其他种族或后续大内容。
+- 确认 Hive MVP 机器包装采用视觉区分：
+  - 不为 `Launch / Tuning / Unit`、`Gate / Prime / Echo / Surge`、`Unit slot`、`Queue` 或 `Deploy Lane` 设置 Hive 副名。
+  - 通用机器标签在主显示中保持通用。
+  - Hive 特色通过虫壳、酸液、巢脉材质、图标风格、组件外观、运动反馈和命名效果表达。
+- 确认 Hive 4 个 `Unit slot` 的 MVP 单位原型：
+  - Hive MVP 单位采用轻技能深度：每个单位只保留 1 个可见行为特征，不做主动技能、单位成长线、复杂状态或独立种族资源。
+  - Hive MVP 单位属性采用职责优先属性表，并使用中对比职责表作为第一版数值口径：每个单位只锁第一版核心属性起点，包括 HP、伤害、攻击间隔、移动速度、攻击范围和一个特殊行为参数；当前不做完整战斗数值表。
+  - Slot 1：`短牙虫`，稳定补线，`progress_required = 3`，快速接线，近战轻咬，不抗线、不爆发。可见行为特征为快速进入接战点，无额外状态；占位剪影为小体型、低伏身体、短牙前突。
+  - Slot 2：`盾壳虫`，守线抗压，`progress_required = 5`，较慢但更硬，近战稳定攻击，减少漏兵，不快速推进。可见行为特征为接敌后更能站住，承受第一轮接触压力；占位剪影为宽壳、低重心、前盾状甲壳。
+  - Slot 3：`酸囊虫`，破僵持，`progress_required = 8`，短程酸液弹道，命中点小范围溅射，负责打破一路持续接战或门前卡住的局面。占位剪影为背部或腹部酸囊、短喷口、短程喷射弧线。
+  - Slot 4：`碾壳兽`，高承诺翻线，`progress_required = 12`，慢到场的重单位，用同一路线接战点横扫重击压制并推回战线，不频繁出现。占位剪影为大型厚壳、重前肢或重头部、明显压线体量。
+  - Hive 4 个 `Unit slot` 的第一版属性起点已确认：`短牙虫` hp 6 / damage 1 / 0.7s / range 1.5 / speed 10；`盾壳虫` hp 18 / damage 2 / 1.4s / range 1.5 / speed 6；`酸囊虫` hp 8 / damage 3 / 1.8s / range 7 / speed 7；`碾壳兽` hp 26 / damage 6 / 2.6s / range 2 / speed 5。
+  - Hive 4 个 `Unit slot` 的第一版攻击几何已确认：`短牙虫` 和 `盾壳虫` 都是同路最近目标单体近战，不带隐藏行为；`酸囊虫` 弹道速度 14 路径单位/s，命中点同路溅射半径 2.5，最多命中主目标 + 2 个附近目标，目标死亡时打到目标死亡位置；`碾壳兽` 同路接战点横扫 3.5 路径单位，最多命中 3 个目标，不击退、不跨路。
+  - Slot 3 的半远程单位是 MVP 初期验证目标，用来测试短程远程单位能否在 Hive 前线分工中被玩家读懂。
+  - Slot 3 不做持续炮台，不留酸池或 DoT，不替代 `Tuning` 的重复重击读法。
+  - Slot 4 的横扫只作用于同一路线接战点附近，不跨路线，不做持续控场。
+- 确认 Hive 两个 `Player Guardian` 的身份和轴倾向：
+  - `巢脉母`：偏 `Launch`，让玩家更容易读到稳定补线和持续压线；软倾向，不锁死本局主轴，不直接生成更多单位。
+  - `酸冠母`：偏 `Tuning`，让玩家更容易读到高价值命中、酸囊弹道和小范围破点；软倾向，不替代奖励、商店和反制决策，不让酸囊虫变成持续炮台。
+- 确认 Hive Guardian 技能结构：
+  - 每个 Guardian 有 1 个低强度自动守家战术技能，让 Guardian 在战场上可见，但不能独自解决漏兵或让玩家忽略三路稳线。
+  - Player Guardian 有基础普通攻击作为防偷家手段，独立于战术技能存在；普通攻击可以清理少量入侵单位，但不能替玩家稳住持续漏线。
+  - 单位进入玩家基地圈后，Guardian 基础攻击和战术技能按基地圈内空间关系选目标，不再按路线筛选；`entered_from = Left / Mid / Right` 只能作为危险来源、日志或结果页字段。
+  - 两个 Guardian 的战术技能采用完全不同的自动守家规则，而不是同结构换表现；英雄特色需要在战术技能上可见。
+  - Guardian 战术技能效果已确认：`巢脉母` 使用 `巢脉牵缚`，敌人进入玩家基地圈后，低频牵缚 / 减速最接近 Player Guardian 的入侵者并造成低伤害，距离并列时选最低 HP；`酸冠母` 使用 `酸冠反喷`，玩家 Guardian 受到实际 HP 伤害后，低频向攻击者反喷酸液并造成小范围低伤害。
+  - Guardian 战术技能第一版参数起点已确认：`巢脉牵缚` 为 8s 冷却、单目标、短暂停顿 / 减速、低伤害；`酸冠反喷` 为 6s 冷却、受到实际 HP 伤害后触发、一次受击最多触发一次、冷却中受击不储存额外触发次数。
+  - Guardian 战术技能伤害 / 范围采用中数值起点：`巢脉牵缚` 造成 4 damage，停顿 0.5s，并使目标减速 40% 持续 1.2s；`酸冠反喷` 以攻击者位置为中心，在 Player base circle 内半径 3.0，对攻击者造成 4 damage，并对最多 2 个附近入侵者各造成 1 damage。
+  - `酸冠反喷` 允许有限卖血打法：玩家可以接受少量漏线，用 Guardian HP 换一次反击清理机会；它不治疗、不返还资源、不提高最大 HP、不降低本次受击伤害，也不能让玩家长期忽略三路稳线。
+  - 每个 Guardian 有 1 个轻量战略技能，必须走 Machine Contract，服务其轴倾向，并保持为开局软倾向。
+  - Hive Guardian 采用单一 `Guardian Contract` 表记录战略和战术效果；表内用 `contract_layer=strategic_machine / tactical_battle` 区分结算层。`strategic_machine` 行进入机器结算，`tactical_battle` 行只进入战场 / Guardian 结算。
+  - Guardian 技能方向采用轴内种族化表现改写：`巢脉母` 的战略技能只在 `Launch` 内表达 Hive 回流 / 巢脉输送，`酸冠母` 的战略技能只在 `Tuning` 内表达酸液弹道 / 命中反馈；两者都不跨轴直接补 `Unit`。
+  - Guardian 战略技能目标采用折中方案：`巢脉母` 规则目标为 `Launch.Recycle / Launch.Pool`，表现包装使用 `Route Board / Recycle path` 的巢脉回流；`酸冠母` 规则目标为 `Tuning.Prime`，表现包装使用 `Gate -> Prime ingress` 的酸冠入槽和 Prime 命中反馈。
+  - Guardian 战略技能 operation 已确认：`巢脉母` 采用隐藏 pity 伪随机的 Recycle 强化，合法 Recycle 未触发强化时推进隐藏保底，触发时该次 Recycle 额外返回 1 个 clean ball，触发后重置；`酸冠母` 采用 Gate miss 计数，只有 `Tuning.Gate` 计数，计数满后下一次本应进入 `Gate` 的结果改为 `Prime`，触发后重置。
+  - 两个 Guardian 的战略计数都在每场战斗开始时重置为 0，不跨战斗保留。
+  - `酸冠母` 不把 `Echo / Surge` 计入 Prime miss，也不统计 `Launch` 的 Split / Recycle / Waste；`巢脉母` 不改变 Route Board 概率、Pool 容量、Recycle 标签继承规则，也不绕过 Pool 满时的 Recycle 回流失败规则。
+  - Guardian 战略技能强度采用保守起点：`巢脉母` 的 Recycle 强化基础触发概率为 15%，第 6 次合法 Recycle 保底触发；`酸冠母` 第一版调参起点为 6 次 `Tuning.Gate` miss 后，下次本应进入 `Gate` 的结果改为 `Prime`。
+  - Hive 的 MVP 工作名、占位剪影、轻技能深度、第一版攻击几何和机器视觉包装方向已确认；两个 `Player Guardian` 的身份、轴倾向、技能结构、技能方向、差异化战术技能效果、战术技能冷却和中数值起点、战术技能目标优先级、`酸冠反喷` 第一版范围、战略技能目标、战略技能 operation、保守强度起点、战略计数重置口径和 `Guardian Contract` 第一版表已确认；最终美术资源和最终数值仍未定。
+- 确认 `Unit.Slot.Exposure Gate` 进入 Unit 基础规则：
+  - 撤回“槽位本身不代表低级兵 / 高级兵”的旧规则。
+  - 4 个 Unit slot 从左到右是低需求到高需求，通常对应低承诺到高承诺单位模板。
+  - 每个 slot 仍然是独立出兵源，不做跨 slot 合成、部件装配或配方结算。
+  - 基础每场战斗开始时最左侧 slot 完整暴露，其余 slot 被闸门挡住未暴露区域。
+  - 闸门随战斗时间从左到右缩短，逐步暴露更高需求 slot。
+  - 球打到未暴露区域会像碰到其他物理障碍一样弹开，不直接消失，也不立即转成 Waste。
+  - 构筑可以影响初始闸门长度、缩短速度、特定 slot 暴露优先级或短时暴露窗口。
+  - 构筑不能无代价让所有高需求 slot 开局全开。
+- 确认 `Unit.Slot.Exposure Gate` 第一版 baseline：
+  - Slot 1：0s 开始暴露，0s 完全暴露，`progress_required = 3`。
+  - Slot 2：12s 开始暴露，24s 完全暴露，`progress_required = 5`。
+  - Slot 3：36s 开始暴露，54s 完全暴露，`progress_required = 8`。
+  - Slot 4：72s 开始暴露，96s 完全暴露，`progress_required = 12`。
+  - 该 baseline 目标是 Battle 1 前 30 秒看到 Slot 2 完整开放，35-70s 看到 Slot 3 进入舞台，70s 后看到 Slot 4 参与构筑兑现。
+  - 暴露开始到完全暴露之间的插值方式仍属于实现调试项；当前只锁定开始时间、完全暴露时间和 `progress_required` 起点。
+- 确认第一版逐战斗难度指标：
+  - Battle 1：90-110s，0 次反制，单路轻压，首次游玩失败率目标 0-5%。
+  - Battle 2：100-125s，0 次反制，双路基础压力，首次游玩失败率目标 5-10%。
+  - Battle 3：115-140s，1 次反制，主压路线 + 反制预警，首次游玩失败率目标 10-15%。
+  - Battle 4：105-130s，0 次反制，商店补洞验证，首次游玩失败率目标 8-12%。
+  - Battle 5：125-150s，1-2 次反制，主压 + 副压，首次游玩失败率目标 15-20%。
+  - Endpoint：165-195s，1 次反制，Endpoint Guardian + 基地圈输出，首次游玩失败率目标 20-25%。
+  - 这些指标是后续波次、模拟和 playtest 的目标曲线，不是刷怪脚本。
+
+## 2026-06-08
+
+- 确认 Hive 第一种族数值采用职责带口径，不采用一次性精确终局表：
+  - 第一版调参先保住 4 个 Unit slot 和 2 个 `Player Guardian` 的战场职责，再用战斗时长、失败率和软阈值护栏修正强度。
+  - `短牙虫` 快速接线，制造持续前线存在，但不能单独抗住持续压力。
+  - `盾壳虫` 守线抗压，减少漏兵，但不能变成主要推进输出。
+  - `酸囊虫` 短程半远程破僵，命中点小范围溅射，但不能变成持续炮台或吃掉 `Tuning` 的高价值命中读法。
+  - `碾壳兽` 高承诺晚到翻线，横扫制造路线翻转，但不能频繁出现或常驻清场。
+  - Player Guardian 基础攻击只是普通防偷家手段；`巢脉母` 和 `酸冠母` 只能提供软轴倾向和弱守家，不能替代奖励、商店、反制或持续稳线。
+  - 如果某个数值修改能提高胜率但破坏职责带，不能作为 MVP 正式调参方向，只能作为临时沙盒参数。
+- 确认 Hive 第一种族的 MVP 数值职责带口径已满足文档态实现前硬门槛；精确最终平衡仍需模拟和 playtest。
+- 确认中立修正采用职责带平衡口径，不采用一次性精确终局表：
+  - 价格带保持 `休整 3 / 补洞 4 / 转向 5 / 主轴深化 6`。
+  - 补洞项只回应一个已公开风险或反制目标，不能抹掉整个反制家族。
+  - 转向项改变构筑形状，不能同时解决当前风险并强化主轴成默认最优。
+  - 主轴深化项强化已形成主轴，不能不看当前主轴也总是最优。
+  - 第一次奖励仍按战场结果模型验收，不要求三轴锚点产生相同单位数或胜率。
+  - 如果一个修正提高胜率但只被玩家读成“兵更多”或“数字更大”，不能作为 MVP 正式平衡方向。
+- 确认 `休整` 结果页口径：
+  - `休整` 是 Gold sink 和 HP 压力回应，不是中立机器修正。
+  - 结果页记录 `rest.total_purchases`、`rest.total_gold_spent`、`rest.total_hp_restored`、`rest.windows_used`、`rest.endpoint_relevance` 和 `rest.opportunity_cost`。
+  - `rest.endpoint_relevance` 使用 `none`、`helped_survive_to_endpoint`、`changed_endpoint_margin`、`insufficient`。
+  - 如果高额休整导致玩家放弃补洞项，结果页必须显示机会成本。
+- 确认中立修正职责带平衡口径和休整结果页口径已满足文档态实现前硬门槛；精确最终平衡仍需模拟和 playtest。
+- 新增 `docs/ball-machine-physical.md` 作为候选草案，记录球机物理表现层的根决策（当时尚未经过 `/plan-design-review`，未 playtest，未最终锁定，不参与文档权威顺序）：
+  - 球机结算采用模型 A 真物理：命中由物理落点决定，`docs/machine-warehouses.md` 的百分比作为物理布局要逼近的目标分布，不是 RNG roll；强制落槽类 override 例外。
+  - 三仓 = 三块串联的缩小版钉板结构（`Launch` / `Tuning` / `Unit`），左侧竖条垂直堆叠，球自上而下穿过；`Peglin` 仅作为结构参考，不作为 UI 外观目标；层间落点在一定范围内随机（折中弱打散）。
+  - 每块板为顶部进球、钉子 + 活动块弹跳、底部结果槽；底槽映射 `Launch`=进 Tuning / Split / Recycle / Waste，`Tuning`=Gate / Prime / Echo / Surge，`Unit`=slot 1-4 + Exposure 挡板。
+  - 发射为 `Launch` 顶部自动摆动炮台，按 `Launcher` 节奏发球，玩家不瞄准；球机全自动，玩家只通过构筑改钉子 / 活动块 / 槽宽和 `Deploy Lane` 间接影响。
+  - override 物理化采用 A1：倾向类改钉子 / 活动块 / 槽宽；强制落槽类用槽位强制导入表现；结算类（Prime value、Echo 复制、Surge 延迟、Slot Primer floor 等）保持逻辑。
+  - 同屏采用左右分屏：球机竖条在左，三路战场在右。`Forge` / `Pool` / `Queue` / `Loop Safety` 保持离散层。
+  - 本草案不改动 `docs/machine-warehouses.md` 的任何逻辑数值与规则。
+- 根据 2026-06-08 `/plan-design-review` 收口 `docs/ball-machine-physical.md`：
+  - 写入战中 1 秒扫视信息层级：P0 当前 `Deploy Lane` / 下一次部署 / 最高危险路线，P1 active ball 机器因果链，P2 Queue head / 即将填满 slot，P3 Pool / Forge / 炮台和背景球。
+  - 写入物理反馈状态语法：Natural Hit、Forced Redirect、Distribution Shift、Blocked Bounce、Valid Unit Hit、Split Return、Recycle Return、Waste、Logic Settlement、Counter Disruption。
+  - 写入灰阶 / 色盲可读规则：当前选路、路线危险、机器反制和 active ball 必须使用 color + shape + motion 三重编码。
+  - 明确 `Peglin` 只作为结构参考，不作为 UI 外观目标；视觉身份来自通用机器标签、组件形态和 Hive 材质 / 运动反馈。
+  - 将五个 deferred decisions 整理为候选决策：active ball 板获得 P1 焦点、战中不显示精确百分比、强制落槽统一候选为导轨 / 引导槽、物理状态使用小型音频族、实现 handoff 前创建最小 `docs/DESIGN.md`。当时仍需用户确认后才能进入 handoff；随后已按下方记录确认进入 MVP v0 handoff，但仍不提升为最终 canon。
+- 用户确认 `docs/ball-machine-physical.md` 作为 MVP v0 实现假设进入 `/implementation-handoff`，但不等于最终 canon。
+- 用户确认 `docs/ball-machine-physical.md` 第 17 节五个候选决策按当前写法进入 handoff：
+  - active ball 所在板获得 P1 焦点，inactive boards 降低对比但保持可见。
+  - 战中不显示精确百分比，只显示物理槽形、组件变化和当前样本反馈；debug / 结果页可显示样本摘要。
+  - 强制落槽统一使用导轨 / 引导槽语言，Hive 可包装为虫壳轨 / 酸液导槽。
+  - 每个物理状态有小型音频族，音频辅助视觉但不能替代视觉可读。
+  - 实现 handoff 前创建最小 `docs/DESIGN.md`。
+- 新增 `docs/DESIGN.md` 作为 MVP v0 `/implementation-handoff` 前置设计系统：
+  - 包含 art direction：可读的物理战争机器、左侧球机、右侧三路战场、Hive 虫壳 / 酸液 / 巢脉包装、通用标签保持可见。
+  - 包含 color / shape tokens：当前选路、路线危险、机器反制、active ball、Tuning 槽、Unit Exposure 和强制导轨均有颜色、形状和运动配对。
+  - 包含 HUD components：Machine Strip、Forge / Pool / Launcher、Tuning Result、Unit Slots、Queue Bridge、Deploy Lane Overlay、Lane Danger、Guardian HUD、Reward Cards、Shop Cards、Result Page。
+  - 包含 animation / audio vocabulary：Natural Hit、Forced Redirect、Distribution Shift、Blocked Bounce、Valid Unit Hit、Split Return、Recycle Return、Waste、Logic Settlement、Counter Disruption、Deploy Birth 和 Lane Danger Up。
+- MVP v0 可以进入 `/implementation-handoff`。handoff 应引用当前正式文档、候选草案、`docs/DESIGN.md` 和 `/plan-design-review` artifact；handoff 只写构建目标、体验要求、占位边界和验收标准，不写游戏代码。
+
 ## 当前未定
 
-- 两个 Guardian 的具体身份、名称、技能和数值。
-- 第一批中立修正清单。
-- 第一种族单位模板、Guardian、技能和数值。
+- 中立修正的精确 playtest 后最终平衡。
+- Hive 4 个 Unit slot 的最终美术资源、攻击频率和 playtest 后最终平衡。
+- 两个 Guardian 的 playtest 后最终数值。MVP 实现输入使用已确认的职责带口径和 first-pass 参数。
+- `Unit.Slot.Exposure Gate` 暴露开始到完全暴露之间的插值方式。
+- 球机物理层的层间随机范围、钉子 / 活动块布局、炮台摆动参数、球物理参数与同屏球数、回流与 Exposure 挡板物理形态、各 Guardian / 修正 / 反制的具体物理表现（见 `docs/ball-machine-physical.md`），以及是否提升为正式规则。
+- `docs/DESIGN.md` 的最终字体、图标、插画、材质、音频资产、精确色值、布局比例和无障碍对比仍需实现后验证。
 
 ## 下一步
 
-下一步仍是设计，不是实现：
+下一步可以进入 `/implementation-handoff`。这一步仍然不写游戏代码，只把当前设计输入翻译成可执行构建包：
 
-1. 写第一批中立修正清单。
-2. 基础机制完成后，再进入第一种族设计。
-3. 只有设计文档稳定后，才创建新的实现计划。
+1. 以当前正式文档和 MVP v0 实现假设生成 handoff。
+2. 在 handoff 中明确 `docs/ball-machine-physical.md` 和 `docs/DESIGN.md` 是 MVP v0 输入，不是最终 canon。
+3. 如实现需要，再收束 `Unit.Slot.Exposure Gate` 暴露插值方式。

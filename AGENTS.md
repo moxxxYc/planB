@@ -12,9 +12,15 @@
 - `docs/enemy-rules.md`
 - `docs/deploy-lane-ui.md`
 - `docs/guardian-system.md`
+- `docs/mvp-learning-checkpoints.md`
 - `docs/mvp-scope.md`
 - `docs/PROGRESS.md`
 - `AGENTS.md`
+
+当前候选草案：
+
+- `docs/neutral-modifiers.md`：记录已确认的中立奖励 / 商店结构、Gold faucet、价格带、职责带平衡口径和休整结果页口径。精确 playtest 后最终平衡未确认。
+- `docs/ball-machine-physical.md`：记录球机物理表现层候选草案（模型 A 真物理、三仓三块串联钉板结构，`Peglin` 仅作为结构参考、摆动炮台、override 物理化、左右分屏、同屏信息层级、物理反馈语法和灰阶可读规则）。叠加在 `docs/machine-warehouses.md` 逻辑之上，不改其规则。具体物理参数和各效果物理表现未定，未 playtest，未最终锁定。
 
 `docs/archive/` 是旧方向、过时计划、历史 skill 产物、旧 prototype 和旧实现假设的归档目录。除非被正式文档明确引用为当前规则，否则只当作背景材料。
 
@@ -31,6 +37,14 @@
 - 如果未来进入实现，必须从当前正式文档重新写有范围约束的实现计划。
 - 优先长期清晰的项目结构，不为了表面连续性保留错误旧术语。
 
+## 游戏设计技能强制要求
+
+- 游戏设计、GDD、玩法规则、经济、平衡、UI 手感、种族、Guardian、奖励、商店、敌人、战场规则相关工作，必须优先使用本项目的 gstack-game 技能链路。
+- 不要用 Superpowers 或通用 brainstorming 代替 gstack-game 的设计技能，除非用户明确要求进入工程实现、代码计划或通用软件开发流程。
+- 涉及玩法 canon 的新增、删改或锁定，必须先通过 gstack-game 设计流程提出候选、说明取舍，并等待用户确认。
+- 未经确认的设计内容只能标记为候选草案、假设或待确认，不能写成“已锁定”“正式规则”或实现输入。
+- 如果技能规则冲突，游戏设计场景下以 gstack-game 技能和本文件为准。
+
 ## 文档权威顺序
 
 - `docs/gdd.md`：总设计与跨系统边界。
@@ -39,8 +53,11 @@
 - `docs/enemy-rules.md`：敌人波次与机器反制规则。
 - `docs/deploy-lane-ui.md`：`Deploy Lane` 直接点路、选中高亮和路线危险提示。
 - `docs/guardian-system.md`：Guardian 通用系统规则。
+- `docs/mvp-learning-checkpoints.md`：MVP 玩家学习检查点、验收信号和失败信号。
 - `docs/mvp-scope.md`：第一版 MVP 内容边界。
 - `docs/PROGRESS.md`：近期决策日志，不是实现证明。
+
+候选草案不参与文档权威顺序，除非用户确认后再提升为正式规则。
 
 如果文档冲突，先以更具体的规则文档为准，再更新 GDD 和 PROGRESS 消除冲突。
 
@@ -65,6 +82,8 @@
 - 敌人波次或反制变更：更新 `docs/enemy-rules.md` 和 `docs/PROGRESS.md`。
 - `Deploy Lane` UI 或选路规则变更：更新 `docs/deploy-lane-ui.md` 和 `docs/PROGRESS.md`。
 - Guardian 通用规则变更：更新 `docs/guardian-system.md` 和 `docs/PROGRESS.md`。
+- MVP 学习检查点变更：更新 `docs/mvp-learning-checkpoints.md` 和 `docs/PROGRESS.md`。
+- 中立奖励 / 商店修正候选变更：更新 `docs/neutral-modifiers.md` 和 `docs/PROGRESS.md`，用户确认后才能提升为正式规则。
 - MVP 范围变更：更新 `docs/mvp-scope.md` 和 `docs/PROGRESS.md`。
 - 实现工作开始前：先创建新的实现计划，不引用已删除实现。
 - 如果发现归档 prototype 或归档实现文件，默认忽略；只有用户明确要求考古时才读取。
