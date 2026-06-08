@@ -4,6 +4,7 @@ extends RefCounted
 const REQUIRED_SCENES := [
 	"res://scenes/run/mvp_shell.tscn",
 	"res://scenes/ball_machine/machine_causality_debug.tscn",
+	"res://scenes/battlefield/battlefield_deploy_debug.tscn",
 ]
 
 const REQUIRED_SCRIPTS := [
@@ -11,9 +12,13 @@ const REQUIRED_SCRIPTS := [
 	"res://scripts/ball_machine/machine_causality_model.gd",
 	"res://scripts/ball_machine/machine_causality_view.gd",
 	"res://scripts/ball_machine/machine_causality_debug.gd",
+	"res://scripts/battlefield/battlefield_deploy_model.gd",
+	"res://scripts/battlefield/battlefield_deploy_view.gd",
+	"res://scripts/battlefield/battlefield_deploy_debug.gd",
 	"res://scripts/data/machine_component_definition.gd",
 	"res://scripts/data/battle_lane_definition.gd",
 	"res://scripts/data/unit_template_definition.gd",
+	"res://scripts/data/enemy_unit_template_definition.gd",
 	"res://scripts/data/guardian_definition.gd",
 	"res://scripts/data/modifier_definition.gd",
 	"res://scripts/data/counter_definition.gd",
@@ -51,6 +56,9 @@ const REQUIRED_RESOURCE_PATHS := [
 	"res://resources/enemies/pool_polluter.tres",
 	"res://resources/enemies/echo_breaker.tres",
 	"res://resources/enemies/stagger_punisher.tres",
+	"res://resources/enemies/enemy_grunt.tres",
+	"res://resources/enemies/enemy_raider.tres",
+	"res://resources/enemies/enemy_brute.tres",
 	"res://resources/run/result_main_axis.tres",
 	"res://resources/run/result_rewards.tres",
 	"res://resources/run/result_shop.tres",
@@ -78,6 +86,9 @@ const REQUIRED_TERMS := [
 	"盾壳虫",
 	"酸囊虫",
 	"碾壳兽",
+	"Enemy Grunt",
+	"Enemy Raider",
+	"Enemy Brute",
 ]
 
 const SOURCE_DOCS := [
@@ -112,8 +123,8 @@ const SESSION_STEPS := [
 	},
 	{
 		"id": "battle_shell",
-		"label": "Battle Shell Placeholder",
-		"summary": "Names Launch / Tuning / Unit, current Deploy Lane, and three lanes without combat simulation.",
+		"label": "M2 Battlefield / Deploy Loop",
+		"summary": "M1 queue entries can deploy to direct-click Left / Mid / Right lanes with placeholder combat.",
 	},
 	{
 		"id": "reward_shell",

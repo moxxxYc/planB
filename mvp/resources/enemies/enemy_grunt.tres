@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemyUnitTemplateDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_unit_template_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+enemy_id = &"enemy.grunt"
+display_name = "Enemy Grunt"
+hp = 10
+attack_damage = 2
+attack_interval = 1.0
+attack_range = 3.0
+move_speed = 7.0
+role_note = "基础同路接战。"
+placeholder_note = "M2 debug duty value from current docs; not final balance."

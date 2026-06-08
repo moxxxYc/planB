@@ -31,7 +31,7 @@ func _build_layout() -> void:
 
 	root.add_child(_make_label(
 		"Godot 4.6 shell for current-doc MVP implementation. M0 data placeholders remain, "
-		+ "and M1 adds a scoped machine causality debug scene without M2/M3 systems.",
+		+ "M1 adds machine causality, and M2 adds a scoped battlefield/deploy debug loop.",
 		16
 	))
 
@@ -76,6 +76,11 @@ func _build_layout() -> void:
 	machine_button.pressed.connect(_on_machine_debug_pressed)
 	root.add_child(machine_button)
 
+	var battlefield_button := Button.new()
+	battlefield_button.text = "Open M2 Battlefield / Deploy Debug"
+	battlefield_button.pressed.connect(_on_battlefield_debug_pressed)
+	root.add_child(battlefield_button)
+
 
 func _make_label(text: String, font_size: int) -> Label:
 	var label := Label.new()
@@ -108,6 +113,10 @@ func _on_step_pressed() -> void:
 
 func _on_machine_debug_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/ball_machine/machine_causality_debug.tscn")
+
+
+func _on_battlefield_debug_pressed() -> void:
+	get_tree().change_scene_to_file("res://scenes/battlefield/battlefield_deploy_debug.tscn")
 
 
 func _refresh_step() -> void:

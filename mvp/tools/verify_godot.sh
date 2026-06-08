@@ -37,6 +37,13 @@ else
   echo "[verify] 跳过 M1 机器因果验证：未找到 tools/verify_machine_causality.gd"
 fi
 
+if [[ -f "$ROOT/tools/verify_battlefield_deploy_loop.gd" ]]; then
+  echo "[verify] 运行 tools/verify_battlefield_deploy_loop.gd"
+  "$GODOT_BIN" --headless --path "$ROOT" --script "res://tools/verify_battlefield_deploy_loop.gd" --no-header
+else
+  echo "[verify] 跳过 M2 战场/Deploy Lane 验证：未找到 tools/verify_battlefield_deploy_loop.gd"
+fi
+
 if [[ -f "$ROOT/export_presets.cfg" ]]; then
   echo "[verify] 找到 export_presets.cfg"
   echo "[verify] 手动测试导出可执行（preset 名按实际配置）:"
