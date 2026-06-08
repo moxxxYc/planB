@@ -17,13 +17,14 @@ const COLOR_BASE := Color("#6f7880")
 const COLOR_QUEUE := Color("#f0d35e")
 
 const LANE_ORDER := ["Left", "Mid", "Right"]
+const TEXT_SCALE := 1.18
 
 var model: RefCounted = null
 var _lane_rects: Dictionary = {}
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(840, 640)
+	custom_minimum_size = Vector2(1040, 760)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 
@@ -50,7 +51,7 @@ func _gui_input(event: InputEvent) -> void:
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), COLOR_BG, true)
 	if model == null:
-		_draw_text("No battlefield model", Vector2(24, 32), 18, COLOR_TEXT)
+		_draw_text("没有战场模型", Vector2(24, 32), 18, COLOR_TEXT)
 		return
 
 	var summary: Dictionary = model.get_debug_summary()
@@ -62,25 +63,25 @@ func _draw() -> void:
 
 func _draw_header(summary: Dictionary) -> void:
 	var queue_preview: Array = summary.get("queue_preview", [])
-	var queue_text := "Queue head: empty"
+	var queue_text := "队首：空"
 	if not queue_preview.is_empty():
 		var head: Dictionary = queue_preview[0]
-		queue_text = "Queue head -> %s | S%d | %s" % [
-			head.get("deploy_lane_name", ""),
+		queue_text = "队首 -> %s | 槽 %d | %s" % [
+			_display_lane(head.get("deploy_lane_name", "")),
 			head.get("source_slot_id", 0),
-			head.get("tuning_result", ""),
+			_display_tuning(head.get("tuning_result", "")),
 		]
 
 	_draw_text(
-		"Deploy Lane: %s" % summary.get("selected_lane_name", "Mid"),
+		"部署路线：%s" % _display_lane(summary.get("selected_lane_name", "Mid")),
 		Vector2(24, 28),
 		20,
 		COLOR_PLAYER
 	)
 	_draw_text(queue_text, Vector2(24, 56), 15, COLOR_QUEUE)
 	_draw_text(
-		"Battle: %s | %.1fs" % [
-			summary.get("battle_state", "running"),
+		"战斗：%s | %.1f 秒" % [
+			_display_battle_state(summary.get("battle_state", "running")),
 			float(summary.get("battle_time_seconds", 0.0)),
 		],
 		Vector2(24, 80),
@@ -98,14 +99,14 @@ func _draw_guardians(summary: Dictionary) -> void:
 
 	draw_circle(Vector2(44, top_y + 190), 28, COLOR_BASE)
 	draw_arc(Vector2(44, top_y + 190), 31, 0.0, TAU, 36, COLOR_PLAYER, 3.0)
-	_draw_text("Player Guardian", Vector2(18, top_y + 232), 12, COLOR_TEXT)
-	_draw_text("HP %d / %d" % [player_hp, player_max], Vector2(18, top_y + 250), 12, COLOR_PLAYER)
+	_draw_text("玩家守护者", Vector2(18, top_y + 232), 12, COLOR_TEXT)
+	_draw_text("生命 %d / %d" % [player_hp, player_max], Vector2(18, top_y + 250), 12, COLOR_PLAYER)
 
 	var enemy_x := size.x - 48.0
 	draw_circle(Vector2(enemy_x, top_y + 190), 28, COLOR_BASE)
 	draw_arc(Vector2(enemy_x, top_y + 190), 31, 0.0, TAU, 36, COLOR_ENEMY, 3.0)
-	_draw_text("Enemy Guardian", Vector2(enemy_x - 82, top_y + 232), 12, COLOR_TEXT)
-	_draw_text("HP %d / %d" % [enemy_hp, enemy_max], Vector2(enemy_x - 82, top_y + 250), 12, COLOR_ENEMY)
+	_draw_text("敌方守护者", Vector2(enemy_x - 82, top_y + 232), 12, COLOR_TEXT)
+	_draw_text("生命 %d / %d" % [enemy_hp, enemy_max], Vector2(enemy_x - 82, top_y + 250), 12, COLOR_ENEMY)
 
 
 func _draw_lanes(summary: Dictionary) -> void:
@@ -140,14 +141,14 @@ func _draw_lanes(summary: Dictionary) -> void:
 			draw_rect(rect.grow(-10.0), COLOR_PLAYER_DARK, false, 2.0)
 			_draw_deploy_arrows(rect)
 
-		_draw_lane_gate(rect, 0.08, int(lane_data.get("player_gate_hp", 0)), "P Gate")
-		_draw_lane_gate(rect, 0.92, int(lane_data.get("enemy_gate_hp", 0)), "E Gate")
+		_draw_lane_gate(rect, 0.08, int(lane_data.get("player_gate_hp", 0)), "我方闸")
+		_draw_lane_gate(rect, 0.92, int(lane_data.get("enemy_gate_hp", 0)), "敌方闸")
 		_draw_lane_danger(rect, int(lane_data.get("danger_tier", 0)))
 
-		_draw_text(lane_name, rect.position + Vector2(12, 22), 16, COLOR_TEXT)
+		_draw_text(_display_lane(lane_name), rect.position + Vector2(12, 22), 16, COLOR_TEXT)
 		_draw_text(
-			"%s | danger %d" % [
-				lane_data.get("state", "idle"),
+			"%s | 危险 %d" % [
+				_display_lane_state(lane_data.get("state", "idle")),
 				int(lane_data.get("danger_tier", 0)),
 			],
 			rect.position + Vector2(12, lane_height - 14),
@@ -232,6 +233,62 @@ func _draw_text(text: String, draw_position: Vector2, font_size: int, color: Col
 		text,
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1.0,
-		font_size,
+		_scaled_font(font_size),
 		color
 	)
+
+
+func _display_lane(lane) -> String:
+	match str(lane):
+		"Left", "left":
+			return "左路"
+		"Mid", "mid":
+			return "中路"
+		"Right", "right":
+			return "右路"
+	return str(lane)
+
+
+func _display_tuning(tuning_result) -> String:
+	match str(tuning_result):
+		"Gate":
+			return "闸门"
+		"Prime":
+			return "预充"
+		"Echo":
+			return "复写"
+		"Surge":
+			return "脉冲"
+	return str(tuning_result)
+
+
+func _display_battle_state(state) -> String:
+	match str(state):
+		"running":
+			return "进行中"
+		"player_win":
+			return "玩家胜利"
+		"player_loss":
+			return "玩家失败"
+	return str(state)
+
+
+func _display_lane_state(state) -> String:
+	match str(state):
+		"idle":
+			return "空闲"
+		"pushing":
+			return "推进"
+		"stalled":
+			return "僵持"
+		"leaking":
+			return "漏怪"
+		"gate broken":
+			return "路闸破损"
+		"invading":
+			return "入侵"
+	return str(state)
+
+
+func _scaled_font(font_size: int) -> int:
+	return int(round(float(font_size) * TEXT_SCALE))

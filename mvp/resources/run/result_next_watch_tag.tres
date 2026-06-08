@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1")
 field_id = &"result.next_watch_tag"
-checkpoint = "Endpoint"
+checkpoint = "终点战"
 display_name = "下一局观察标签"
-purpose = "Record one next-run watch tag after failure without resource compensation."
+purpose = "失败后记录一个下一局观察标签，不给予资源补偿。"

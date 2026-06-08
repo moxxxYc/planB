@@ -13,12 +13,13 @@ const COLOR_UNIT := Color("#c58be8")
 const COLOR_ACTIVE := Color("#f4f0d8")
 const COLOR_WARNING := Color("#e84b4b")
 const COLOR_BLOCKER := Color(0.9, 0.9, 0.9, 0.28)
+const TEXT_SCALE := 1.22
 
 var model: RefCounted = null
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(760, 640)
+	custom_minimum_size = Vector2(980, 760)
 
 
 func set_model(next_model: RefCounted) -> void:
@@ -55,8 +56,8 @@ func _draw() -> void:
 func _draw_supply(rect: Rect2, supply: Dictionary) -> void:
 	draw_rect(rect, COLOR_PANEL, true)
 	draw_rect(rect, COLOR_LAUNCH, false, 2.0)
-	_draw_text("Forge / Pool / Launcher", rect.position + Vector2(14, 22), 18, COLOR_TEXT)
-	_draw_text("Forge", rect.position + Vector2(18, 54), 14, COLOR_LAUNCH)
+	_draw_text("造球器 / 球池 / 发射器", rect.position + Vector2(14, 24), 18, COLOR_TEXT)
+	_draw_text("造球器", rect.position + Vector2(18, 57), 14, COLOR_LAUNCH)
 
 	var pool_origin := rect.position + Vector2(116, 44)
 	var pool_count: int = supply.get("pool_count", 0)
@@ -67,8 +68,8 @@ func _draw_supply(rect: Rect2, supply: Dictionary) -> void:
 		draw_circle(pos, 8.0, color)
 		draw_arc(pos, 10.0, 0.0, TAU, 24, COLOR_TEXT, 1.0)
 
-	_draw_text("Pool %d / %d" % [pool_count, pool_capacity], rect.position + Vector2(258, 54), 14, COLOR_TEXT)
-	_draw_text("Launcher", rect.position + Vector2(390, 54), 14, COLOR_LAUNCH)
+	_draw_text("球池 %d / %d" % [pool_count, pool_capacity], rect.position + Vector2(258, 57), 14, COLOR_TEXT)
+	_draw_text("发射器", rect.position + Vector2(390, 57), 14, COLOR_LAUNCH)
 	draw_line(rect.position + Vector2(472, 48), rect.position + Vector2(548, 28), COLOR_ACTIVE, 3.0)
 	draw_circle(rect.position + Vector2(558, 26), 6.0, COLOR_ACTIVE)
 
@@ -76,7 +77,7 @@ func _draw_supply(rect: Rect2, supply: Dictionary) -> void:
 func _draw_board(rect: Rect2, title: String, slots: Array, accent: Color) -> void:
 	draw_rect(rect, COLOR_PANEL_DIM, true)
 	draw_rect(rect, accent, false, 2.0)
-	_draw_text(title, rect.position + Vector2(14, 24), 18, accent)
+	_draw_text(_display_board(title), rect.position + Vector2(14, 24), 18, accent)
 
 	for row in range(3):
 		for col in range(8):
@@ -95,13 +96,13 @@ func _draw_board(rect: Rect2, title: String, slots: Array, accent: Color) -> voi
 			fill = accent
 		draw_rect(slot_rect, fill, true)
 		draw_rect(slot_rect, accent, false, 1.0)
-		_draw_text(slot_name, slot_rect.position + Vector2(6, 19), 12, COLOR_TEXT)
+		_draw_text(_display_slot(slot_name), slot_rect.position + Vector2(6, 20), 12, COLOR_TEXT)
 
 
 func _draw_unit_board(rect: Rect2) -> void:
 	draw_rect(rect, COLOR_PANEL_DIM, true)
 	draw_rect(rect, COLOR_UNIT, false, 2.0)
-	_draw_text("Unit", rect.position + Vector2(14, 24), 18, COLOR_UNIT)
+	_draw_text("单位仓", rect.position + Vector2(14, 24), 18, COLOR_UNIT)
 
 	for row in range(3):
 		for col in range(8):
@@ -138,7 +139,7 @@ func _draw_unit_board(rect: Rect2) -> void:
 		)
 		draw_rect(progress_rect, COLOR_ACTIVE, true)
 
-		_draw_text("S%d" % slot["slot_id"], slot_rect.position + Vector2(6, 17), 13, COLOR_TEXT)
+		_draw_text("槽 %d" % slot["slot_id"], slot_rect.position + Vector2(6, 18), 13, COLOR_TEXT)
 		_draw_text(
 			"%d / %d" % [progress_current, progress_required],
 			slot_rect.position + Vector2(6, 35),
@@ -146,14 +147,14 @@ func _draw_unit_board(rect: Rect2) -> void:
 			COLOR_TEXT
 		)
 		_draw_text(
-			"full %.0fs" % slot["full_exposure_seconds"],
+			"%.0f 秒全开" % slot["full_exposure_seconds"],
 			slot_rect.position + Vector2(6, 52),
 			11,
 			COLOR_TEXT.darkened(0.18)
 		)
 
 	_draw_text(
-		"Exposure baseline: 0s / 24s / 54s / 96s",
+		"暴露基线：0 / 24 / 54 / 96 秒",
 		rect.position + Vector2(352, 24),
 		13,
 		COLOR_TEXT
@@ -164,13 +165,13 @@ func _draw_queue_bridge(rect: Rect2) -> void:
 	draw_rect(rect, Color("#20211d"), true)
 	draw_rect(rect, COLOR_UNIT, false, 1.0)
 	var queue_entries: Array = model.queue_entries
-	var text := "Queue empty"
+	var text := "队列为空"
 	if not queue_entries.is_empty():
 		var entry: Dictionary = queue_entries[queue_entries.size() - 1]
-		text = "%s  S%d  %s" % [
+		text = "%s  槽%d  %s" % [
 			entry.get("queue_entry_id", ""),
 			entry.get("source_slot_id", 0),
-			entry.get("tuning_result", ""),
+			_display_slot(entry.get("tuning_result", "")),
 		]
 	_draw_text(text, rect.position + Vector2(10, 25), 13, COLOR_TEXT)
 
@@ -185,7 +186,7 @@ func _draw_active_ball() -> void:
 	draw_circle(center, 10.0, color)
 	draw_arc(center, 14.0, 0.0, TAU, 28, COLOR_TEXT, 2.0)
 	draw_line(center - Vector2(28, 11), center - Vector2(8, 4), color, 2.0)
-	_draw_text("active ball", center + Vector2(16, 4), 12, COLOR_TEXT)
+	_draw_text("当前球", center + Vector2(16, 4), 12, COLOR_TEXT)
 	if state == "Blocked Bounce":
 		draw_arc(center + Vector2(18, -4), 18.0, PI * 0.05, PI * 0.8, 18, COLOR_WARNING, 2.0)
 
@@ -224,6 +225,42 @@ func _draw_text(text: String, draw_position: Vector2, font_size: int, color: Col
 		text,
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1.0,
-		font_size,
+		_scaled_font(font_size),
 		color
 	)
+
+
+func _display_board(board_name: String) -> String:
+	match board_name:
+		"Launch":
+			return "发射仓"
+		"Tuning":
+			return "调校仓"
+		"Unit":
+			return "单位仓"
+	return board_name
+
+
+func _display_slot(slot_name: String) -> String:
+	match slot_name:
+		"Gate":
+			return "闸门"
+		"Prime":
+			return "预充"
+		"Echo":
+			return "复写"
+		"Surge":
+			return "脉冲"
+		"Tuning":
+			return "调校"
+		"Split":
+			return "分裂"
+		"Recycle":
+			return "回收"
+		"Waste":
+			return "废弃"
+	return slot_name
+
+
+func _scaled_font(font_size: int) -> int:
+	return int(round(float(font_size) * TEXT_SCALE))

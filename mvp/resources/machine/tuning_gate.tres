@@ -6,6 +6,6 @@
 script = ExtResource("1")
 component_id = &"tuning.gate"
 warehouse = "Tuning"
-display_name = "Gate"
+display_name = "闸门"
 component_kind = "tuning_slot"
-placeholder_note = "Ordinary Unit ingress slot placeholder."
+placeholder_note = "普通单位入口槽占位。"

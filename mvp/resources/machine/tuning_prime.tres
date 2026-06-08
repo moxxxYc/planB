@@ -6,6 +6,6 @@
 script = ExtResource("1")
 component_id = &"tuning.prime"
 warehouse = "Tuning"
-display_name = "Prime"
+display_name = "预充"
 component_kind = "tuning_slot"
-placeholder_note = "High-value hit placeholder. No Unit progress effect implemented."
+placeholder_note = "高价值命中占位。"

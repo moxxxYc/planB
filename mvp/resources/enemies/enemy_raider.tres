@@ -5,11 +5,11 @@
 [resource]
 script = ExtResource("1")
 enemy_id = &"enemy.raider"
-display_name = "Enemy Raider"
+display_name = "敌方突袭者"
 hp = 7
 attack_damage = 1
 attack_interval = 0.7
 attack_range = 3.0
 move_speed = 10.0
 role_note = "漏兵压力和路线危险提示。"
-placeholder_note = "M2 debug duty value from current docs; not final balance."
+placeholder_note = "M2 调试职责数值，非最终平衡。"

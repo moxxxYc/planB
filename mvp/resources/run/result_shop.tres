@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1")
 field_id = &"result.shop"
-checkpoint = "Result Overview"
+checkpoint = "结果总览"
 display_name = "关键商店"
-purpose = "Record purchased machine modifier, rest, and Gold opportunity cost."
+purpose = "记录已购买机器修正、休整和金币机会成本。"

@@ -107,7 +107,7 @@ func reset() -> void:
 
 func start_new_run(guardian_id: String = "hive.vein_mother") -> Dictionary:
 	reset()
-	telemetry["gold_faucet.debug_first_pass"] = "6 / 6 / 8 / 0 / 0 / 0, debug first-pass, not final balance"
+	telemetry["gold_faucet.debug_first_pass"] = "6 / 6 / 8 / 0 / 0 / 0，调试首版水龙头，非最终平衡。"
 	_enter_step("Guardian Select")
 	return choose_guardian(guardian_id)
 
@@ -119,19 +119,19 @@ func choose_guardian(guardian_id: String) -> Dictionary:
 	var guardian: Resource = GUARDIAN_RESOURCES[guardian_id]
 	chosen_guardian = _guardian_to_dict(guardian)
 	main_axis = str(chosen_guardian.get("axis_lean", "Launch"))
-	decision_windows.append("Guardian")
+	decision_windows.append("守护者")
 	telemetry["guardian.choice_id"] = chosen_guardian["guardian_id"]
-	telemetry["guardian.choice_read"] = "%s leans %s with %s and %s." % [
+	telemetry["guardian.choice_read"] = "%s 倾向%s轴，战术为%s，战略目标为%s。" % [
 		chosen_guardian["display_name"],
-		chosen_guardian["axis_lean"],
+		_display_axis(chosen_guardian["axis_lean"]),
 		chosen_guardian["tactical_skill"],
-		chosen_guardian["strategic_target"],
+		_display_component(chosen_guardian["strategic_target"]),
 	]
 	_log(
 		"guardian selected",
-		"%s selected before Battle 1. Axis lean: %s." % [
+		"%s 已在第一战前选定。轴倾向：%s。" % [
 			chosen_guardian["display_name"],
-			chosen_guardian["axis_lean"],
+			_display_axis(chosen_guardian["axis_lean"]),
 		],
 		chosen_guardian
 	)
@@ -210,9 +210,9 @@ func run_battle(battle_number: int, counter_id: String = "") -> Dictionary:
 
 	_log(
 		"battle resolved",
-		"Battle %d resolved as %s. Debug Gold faucet is first-pass, not final balance." % [
+		"第 %d 战结算为%s。金币水龙头为调试首版，非最终平衡。" % [
 			battle_number,
-			outcome,
+			_display_outcome(outcome),
 		],
 		{
 			"battle_number": battle_number,
@@ -237,7 +237,7 @@ func choose_first_reward(reward_id: String) -> Dictionary:
 
 	first_reward = _modifier_to_dict(MODIFIER_RESOURCES[reward_id])
 	main_axis = first_reward["warehouse"]
-	decision_windows.append("First Reward")
+	decision_windows.append("第一奖励")
 
 	telemetry["reward1.choice_id"] = first_reward["display_name"]
 	telemetry["reward1.axis"] = first_reward["warehouse"]
@@ -246,14 +246,14 @@ func choose_first_reward(reward_id: String) -> Dictionary:
 		first_reward["operation"],
 	]
 	telemetry["reward1.battlefield_expectation"] = first_reward["player_read"]
-	telemetry["reward1.battlefield_result"] = "%s seen on %s during debug battles." % [
+	telemetry["reward1.battlefield_result"] = "调试战斗中在%s看到了：%s" % [
+		_display_lane(_lane_for_battle(2)),
 		first_reward["player_read"],
-		_lane_for_battle(2),
 	]
 
 	_log(
 		"first reward selected",
-		"%s selected as %s axis anchor." % [first_reward["display_name"], main_axis],
+		"%s 被选择为%s轴锚点。" % [first_reward["display_name"], _display_axis(main_axis)],
 		first_reward
 	)
 	return first_reward.duplicate(true)
@@ -270,7 +270,7 @@ func run_first_shop() -> Dictionary:
 	var neutral_cap_after := 1
 	var price := _price_for_modifier(shop_purchase)
 	gold = max(0, gold - price)
-	decision_windows.append("First Shop")
+	decision_windows.append("第一次商店")
 
 	var rest_record := _maybe_rest("first_shop")
 
@@ -287,9 +287,9 @@ func run_first_shop() -> Dictionary:
 
 	_log(
 		"shop purchase",
-		"Bought %s for %d Gold. Neutral modifier cap used. Rest is a separate choice." % [
-			shop_purchase["display_name"],
+		"花费 %d 金币购买%s。中立修改购买上限已使用；休整是独立选择。" % [
 			price,
+			shop_purchase["display_name"],
 		],
 		{
 			"gold_before": gold_before,
@@ -313,7 +313,7 @@ func choose_second_reward() -> Dictionary:
 	var candidates := _second_reward_candidates_for_axis(main_axis)
 	var choice_id: String = candidates[0]["modifier_id"]
 	second_reward = _modifier_to_dict(MODIFIER_RESOURCES[choice_id])
-	decision_windows.append("Second Reward")
+	decision_windows.append("第二奖励")
 
 	telemetry["second_offer.current_axis"] = main_axis
 	telemetry["second_offer.candidates"] = candidates.duplicate(true)
@@ -322,10 +322,10 @@ func choose_second_reward() -> Dictionary:
 
 	_log(
 		"second reward selected",
-		"%s selected as %s for current axis %s." % [
+		"%s 被选择为%s候选，当前轴为%s。" % [
 			second_reward["display_name"],
 			candidates[0]["offer_role"],
-			main_axis,
+			_display_axis(main_axis),
 		],
 		{"candidates": candidates, "choice": second_reward}
 	)
@@ -335,12 +335,12 @@ func choose_second_reward() -> Dictionary:
 func run_endpoint_prep() -> Dictionary:
 	_enter_step("Endpoint Prep")
 	var rest_record := _maybe_rest("endpoint_prep")
-	decision_windows.append("Endpoint Prep")
+	decision_windows.append("终点准备")
 	telemetry["session.decision_windows"] = decision_windows.duplicate(true)
 	telemetry["session.consecutive_no_explained_decision_battles"] = 0
 	_log(
 		"endpoint prep",
-		"Endpoint prep opened. No second shop; Rest only if HP and Gold allow.",
+		"终点准备已开启。没有第二次商店；只有生命和金币允许时才休整。",
 		{"rest": rest_record, "gold": gold}
 	)
 	return {"rest": rest_record, "gold": gold}
@@ -383,7 +383,7 @@ func run_endpoint(player_wins: bool) -> Dictionary:
 
 	_log(
 		"endpoint resolved",
-		"Endpoint Guardian used Telegraphed Sweep warning. Outcome: %s." % endpoint_outcome,
+		"终点守护者触发了横扫预告。结果：%s。" % _display_endpoint_outcome(endpoint_outcome),
 		{
 			"outcome": endpoint_outcome,
 			"payoff": payoff,
@@ -420,9 +420,9 @@ func apply_counter(counter_id: String, battle_number: int = 3) -> Dictionary:
 
 	_log(
 		"counter warning",
-		"%s warned against %s, then applied visible effect: %s" % [
+		"%s 对%s发出预警，随后施加可见效果：%s" % [
 			record["display_name"],
-			record["target_component"],
+			_display_component(record["target_component"]),
 			record["visible_effect"],
 		],
 		record
@@ -456,17 +456,17 @@ func build_result_page() -> Dictionary:
 	result_page = {
 		"chosen_guardian": "%s (%s)" % [
 			chosen_guardian.get("display_name", ""),
-			chosen_guardian.get("axis_lean", ""),
+			_display_axis(chosen_guardian.get("axis_lean", "")),
 		],
-		"main_axis": main_axis,
-		"key_rewards": "First: %s; Second: %s" % [
+		"main_axis": _display_axis(main_axis),
+		"key_rewards": "第一奖励：%s；第二奖励：%s" % [
 			first_reward.get("display_name", ""),
 			second_reward.get("display_name", ""),
 		],
 		"shop_rest_choice": _summarize_shop_and_rest(),
 		"counter_target": "%s -> %s" % [
 			latest_counter.get("display_name", ""),
-			latest_counter.get("target_component", ""),
+			_display_component(latest_counter.get("target_component", "")),
 		],
 		"deploy_lane_impact": _summarize_deploy_lane_impact(),
 		"endpoint_payoff_or_break_reason": payoff_or_break,
@@ -477,7 +477,7 @@ func build_result_page() -> Dictionary:
 	telemetry["unit.key_queue_entries_by_slot"] = key_queue_entries_by_slot.duplicate(true)
 	telemetry["unit.dominant_slot_share"] = _dominant_slot_share()
 
-	_log("result page", "Result page built from real M3 run data.", result_page)
+	_log("result page", "结算页已由真实 M3 本局数据生成。", result_page)
 	return result_page.duplicate(true)
 
 
@@ -614,7 +614,7 @@ func _apply_gold_faucet(battle_number: int, outcome: String) -> void:
 	gold += awarded
 	_log(
 		"gold faucet",
-		"Battle %d awarded %d Gold. Debug first-pass faucet, not final balance." % [
+		"第 %d 战获得 %d 金币。调试首版水龙头，非最终平衡。" % [
 			battle_number,
 			awarded,
 		],
@@ -658,7 +658,7 @@ func _record_deploy_lane_impact(
 		"source_slot_id": queue_entry.get("source_slot_id", 0),
 		"unit_id": deployed.get("unit_id", ""),
 		"unit_name": deployed.get("display_name", ""),
-		"impact": "future queue entry deployed to selected lane; existing units were not retargeted",
+		"impact": "未来队列条目部署到选中路线；已部署单位不会被重新指派。",
 	}
 	deploy_lane_records.append(record)
 
@@ -683,14 +683,14 @@ func _record_unit_contribution(queue_entry: Dictionary, lane_name: String, battl
 func _slot_result_read(slot_id: int) -> String:
 	match slot_id:
 		1:
-			return "steady low-demand line refill"
+			return "低需求单位稳定补线。"
 		2:
-			return "shield pressure absorbed lane contact"
+			return "盾壳虫吸收路线接触压力。"
 		3:
-			return "acid sac helped break a stall"
+			return "酸囊虫帮助打破僵持。"
 		4:
-			return "crush shell beast anchored late pressure"
-	return "unknown slot contribution"
+			return "碾壳兽承担后段压力。"
+	return "未知单位槽贡献。"
 
 
 func _counter_to_record(counter: Resource, battle_number: int) -> Dictionary:
@@ -701,16 +701,16 @@ func _counter_to_record(counter: Resource, battle_number: int) -> Dictionary:
 		"counter_id": str(counter.get("counter_id")),
 		"display_name": display_name,
 		"battle_number": battle_number,
-		"warning": "%s warning for %.1fs at %s." % [
+		"warning": "%s 对%s预警 %.1f 秒。" % [
 			display_name,
+			_display_component(target_component),
 			float(counter.get("warning_seconds")),
-			target_component,
 		],
 		"target_component": target_component,
 		"visible_effect": visible_effect,
-		"log_record": "UI/log records %s -> %s -> %s." % [
+		"log_record": "UI / 日志记录：%s -> %s -> %s。" % [
 			display_name,
-			target_component,
+			_display_component(target_component),
 			visible_effect,
 		],
 	}
@@ -806,21 +806,21 @@ func _second_reward_candidates_for_axis(axis: String) -> Array[Dictionary]:
 	match axis:
 		"Tuning":
 			return [
-				_offer("echo_latch", "Deepen current axis", "Because your first reward is Tuning."),
-				_offer("surge_buffer", "Patch", "Because counters can break repeated Tuning value."),
-				_offer("queue_brace", "Pivot", "Because queue gaps remain visible pressure."),
+				_offer("echo_latch", "深化当前轴", "因为第一奖励已经落在调校仓。"),
+				_offer("surge_buffer", "补洞", "因为反制会打断重复调校价值。"),
+				_offer("queue_brace", "转轴", "因为队列空窗仍然是可见压力。"),
 			]
 		"Unit":
 			return [
-				_offer("muster_pair", "Deepen current axis", "Because your first reward is Unit."),
-				_offer("queue_brace", "Patch", "Because Stagger Punisher attacks queue gaps."),
-				_offer("front_recycle", "Pivot", "Because Launch flow can cover empty windows."),
+				_offer("muster_pair", "深化当前轴", "因为第一奖励已经落在单位仓。"),
+				_offer("queue_brace", "补洞", "因为断档惩罚者攻击队列空窗。"),
+				_offer("front_recycle", "转轴", "因为发射仓流量可以覆盖空窗。"),
 			]
 		_:
 			return [
-				_offer("front_recycle", "Deepen current axis", "Because your first reward is Launch."),
-				_offer("junk_sieve", "Patch", "Because Pool Polluter attacks Pool capacity."),
-				_offer("queue_brace", "Pivot", "Because queue gaps remain visible pressure."),
+				_offer("front_recycle", "深化当前轴", "因为第一奖励已经落在发射仓。"),
+				_offer("junk_sieve", "补洞", "因为池污染者攻击球池容量。"),
+				_offer("queue_brace", "转轴", "因为队列空窗仍然是可见压力。"),
 			]
 
 
@@ -858,67 +858,67 @@ func _modifier_names_from_ids(ids: Array[String]) -> Array[String]:
 func _counter_response_link(counter_record: Dictionary) -> String:
 	var target := str(counter_record.get("target_component", ""))
 	if target.contains("Pool"):
-		return "Junk Sieve / Pool Pocket available as Launch pollution patch."
+		return "可用废料筛 / 池袋作为发射仓污染补洞。"
 	if target.contains("Echo"):
-		return "Surge Buffer / Prime Charge available as Tuning patch or pivot."
-	return "Queue Brace / Slot Primer available as Unit gap patch."
+		return "可用脉冲缓冲 / 预充强化作为调校仓补洞或转轴。"
+	return "可用队列支架 / 槽预涂作为单位仓空窗补洞。"
 
 
 func _endpoint_payoff_for_axis(axis: String, player_wins: bool) -> String:
 	if not player_wins:
-		return "main axis did not clearly convert into Endpoint base-circle output"
+		return "主轴没有清楚转化为终点守护者伤害。"
 	match axis:
 		"Tuning":
-			return "Tuning high-value hit survived Echo pressure and opened Endpoint damage window"
+			return "调校高价值命中顶住复写压力，打开终点伤害窗口。"
 		"Unit":
-			return "Unit batch release produced a late Endpoint lane push"
+			return "单位批量释放形成后段终点路线推进。"
 		_:
-			return "Launch sustained flow kept queue pressure through Telegraphed Sweep"
+			return "发射仓持续流量在横扫预告后仍维持队列压力。"
 
 
 func _break_reason_for_counter(counter_record: Dictionary) -> String:
 	var target := str(counter_record.get("target_component", ""))
 	if target.contains("Pool"):
-		return "Pool pollution broke Launch sustained flow before Endpoint"
+		return "球池污染在终点前打断了发射仓持续流量。"
 	if target.contains("Echo"):
-		return "Echo / Surge value was interrupted before Endpoint payoff"
-	return "queue gap let Stagger pressure reach Guardian HP"
+		return "复写 / 脉冲价值在终点收益前被打断。"
+	return "队列空窗让断档压力打到守护者生命。"
 
 
 func _next_watch_tag(counter_record: Dictionary, player_wins: bool) -> String:
 	if player_wins:
 		match main_axis:
 			"Tuning":
-				return "Tuning high-value hit confirmed"
+				return "观察：调校高价值命中已确认"
 			"Unit":
-				return "Unit batch release confirmed"
+				return "观察：单位批量释放已确认"
 			_:
-				return "Launch sustained flow confirmed"
+				return "观察：发射仓持续流量已确认"
 
 	var target := str(counter_record.get("target_component", ""))
 	if target.contains("Pool"):
-		return "Launch pollution patch"
+		return "观察：发射仓污染补洞"
 	if target.contains("Echo"):
-		return "Tuning repeated hit"
-	return "Unit gap patch"
+		return "观察：调校重复命中"
+	return "观察：单位空窗补洞"
 
 
 func _summarize_shop_and_rest() -> String:
-	var rest_text := "no Rest"
+	var rest_text := "未休整"
 	if not rest_records.is_empty():
 		var restored := 0
 		var spent := 0
 		for record in rest_records:
 			restored += int(record.get("hp_restored", 0))
 			spent += int(record.get("gold_spent", 0))
-		rest_text = "Rest x%d, %d HP restored for %d Gold" % [
+		rest_text = "休整 %d 次，花费 %d 金币恢复 %d 生命" % [
 			rest_records.size(),
-			restored,
 			spent,
+			restored,
 		]
-	return "%s (%s), %s, Gold left %d" % [
+	return "%s（%s），%s，剩余金币 %d" % [
 		shop_purchase.get("display_name", ""),
-		shop_purchase.get("role_tag", ""),
+		_display_role(shop_purchase.get("role_tag", "")),
 		rest_text,
 		gold,
 	]
@@ -926,17 +926,17 @@ func _summarize_shop_and_rest() -> String:
 
 func _summarize_deploy_lane_impact() -> String:
 	if deploy_lane_records.is_empty():
-		return "No key Deploy Lane impact recorded."
+		return "未记录关键部署路线影响。"
 
 	var first := deploy_lane_records[0]
 	var last := deploy_lane_records[deploy_lane_records.size() - 1]
-	return "Battle %d sent %s from S%d to %s; Endpoint sent %s to %s. Lane clicks affected future deployments only." % [
+	return "第 %d 战把来自槽 %d 的%s送到%s；终点把%s送到%s。路线点击只影响未来部署。" % [
 		int(first.get("battle", 0)),
-		first.get("unit_name", ""),
 		int(first.get("source_slot_id", 0)),
-		first.get("selected_lane", ""),
+		first.get("unit_name", ""),
+		_display_lane(first.get("selected_lane", "")),
 		last.get("unit_name", ""),
-		last.get("selected_lane", ""),
+		_display_lane(last.get("selected_lane", "")),
 	]
 
 
@@ -966,3 +966,88 @@ func _dominant_slot_share() -> Dictionary:
 		"share": share,
 		"debug_key_entry_count": total,
 	}
+
+
+func _display_axis(axis) -> String:
+	match str(axis):
+		"Launch":
+			return "发射"
+		"Tuning":
+			return "调校"
+		"Unit":
+			return "单位"
+	return str(axis)
+
+
+func _display_lane(lane) -> String:
+	match str(lane):
+		"Left", "left":
+			return "左路"
+		"Mid", "mid":
+			return "中路"
+		"Right", "right":
+			return "右路"
+	return str(lane)
+
+
+func _display_role(role) -> String:
+	match str(role):
+		"Anchor":
+			return "锚点"
+		"Patch":
+			return "补洞"
+		"Pivot":
+			return "转轴"
+		"Deepen":
+			return "深化"
+		"Rest":
+			return "休整"
+	return str(role)
+
+
+func _display_outcome(outcome) -> String:
+	match str(outcome):
+		"player_win":
+			return "玩家胜利"
+		"player_loss":
+			return "玩家失败"
+		"win":
+			return "胜利"
+		"loss":
+			return "失败"
+	return str(outcome)
+
+
+func _display_endpoint_outcome(outcome) -> String:
+	return _display_outcome(outcome)
+
+
+func _display_component(component) -> String:
+	var text := str(component)
+	if text.is_empty():
+		return ""
+	return text \
+		.replace("Launch", "发射仓") \
+		.replace("Tuning", "调校仓") \
+		.replace("Unit", "单位仓") \
+		.replace("Pool", "球池") \
+		.replace("Junk", "废球") \
+		.replace("Recycle", "回收") \
+		.replace("Prime", "预充") \
+		.replace("Echo", "复写") \
+		.replace("Surge", "脉冲") \
+		.replace("Queue", "队列") \
+		.replace("Slot", "单位槽") \
+		.replace("Gate", "闸门") \
+		.replace("capacity", "容量") \
+		.replace("pollution", "污染") \
+		.replace("value_bonus", "价值加成") \
+		.replace("repeat_value", "重复价值") \
+		.replace("target_lock", "目标锁定") \
+		.replace("charge_buffer", "充能缓冲") \
+		.replace("progress_floor", "进度底线") \
+		.replace("empty_gap_response", "空窗响应") \
+		.replace("empty_gap", "空窗") \
+		.replace("merge_window", "合并窗口") \
+		.replace("fire_behavior", "发射行为") \
+		.replace("return_position", "回流位置")

@@ -80,7 +80,7 @@ func reset() -> void:
 			"state": "idle",
 		}
 
-	_record_event("battle reset", "Battlefield ready. Default Deploy Lane is Mid.", {})
+	_record_event("battle reset", "战场已准备，默认部署路线为中路。", {})
 
 
 func select_lane(lane) -> bool:
@@ -90,7 +90,7 @@ func select_lane(lane) -> bool:
 	selected_lane_id = lane_id
 	_record_event(
 		"lane selected",
-		"Deploy Lane changed to %s." % LANE_NAMES[lane_id],
+		"部署路线已切换到%s。" % _display_lane(lane_id),
 		{"lane_name": LANE_NAMES[lane_id]}
 	)
 	_update_lane_states_and_danger()
@@ -112,9 +112,9 @@ func enqueue_machine_queue_entry(queue_entry: Dictionary) -> bool:
 	deploy_queue.append(entry)
 	_record_event(
 		"queue entry added",
-		"Queue head %s now previews Deploy Lane %s." % [
+		"队首 %s 现在预览部署到%s。" % [
 			entry.get("queue_entry_id", ""),
-			get_selected_lane_name(),
+			_display_lane(selected_lane_id),
 		],
 		{
 			"queue_entry_id": entry.get("queue_entry_id", ""),
@@ -143,9 +143,9 @@ func deploy_next_queue_entry() -> Dictionary:
 	var unit := _spawn_player_unit_from_queue(entry, lane_id)
 	_record_event(
 		"queue deployed",
-		"Queue entry %s deployed to %s." % [
+		"队列条目 %s 已部署到%s。" % [
 			entry.get("queue_entry_id", ""),
-			LANE_NAMES[lane_id],
+			_display_lane(lane_id),
 		],
 		{
 			"queue_entry_id": entry.get("queue_entry_id", ""),
@@ -174,9 +174,9 @@ func spawn_enemy(lane, enemy_name := "Enemy Grunt", path_pos := ENEMY_SPAWN_POS)
 	units.append(unit)
 	_record_event(
 		"enemy spawned",
-		"%s spawned on %s at %.1f." % [
+		"%s 在%s %.1f 位置出现。" % [
 			unit.get("display_name", enemy_name),
-			LANE_NAMES[lane_id],
+			_display_lane(lane_id),
 			unit.get("path_pos", path_pos),
 		],
 		unit
@@ -245,8 +245,8 @@ func set_public_warning(lane, tier: int) -> bool:
 	lanes[lane_id] = lane_data
 	_record_event(
 		"lane warning",
-		"%s public warning raised to tier %d." % [
-			LANE_NAMES[lane_id],
+		"%s公开预警提升到 %d 级。" % [
+			_display_lane(lane_id),
 			lane_data["public_warning_tier"],
 		],
 		{
@@ -304,7 +304,7 @@ func force_lane_state_for_debug(lane, state: String) -> bool:
 			lane_data["player_gate_hp"] = 0
 			lane_data["player_gate_broken"] = true
 			lanes[lane_id] = lane_data
-			_record_event("gate broken", "%s player-side Lane Gate broke." % LANE_NAMES[lane_id], {})
+			_record_event("gate broken", "%s玩家侧路闸被击破。" % _display_lane(lane_id), {})
 		"invading":
 			var lane_data: Dictionary = lanes[lane_id]
 			lane_data["player_gate_hp"] = 0
@@ -333,7 +333,7 @@ func force_battle_result_for_debug(next_state: String) -> bool:
 			player_guardian_hp = 0
 		_:
 			return false
-	_record_event("battle resolved", "Battle resolved: %s." % battle_state, {})
+	_record_event("battle resolved", "战斗已结算：%s。" % _display_battle_state(battle_state), {})
 	return true
 
 
@@ -364,7 +364,7 @@ func _spawn_debug_player_unit(lane_id: StringName, path_pos: float) -> Dictionar
 	units.append(unit)
 	_record_event(
 		"unit spawned",
-		"Debug Hive unit placed on %s at %.1f." % [LANE_NAMES[lane_id], path_pos],
+		"调试蜂巢单位已放置到%s %.1f 位置。" % [_display_lane(lane_id), path_pos],
 		unit
 	)
 	return unit
@@ -457,9 +457,9 @@ func _attack_unit_target(index: int, target_index: int, delta: float) -> void:
 		unit["attack_cooldown"] = float(unit.get("attack_interval", 1.0))
 		_record_event(
 			"unit attacking",
-			"%s attacked an opposing unit on %s." % [
+			"%s 在%s攻击敌对单位。" % [
 				unit.get("display_name", ""),
-				unit.get("lane_name", ""),
+				_display_lane(unit.get("lane_name", "")),
 			],
 			{"unit_id": unit.get("unit_id", "")}
 		)
@@ -515,19 +515,19 @@ func _attack_gate(index: int, target_side: String, delta: float) -> void:
 		lane_data[broken_key] = true
 		_record_event(
 			"gate broken",
-			"%s %s Lane Gate broke." % [
-				LANE_NAMES[lane_id],
-				target_side,
+			"%s%s路闸被击破。" % [
+				_display_lane(lane_id),
+				_display_side(target_side),
 			],
 			{"lane_name": LANE_NAMES[lane_id], "target_side": target_side}
 		)
 	else:
 		_record_event(
 			"gate damaged",
-			"%s damaged %s %s Gate." % [
+			"%s 伤害了%s%s路闸。" % [
 				unit.get("display_name", ""),
-				LANE_NAMES[lane_id],
-				target_side,
+				_display_lane(lane_id),
+				_display_side(target_side),
 			],
 			{"lane_name": LANE_NAMES[lane_id], "target_side": target_side}
 		)
@@ -556,7 +556,7 @@ func _attack_guardian(index: int, target_side: String, delta: float) -> void:
 
 	_record_event(
 		"guardian damaged",
-		"%s attacked %s Guardian." % [unit.get("display_name", ""), target_side],
+		"%s 攻击了%s守护者。" % [unit.get("display_name", ""), _display_side(target_side)],
 		{"target_side": target_side, "battle_state": battle_state}
 	)
 	unit["attack_cooldown"] = float(unit.get("attack_interval", 1.0))
@@ -593,9 +593,9 @@ func _damage_unit(target_index: int, amount: int, source_id: String) -> void:
 		target["state"] = "dead"
 		_record_event(
 			"unit died",
-			"%s died on %s." % [
+			"%s 在%s阵亡。" % [
 				target.get("display_name", ""),
-				target.get("lane_name", ""),
+				_display_lane(target.get("lane_name", "")),
 			],
 			{
 				"unit_id": target.get("unit_id", ""),
@@ -714,10 +714,42 @@ func _record_event(state: String, description: String, data: Dictionary) -> Dict
 func _normalize_lane_id(lane) -> StringName:
 	var text := str(lane).strip_edges().to_lower()
 	match text:
-		"left", "lane_left", "left lane":
+		"left", "lane_left", "left lane", "左路", "左":
 			return &"left"
-		"mid", "middle", "lane_mid", "mid lane":
+		"mid", "middle", "lane_mid", "mid lane", "中路", "中":
 			return &"mid"
-		"right", "lane_right", "right lane":
+		"right", "lane_right", "right lane", "右路", "右":
 			return &"right"
 	return &""
+
+
+func _display_lane(lane) -> String:
+	var lane_id := _normalize_lane_id(lane)
+	match lane_id:
+		&"left":
+			return "左路"
+		&"mid":
+			return "中路"
+		&"right":
+			return "右路"
+	return str(lane)
+
+
+func _display_side(side: String) -> String:
+	match side:
+		PLAYER_SIDE:
+			return "玩家侧"
+		ENEMY_SIDE:
+			return "敌方侧"
+	return side
+
+
+func _display_battle_state(state: String) -> String:
+	match state:
+		"running":
+			return "进行中"
+		"player_win":
+			return "玩家胜利"
+		"player_loss":
+			return "玩家失败"
+	return state

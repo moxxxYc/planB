@@ -40,10 +40,10 @@ const UNIT_FULL_EXPOSURE_SECONDS := {
 }
 
 const UNIT_LABELS := {
-	1: "Slot 1 / 短牙虫",
-	2: "Slot 2 / 盾壳虫",
-	3: "Slot 3 / 酸囊虫",
-	4: "Slot 4 / 碾壳兽",
+	1: "单位槽 1 / 短牙虫",
+	2: "单位槽 2 / 盾壳虫",
+	3: "单位槽 3 / 酸囊虫",
+	4: "单位槽 4 / 碾壳兽",
 }
 
 const BOARD_NAMES := [
@@ -101,7 +101,7 @@ func force_tuning_result(tuning_result: String) -> bool:
 	var event := _record_event(
 		"Tuning",
 		"Natural Hit",
-		"Debug forced Tuning result: %s" % tuning_result,
+		"调试指定调校结果：%s" % _display_tuning(tuning_result),
 		{"tuning_result": tuning_result},
 		chain_id
 	)
@@ -151,14 +151,14 @@ func force_blocked_bounce(slot_id: int) -> Dictionary:
 	_record_event(
 		"Tuning",
 		"Natural Hit",
-		"Tuning Gate passed the ball into the Unit board.",
+		"调校闸门把球送入单位板。",
 		{"tuning_result": "Gate"},
 		chain_id
 	)
 	var event := _record_event(
 		"Unit",
 		"Blocked Bounce",
-		"Unit Slot %d exposure gate blocked the forced hit at %.1fs." % [
+		"单位槽 %d 的暴露闸门在 %.1f 秒挡住了本次命中。" % [
 			slot_id,
 			battle_time_seconds,
 		],
@@ -184,21 +184,21 @@ func force_settlement_state(state: String) -> Dictionary:
 	match state:
 		"Split Return":
 			pool_count = min(POOL_CAPACITY, pool_count + 2)
-			description = "Launch Split returned two clean balls to Pool."
+			description = "发射仓分裂回流向球池返回了两颗干净球。"
 			data = {"pool_count": pool_count}
 		"Recycle Return":
 			pool_count = min(POOL_CAPACITY, pool_count + 1)
-			description = "Launch Recycle returned one clean ball to Pool after a miss."
+			description = "发射仓回收在落空后向球池返回了一颗干净球。"
 			data = {"pool_count": pool_count}
 		"Waste":
-			description = "Launch Waste consumed the active ball without valid settlement."
+			description = "发射仓废弃口吞掉了当前球，没有产生有效结算。"
 			data = {"pool_count": pool_count}
 		"Logic Settlement":
 			component = "Tuning"
-			description = "Prime / Echo / Surge settlement is shown after the physical ball lands."
+			description = "预充 / 复写 / 脉冲的结算会在物理球落定后显示。"
 			data = {"tuning_result": selected_tuning_result}
 		_:
-			description = "Debug forced physical state: %s." % state
+			description = "调试指定物理状态：%s。" % _display_state(state)
 
 	var event := _record_event(component, state, description, data, chain_id)
 	active_ball = _make_active_ball(component, state, state, chain_id)
@@ -216,14 +216,14 @@ func run_forced_chain(tuning_result: String, slot_id: int) -> Dictionary:
 	_record_event(
 		"Launch",
 		"Natural Hit",
-		"Launch Route Board sent the active ball into the Tuning path.",
+		"发射路线板把当前球送入调校路径。",
 		{"launch_result": "Tuning Path"},
 		chain_id
 	)
 	_record_event(
 		"Tuning",
 		"Natural Hit",
-		"Tuning %s slot marked the ball before Unit." % tuning_result,
+		"调校%s槽在进入单位板前标记了这颗球。" % _display_tuning(tuning_result),
 		{"tuning_result": tuning_result},
 		chain_id
 	)
@@ -244,7 +244,7 @@ func run_forced_chain(tuning_result: String, slot_id: int) -> Dictionary:
 		var blocked := _record_event(
 			"Unit",
 			"Blocked Bounce",
-			"Unit Slot %d is not fully exposed at %.1fs." % [
+			"单位槽 %d 在 %.1f 秒尚未完全暴露。" % [
 				slot_id,
 				battle_time_seconds,
 			],
@@ -336,7 +336,7 @@ func _record_chain_intro(chain_id: String) -> void:
 		_record_event(
 			"Forge",
 			"Logic Settlement",
-			"Forge supplied one clean ball because Pool was empty.",
+		"造球器因球池为空补入了一颗干净球。",
 			{"pool_count": pool_count},
 			chain_id
 		)
@@ -344,7 +344,7 @@ func _record_chain_intro(chain_id: String) -> void:
 		_record_event(
 			"Forge",
 			"Logic Settlement",
-			"Forge keeps Pool supplied for the next launch.",
+		"造球器维持球池供给，等待下一次发射。",
 			{"pool_count": pool_count},
 			chain_id
 		)
@@ -353,14 +353,14 @@ func _record_chain_intro(chain_id: String) -> void:
 	_record_event(
 		"Pool",
 		"Natural Hit",
-		"Pool head moved into Launcher.",
+		"球池队首进入发射器。",
 		{"pool_count": pool_count},
 		chain_id
 	)
 	_record_event(
 		"Launcher",
 		"Natural Hit",
-		"Launcher fired the active clean ball.",
+		"发射器发射了当前干净球。",
 		{"pool_count": pool_count},
 		chain_id
 	)
@@ -376,10 +376,10 @@ func _apply_unit_hit(slot_id: int, tuning_result: String, chain_id: String) -> D
 	_record_event(
 		"Unit",
 		"Valid Unit Hit",
-		"Unit Slot %d accepted +%d progress from %s." % [
+		"单位槽 %d 接受来自%s的 +%d 进度。" % [
 			slot_id,
+			_display_tuning(tuning_result),
 			progress_added,
-			tuning_result,
 		],
 		{
 			"slot_id": slot_id,
@@ -394,7 +394,7 @@ func _apply_unit_hit(slot_id: int, tuning_result: String, chain_id: String) -> D
 		_record_event(
 			"Tuning",
 			"Logic Settlement",
-			"Echo copied Unit progress without spawning a second physical ball.",
+			"复写复制了单位进度结算，但没有生成第二颗物理球。",
 			{"slot_id": slot_id},
 			chain_id
 		)
@@ -407,10 +407,10 @@ func _apply_unit_hit(slot_id: int, tuning_result: String, chain_id: String) -> D
 		_record_event(
 			"Queue",
 			"Logic Settlement",
-			"Queue entry %s generated from Unit Slot %d via %s." % [
+			"队列条目 %s 由单位槽 %d 通过%s生成。" % [
 				entry["queue_entry_id"],
 				slot_id,
-				tuning_result,
+				_display_tuning(tuning_result),
 			],
 			entry,
 			chain_id
@@ -454,13 +454,13 @@ func _progress_for_tuning(tuning_result: String) -> int:
 func _tuning_logic_description(tuning_result: String) -> String:
 	match tuning_result:
 		"Prime":
-			return "Prime raises this Unit hit value from 1 to 2."
+			return "预充把这次单位命中的价值从 1 提高到 2。"
 		"Echo":
-			return "Echo copies the Unit progress settlement, not the physical ball."
+			return "复写复制单位进度结算，不复制物理球。"
 		"Surge":
-			return "Surge marks a generated queue entry for 0.25s deploy delay."
+			return "脉冲把生成的队列条目标记为 0.25 秒部署延迟。"
 		_:
-			return "Gate has no extra logic settlement."
+			return "闸门没有额外逻辑结算。"
 
 
 func _record_event(
@@ -499,3 +499,35 @@ func _new_chain_id() -> String:
 
 func _is_valid_slot(slot_id: int) -> bool:
 	return UNIT_REQUIREMENTS.has(slot_id)
+
+
+func _display_tuning(tuning_result: String) -> String:
+	match tuning_result:
+		"Gate":
+			return "闸门"
+		"Prime":
+			return "预充"
+		"Echo":
+			return "复写"
+		"Surge":
+			return "脉冲"
+	return tuning_result
+
+
+func _display_state(state: String) -> String:
+	match state:
+		"Natural Hit":
+			return "自然命中"
+		"Blocked Bounce":
+			return "阻挡反弹"
+		"Valid Unit Hit":
+			return "有效单位命中"
+		"Split Return":
+			return "分裂回流"
+		"Recycle Return":
+			return "回收回流"
+		"Waste":
+			return "废弃"
+		"Logic Settlement":
+			return "逻辑结算"
+	return state

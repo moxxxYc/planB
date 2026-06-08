@@ -6,6 +6,6 @@
 script = ExtResource("1")
 component_id = &"launch.forge"
 warehouse = "Launch"
-display_name = "Forge"
+display_name = "造球器"
 component_kind = "ball_supply"
-placeholder_note = "M0 placeholder. First-pass cadence is documented; no runtime generation implemented."
+placeholder_note = "M0 占位。第一版节拍已在文档记录。"

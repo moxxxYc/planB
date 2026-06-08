@@ -5,11 +5,11 @@
 [resource]
 script = ExtResource("1")
 modifier_id = &"queue_brace"
-display_name = "Queue Brace"
+display_name = "队列撑架"
 source_pool = "Shop"
 warehouse = "Unit"
 target_component = "Unit.Queue.empty_gap_response"
-operation = "trigger"
+operation = "触发"
 role_tag = "Patch"
-player_read = "Unit gap patch"
-placeholder_note = "M0 data placeholder only."
+player_read = "单位仓断档补洞"
+placeholder_note = "M0 调试数据占位。"

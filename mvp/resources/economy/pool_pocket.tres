@@ -5,11 +5,11 @@
 [resource]
 script = ExtResource("1")
 modifier_id = &"pool_pocket"
-display_name = "Pool Pocket"
+display_name = "池袋"
 source_pool = "Reward / Shop"
 warehouse = "Launch"
 target_component = "Launch.Pool.capacity"
-operation = "add"
+operation = "增加"
 role_tag = "Anchor"
-player_read = "Launch sustained flow"
-placeholder_note = "M0 data placeholder only."
+player_read = "发射仓持续流"
+placeholder_note = "M0 调试数据占位。"

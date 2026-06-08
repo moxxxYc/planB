@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1")
 counter_id = &"stagger_punisher"
-display_name = "Stagger Punisher"
+display_name = "断档惩罚者"
 target_component = "Unit.Queue.empty_gap"
 warning_seconds = 3.0
 active_seconds = 16.0
-visible_effect = "Queue gap warning attaches to the most dangerous lane before Raider spawn."
-placeholder_note = "M0 data placeholder only."
+visible_effect = "队列空档预警附着到最危险路线，随后生成突袭者。"
+placeholder_note = "M0 调试数据占位。"

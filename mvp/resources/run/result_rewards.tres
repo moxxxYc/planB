@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1")
 field_id = &"result.rewards"
-checkpoint = "Result Overview"
+checkpoint = "结果总览"
 display_name = "关键奖励"
-purpose = "Record first reward and second reward choices."
+purpose = "记录第一次和第二次奖励选择。"

@@ -116,43 +116,43 @@ const SOURCE_DOCS := [
 const SESSION_STEPS := [
 	{
 		"id": "boot",
-		"label": "MVP Shell Boot",
-		"summary": "Project opened. No run state has been started.",
+		"label": "MVP 入口",
+		"summary": "工程已打开，尚未开始本局状态。",
 	},
 	{
 		"id": "guardian_choice",
-		"label": "Guardian Select",
-		"summary": "Choose between 巢脉母 and 酸冠母 before Battle 1. Choice persists for the run.",
+		"label": "守护者选择",
+		"summary": "在第一场战斗前选择巢脉母或酸冠母，选择后整局固定。",
 	},
 	{
 		"id": "battle_1",
-		"label": "Battle 1",
-		"summary": "M1 queue entries deploy through M2 lanes and record the first machine-chain sample.",
+		"label": "第一场战斗",
+		"summary": "M1 队列条目通过 M2 三路战场部署，并记录第一段机器因果样本。",
 	},
 	{
 		"id": "first_reward",
-		"label": "First Reward",
-		"summary": "Pool Pocket, Prime Charge, and Slot Primer anchor Launch / Tuning / Unit.",
+		"label": "第一次奖励",
+		"summary": "池袋、预充强化、槽位底火分别锚定发射仓、调校仓、单位仓。",
 	},
 	{
 		"id": "shop_gold_rest",
-		"label": "Shop / Gold / Rest",
-		"summary": "First-pass Gold faucet, one neutral modifier purchase cap, and Rest records are implemented.",
+		"label": "商店 / 金币 / 休整",
+		"summary": "已实现第一版调试金币来源、一个中立修正购买上限和休整记录。",
 	},
 	{
 		"id": "counter",
-		"label": "Counter Battles",
-		"summary": "Pool Polluter, Echo Breaker, and Stagger Punisher expose warning, target, effect, and log records.",
+		"label": "反制战斗",
+		"summary": "池污染者、复写破坏者、断档惩罚者都有预警、目标、效果和日志记录。",
 	},
 	{
 		"id": "endpoint",
-		"label": "Endpoint",
-		"summary": "Endpoint Guardian uses Telegraphed Sweep warning and records win/loss conclusion.",
+		"label": "终点战",
+		"summary": "终点守护者使用预告横扫，并记录胜负结论。",
 	},
 	{
 		"id": "result_page",
-		"label": "Result Page",
-		"summary": "Result page fields are populated from real M3 run data and checkpoint telemetry.",
+		"label": "结算页",
+		"summary": "结算页字段来自 M3 本局真实数据和检查点记录。",
 	},
 ]
 

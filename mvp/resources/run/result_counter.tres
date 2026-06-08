@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1")
 field_id = &"result.counter"
-checkpoint = "Counters"
+checkpoint = "反制"
 display_name = "主要反制"
-purpose = "Record which machine component was attacked by enemy counter pressure."
+purpose = "记录敌人反制攻击了哪个机器组件。"

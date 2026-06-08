@@ -4,6 +4,7 @@ extends Control
 const M1ModelScript := preload("res://scripts/ball_machine/machine_causality_model.gd")
 const ModelScript := preload("res://scripts/battlefield/battlefield_deploy_model.gd")
 const ViewScript := preload("res://scripts/battlefield/battlefield_deploy_view.gd")
+const UI_SCALE := 1.22
 
 var _m1_model: RefCounted = M1ModelScript.new()
 var _model: RefCounted = ModelScript.new()
@@ -99,15 +100,15 @@ func _build_layout() -> void:
 	root.add_child(_view)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(430, 0)
+	panel.custom_minimum_size = Vector2(540, 0)
 	root.add_child(panel)
 
 	var side := VBoxContainer.new()
 	side.add_theme_constant_override("separation", 10)
 	panel.add_child(side)
 
-	side.add_child(_make_label("M2 Battlefield / Deploy Lane Debug", 21))
-	side.add_child(_make_label("Click a battlefield lane directly to set Deploy Lane.", 13))
+	side.add_child(_make_label("M2 战场 / 部署路线调试", 21))
+	side.add_child(_make_label("直接点击战场路线即可切换部署路线。", 13))
 
 	_status_label = _make_label("", 14)
 	side.add_child(_status_label)
@@ -117,51 +118,51 @@ func _build_layout() -> void:
 	side.add_child(_guardian_label)
 
 	side.add_child(_make_separator())
-	side.add_child(_make_label("Queue / Enemy Controls", 15))
+	side.add_child(_make_label("队列 / 敌人控制", 15))
 	var queue_row := GridContainer.new()
 	queue_row.columns = 2
 	queue_row.add_theme_constant_override("h_separation", 6)
 	queue_row.add_theme_constant_override("v_separation", 6)
 	side.add_child(queue_row)
-	_add_button(queue_row, "Generate Queue Entry", Callable(self, "_on_generate_queue_pressed"))
-	_add_button(queue_row, "Deploy Queue Head", Callable(self, "_on_deploy_pressed"))
-	_add_button(queue_row, "Spawn Enemy", Callable(self, "_on_spawn_enemy_pressed"))
-	_add_button(queue_row, "Step Battle", Callable(self, "_on_step_pressed"))
-	_add_button(queue_row, "Pause / Run", Callable(self, "_on_pause_pressed"))
-	_add_button(queue_row, "Reset", Callable(self, "_on_reset_pressed"))
+	_add_button(queue_row, "生成队列条目", Callable(self, "_on_generate_queue_pressed"))
+	_add_button(queue_row, "部署队首", Callable(self, "_on_deploy_pressed"))
+	_add_button(queue_row, "生成敌人", Callable(self, "_on_spawn_enemy_pressed"))
+	_add_button(queue_row, "推进战斗", Callable(self, "_on_step_pressed"))
+	_add_button(queue_row, "暂停 / 运行", Callable(self, "_on_pause_pressed"))
+	_add_button(queue_row, "重置", Callable(self, "_on_reset_pressed"))
 
-	side.add_child(_make_label("Lane State Debug", 15))
+	side.add_child(_make_label("路线状态调试", 15))
 	var state_row := GridContainer.new()
 	state_row.columns = 2
 	state_row.add_theme_constant_override("h_separation", 6)
 	state_row.add_theme_constant_override("v_separation", 6)
 	side.add_child(state_row)
-	_add_button(state_row, "Force Pushing", Callable(self, "_on_force_state_pressed").bind("pushing"))
-	_add_button(state_row, "Force Stalled", Callable(self, "_on_force_state_pressed").bind("stalled"))
-	_add_button(state_row, "Force Leaking", Callable(self, "_on_force_state_pressed").bind("leaking"))
-	_add_button(state_row, "Break Gate", Callable(self, "_on_force_state_pressed").bind("gate broken"))
-	_add_button(state_row, "Force Invading", Callable(self, "_on_force_state_pressed").bind("invading"))
-	_add_button(state_row, "Warning T1", Callable(self, "_on_warning_pressed"))
+	_add_button(state_row, "强制推进", Callable(self, "_on_force_state_pressed").bind("pushing"))
+	_add_button(state_row, "强制僵持", Callable(self, "_on_force_state_pressed").bind("stalled"))
+	_add_button(state_row, "强制漏怪", Callable(self, "_on_force_state_pressed").bind("leaking"))
+	_add_button(state_row, "击破路闸", Callable(self, "_on_force_state_pressed").bind("gate broken"))
+	_add_button(state_row, "强制入侵", Callable(self, "_on_force_state_pressed").bind("invading"))
+	_add_button(state_row, "预警 1 级", Callable(self, "_on_warning_pressed"))
 
-	side.add_child(_make_label("Battle Result Debug", 15))
+	side.add_child(_make_label("战斗结果调试", 15))
 	var result_row := HBoxContainer.new()
 	result_row.add_theme_constant_override("separation", 6)
 	side.add_child(result_row)
-	_add_button(result_row, "Resolve Win", Callable(self, "_on_resolve_pressed").bind("player_win"))
-	_add_button(result_row, "Resolve Loss", Callable(self, "_on_resolve_pressed").bind("player_loss"))
+	_add_button(result_row, "结算胜利", Callable(self, "_on_resolve_pressed").bind("player_win"))
+	_add_button(result_row, "结算失败", Callable(self, "_on_resolve_pressed").bind("player_loss"))
 
 	side.add_child(_make_separator())
-	side.add_child(_make_label("Lanes", 15))
+	side.add_child(_make_label("路线", 15))
 	_lane_list = VBoxContainer.new()
 	_lane_list.add_theme_constant_override("separation", 3)
 	side.add_child(_lane_list)
 
-	side.add_child(_make_label("Units", 15))
+	side.add_child(_make_label("单位", 15))
 	_unit_list = VBoxContainer.new()
 	_unit_list.add_theme_constant_override("separation", 3)
 	side.add_child(_unit_list)
 
-	side.add_child(_make_label("Event Log", 15))
+	side.add_child(_make_label("事件日志", 15))
 	_log_list = VBoxContainer.new()
 	_log_list.add_theme_constant_override("separation", 3)
 	side.add_child(_log_list)
@@ -171,24 +172,24 @@ func _refresh() -> void:
 	var summary: Dictionary = _model.get_debug_summary()
 	_view.set_model(_model)
 
-	_status_label.text = "Selected Deploy Lane: %s | %s | %.1fs" % [
-		summary.get("selected_lane_name", "Mid"),
-		summary.get("battle_state", "running"),
+	_status_label.text = "部署路线：%s | %s | %.1f 秒" % [
+		_display_lane(summary.get("selected_lane_name", "Mid")),
+		_display_battle_state(summary.get("battle_state", "running")),
 		float(summary.get("battle_time_seconds", 0.0)),
 	]
 
 	var queue_preview: Array = summary.get("queue_preview", [])
 	if queue_preview.is_empty():
-		_queue_label.text = "Queue head: empty"
+		_queue_label.text = "队首：空"
 	else:
 		var head: Dictionary = queue_preview[0]
-		_queue_label.text = "Queue head -> %s | %s | source S%d" % [
-			head.get("deploy_lane_name", ""),
+		_queue_label.text = "队首 -> %s | %s | 来源槽 %d" % [
+			_display_lane(head.get("deploy_lane_name", "")),
 			head.get("queue_entry_id", ""),
 			head.get("source_slot_id", 0),
 		]
 
-	_guardian_label.text = "Player Guardian HP %d/%d | Enemy Guardian HP %d/%d" % [
+	_guardian_label.text = "玩家守护者生命 %d/%d | 敌方守护者生命 %d/%d" % [
 		int(summary.get("player_guardian_hp", 0)),
 		int(summary.get("player_guardian_max_hp", 1)),
 		int(summary.get("enemy_guardian_hp", 0)),
@@ -200,9 +201,9 @@ func _refresh() -> void:
 	for lane_id in [&"left", &"mid", &"right"]:
 		var lane_data: Dictionary = lanes.get(lane_id, {})
 		_lane_list.add_child(_make_label(
-			"%s | %s | danger %d | P gate %d | E gate %d" % [
-				lane_data.get("lane_name", ""),
-				lane_data.get("state", "idle"),
+			"%s | %s | 危险 %d | 我方闸 %d | 敌方闸 %d" % [
+				_display_lane(lane_data.get("lane_name", "")),
+				_display_lane_state(lane_data.get("state", "idle")),
 				int(lane_data.get("danger_tier", 0)),
 				int(lane_data.get("player_gate_hp", 0)),
 				int(lane_data.get("enemy_gate_hp", 0)),
@@ -213,19 +214,19 @@ func _refresh() -> void:
 	_clear_container(_unit_list)
 	var units: Array = summary.get("units", [])
 	if units.is_empty():
-		_unit_list.add_child(_make_label("none", 11))
+		_unit_list.add_child(_make_label("无", 11))
 	else:
 		var unit_start: int = max(0, units.size() - 6)
 		for unit in units.slice(unit_start):
 			_unit_list.add_child(_make_label(
-				"%s | %s | %s %.1f | HP %d/%d | %s" % [
+				"%s | %s | %s %.1f | 生命 %d/%d | %s" % [
 					unit.get("display_name", ""),
-					unit.get("side", ""),
-					unit.get("lane_name", ""),
+					_display_side(unit.get("side", "")),
+					_display_lane(unit.get("lane_name", "")),
 					float(unit.get("path_pos", 0.0)),
 					int(unit.get("hp", 0)),
 					int(unit.get("max_hp", 0)),
-					unit.get("state", ""),
+					_display_unit_state(unit.get("state", "")),
 				],
 				10
 			))
@@ -237,7 +238,7 @@ func _refresh() -> void:
 		_log_list.add_child(_make_label(
 			"%.1f | %s | %s" % [
 				float(event.get("time", 0.0)),
-				event.get("state", ""),
+				_display_event_state(event.get("state", "")),
 				event.get("description", ""),
 			],
 			10
@@ -308,7 +309,7 @@ func _make_label(text: String, font_size: int) -> Label:
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_font_size_override("font_size", _scaled_font(font_size))
 	return label
 
 
@@ -321,6 +322,8 @@ func _make_separator() -> HSeparator:
 func _add_button(parent: Node, text: String, callback: Callable) -> void:
 	var button := Button.new()
 	button.text = text
+	button.custom_minimum_size = Vector2(0, 38)
+	button.add_theme_font_size_override("font_size", _scaled_font(13))
 	button.pressed.connect(callback)
 	parent.add_child(button)
 
@@ -329,3 +332,101 @@ func _clear_container(container: Node) -> void:
 	for child in container.get_children():
 		container.remove_child(child)
 		child.free()
+
+
+func _display_lane(lane) -> String:
+	match str(lane):
+		"Left", "left":
+			return "左路"
+		"Mid", "mid":
+			return "中路"
+		"Right", "right":
+			return "右路"
+	return str(lane)
+
+
+func _display_battle_state(state) -> String:
+	match str(state):
+		"running":
+			return "进行中"
+		"player_win":
+			return "玩家胜利"
+		"player_loss":
+			return "玩家失败"
+	return str(state)
+
+
+func _display_lane_state(state) -> String:
+	match str(state):
+		"idle":
+			return "空闲"
+		"pushing":
+			return "推进"
+		"stalled":
+			return "僵持"
+		"leaking":
+			return "漏怪"
+		"gate broken":
+			return "路闸破损"
+		"invading":
+			return "入侵"
+	return str(state)
+
+
+func _display_unit_state(state) -> String:
+	match str(state):
+		"marching":
+			return "行军"
+		"unit attacking":
+			return "攻击单位"
+		"attacking gate":
+			return "攻击路闸"
+		"attacking guardian":
+			return "攻击守护者"
+		"dead":
+			return "阵亡"
+	return str(state)
+
+
+func _display_event_state(state) -> String:
+	match str(state):
+		"battle reset":
+			return "战场重置"
+		"lane selected":
+			return "选择路线"
+		"queue entry added":
+			return "队列加入"
+		"queue deployed":
+			return "队列部署"
+		"enemy spawned":
+			return "敌人出现"
+		"lane warning":
+			return "路线预警"
+		"gate broken":
+			return "路闸击破"
+		"battle resolved":
+			return "战斗结算"
+		"unit spawned":
+			return "单位出现"
+		"unit attacking":
+			return "单位攻击"
+		"gate damaged":
+			return "路闸受击"
+		"guardian damaged":
+			return "守护者受击"
+		"unit died":
+			return "单位阵亡"
+	return str(state)
+
+
+func _display_side(side) -> String:
+	match str(side):
+		"player":
+			return "玩家侧"
+		"enemy":
+			return "敌方侧"
+	return str(side)
+
+
+func _scaled_font(font_size: int) -> int:
+	return int(round(float(font_size) * UI_SCALE))

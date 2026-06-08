@@ -6,6 +6,6 @@
 script = ExtResource("1")
 component_id = &"unit.slot_exposure_gate"
 warehouse = "Unit"
-display_name = "Unit.Slot.Exposure Gate"
+display_name = "单位槽暴露闸门"
 component_kind = "slot_visibility"
-placeholder_note = "M0 placeholder for low-to-high slot exposure. No physics blocker implemented."
+placeholder_note = "M0 低到高槽位暴露占位。"

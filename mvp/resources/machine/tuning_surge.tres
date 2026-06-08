@@ -6,6 +6,6 @@
 script = ExtResource("1")
 component_id = &"tuning.surge"
 warehouse = "Tuning"
-display_name = "Surge"
+display_name = "脉冲"
 component_kind = "tuning_slot"
-placeholder_note = "Fast landing placeholder. No queue delay effect implemented."
+placeholder_note = "快速落地占位。"

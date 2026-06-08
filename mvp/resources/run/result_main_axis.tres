@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1")
 field_id = &"result.main_axis"
-checkpoint = "Result Overview"
+checkpoint = "结果总览"
 display_name = "主机器轴"
-purpose = "Record whether the run mainly strengthened Launch, Tuning, or Unit."
+purpose = "记录本局主要强化发射仓、调校仓还是单位仓。"

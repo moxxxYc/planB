@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1")
 field_id = &"result.deploy_lane"
-checkpoint = "Endpoint"
-display_name = "Deploy Lane 影响"
-purpose = "Record whether key lane choices changed deployment outcomes."
+checkpoint = "终点"
+display_name = "部署路线影响"
+purpose = "记录关键路线选择是否改变部署结果。"

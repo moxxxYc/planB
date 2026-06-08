@@ -4,6 +4,8 @@ extends Control
 const ModelScript := preload("res://scripts/ball_machine/machine_causality_model.gd")
 const ViewScript := preload("res://scripts/ball_machine/machine_causality_view.gd")
 
+const UI_SCALE := 1.24
+
 var _model: RefCounted = ModelScript.new()
 var _view: Control
 var _supply_label: Label
@@ -100,14 +102,14 @@ func _build_layout() -> void:
 	root.add_child(_view)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(430, 0)
+	panel.custom_minimum_size = Vector2(540, 0)
 	root.add_child(panel)
 
 	var side := VBoxContainer.new()
 	side.add_theme_constant_override("separation", 10)
 	panel.add_child(side)
 
-	side.add_child(_make_label("M1 Machine Causality", 22))
+	side.add_child(_make_label("M1 机器因果调试", 23))
 	_supply_label = _make_label("", 14)
 	side.add_child(_supply_label)
 	_time_label = _make_label("", 14)
@@ -116,14 +118,14 @@ func _build_layout() -> void:
 	side.add_child(_tuning_label)
 
 	side.add_child(_make_separator())
-	side.add_child(_make_label("Battle Time", 15))
+	side.add_child(_make_label("战斗时间", 16))
 	var time_row := HBoxContainer.new()
 	time_row.add_theme_constant_override("separation", 6)
 	side.add_child(time_row)
 	for seconds in [0, 24, 54, 96]:
-		_add_button(time_row, "%ds" % seconds, Callable(self, "_on_time_pressed").bind(seconds))
+		_add_button(time_row, "%d 秒" % seconds, Callable(self, "_on_time_pressed").bind(seconds))
 
-	side.add_child(_make_label("Tuning Result", 15))
+	side.add_child(_make_label("调校结果", 16))
 	var tuning_row := GridContainer.new()
 	tuning_row.columns = 4
 	tuning_row.add_theme_constant_override("h_separation", 6)
@@ -131,43 +133,43 @@ func _build_layout() -> void:
 	for tuning_result in _model.TUNING_RESULTS:
 		_add_button(
 			tuning_row,
-			tuning_result,
+			_display_tuning(tuning_result),
 			Callable(self, "_on_tuning_pressed").bind(tuning_result)
 		)
 
-	side.add_child(_make_label("Unit Slot Hit", 15))
+	side.add_child(_make_label("单位槽命中", 16))
 	var slot_row := GridContainer.new()
 	slot_row.columns = 4
 	slot_row.add_theme_constant_override("h_separation", 6)
 	side.add_child(slot_row)
 	for slot_id in [1, 2, 3, 4]:
-		_add_button(slot_row, "Slot %d" % slot_id, Callable(self, "_on_slot_pressed").bind(slot_id))
+		_add_button(slot_row, "槽 %d" % slot_id, Callable(self, "_on_slot_pressed").bind(slot_id))
 
-	side.add_child(_make_label("Physical State", 15))
+	side.add_child(_make_label("物理状态", 16))
 	var state_row := GridContainer.new()
 	state_row.columns = 2
 	state_row.add_theme_constant_override("h_separation", 6)
 	state_row.add_theme_constant_override("v_separation", 6)
 	side.add_child(state_row)
-	_add_button(state_row, "Blocked Bounce", Callable(self, "_on_blocked_pressed"))
-	_add_button(state_row, "Split Return", Callable(self, "_on_state_pressed").bind("Split Return"))
-	_add_button(state_row, "Recycle Return", Callable(self, "_on_state_pressed").bind("Recycle Return"))
-	_add_button(state_row, "Waste", Callable(self, "_on_state_pressed").bind("Waste"))
-	_add_button(state_row, "Logic Settlement", Callable(self, "_on_state_pressed").bind("Logic Settlement"))
-	_add_button(state_row, "Reset", Callable(self, "_on_reset_pressed"))
+	_add_button(state_row, "阻挡反弹", Callable(self, "_on_blocked_pressed"))
+	_add_button(state_row, "分裂回流", Callable(self, "_on_state_pressed").bind("Split Return"))
+	_add_button(state_row, "回收回流", Callable(self, "_on_state_pressed").bind("Recycle Return"))
+	_add_button(state_row, "废弃", Callable(self, "_on_state_pressed").bind("Waste"))
+	_add_button(state_row, "逻辑结算", Callable(self, "_on_state_pressed").bind("Logic Settlement"))
+	_add_button(state_row, "重置", Callable(self, "_on_reset_pressed"))
 
 	side.add_child(_make_separator())
-	side.add_child(_make_label("Unit Progress", 15))
+	side.add_child(_make_label("单位进度", 16))
 	_slot_list = VBoxContainer.new()
 	_slot_list.add_theme_constant_override("separation", 3)
 	side.add_child(_slot_list)
 
-	side.add_child(_make_label("Queue", 15))
+	side.add_child(_make_label("队列", 16))
 	_queue_list = VBoxContainer.new()
 	_queue_list.add_theme_constant_override("separation", 3)
 	side.add_child(_queue_list)
 
-	side.add_child(_make_label("Event Log", 15))
+	side.add_child(_make_label("事件日志", 16))
 	_log_list = VBoxContainer.new()
 	_log_list.add_theme_constant_override("separation", 3)
 	side.add_child(_log_list)
@@ -177,18 +179,18 @@ func _refresh() -> void:
 	_view.set_model(_model)
 
 	var supply: Dictionary = _model.get_supply_summary()
-	_supply_label.text = "Forge / Pool / Launcher: Pool %d / %d, Launcher active" % [
+	_supply_label.text = "造球器 / 球池 / 发射器：球池 %d / %d，发射器运行中" % [
 		supply["pool_count"],
 		supply["pool_capacity"],
 	]
-	_time_label.text = "Battle time: %.0fs" % _model.battle_time_seconds
-	_tuning_label.text = "Current Tuning: %s" % _model.selected_tuning_result
+	_time_label.text = "战斗时间：%.0f 秒" % _model.battle_time_seconds
+	_tuning_label.text = "当前调校：%s" % _display_tuning(_model.selected_tuning_result)
 
 	_clear_container(_slot_list)
 	for slot in _model.get_unit_slots():
-		var accepting := "open" if slot["accepting_hit"] else "blocked"
+		var accepting := "开放" if slot["accepting_hit"] else "被挡"
 		_slot_list.add_child(_make_label(
-			"S%d %d / %d, exposure %.0f%%, %s" % [
+			"槽 %d：%d / %d，暴露 %.0f%%，%s" % [
 				slot["slot_id"],
 				slot["progress_current"],
 				slot["progress_required"],
@@ -200,17 +202,17 @@ func _refresh() -> void:
 
 	_clear_container(_queue_list)
 	if _model.queue_entries.is_empty():
-		_queue_list.add_child(_make_label("empty", 12))
+		_queue_list.add_child(_make_label("空", 12))
 	else:
 		var queue_start: int = max(0, _model.queue_entries.size() - 4)
 		var recent_entries: Array = _model.queue_entries.slice(queue_start)
 		for entry in recent_entries:
 			_queue_list.add_child(_make_label(
-				"%s | source S%d | %s | %s" % [
+				"%s | 来源槽 %d | %s | %s" % [
 					entry["queue_entry_id"],
 					entry["source_slot_id"],
-					entry["tuning_result"],
-					entry["trigger_chain"],
+					_display_tuning(entry["tuning_result"]),
+					_display_chain(entry["trigger_chain"]),
 				],
 				11
 			))
@@ -222,7 +224,7 @@ func _refresh() -> void:
 		_log_list.add_child(_make_label(
 			"%s | %s | %s" % [
 				event["chain_id"],
-				event["state"],
+				_display_state(event["state"]),
 				event["description"],
 			],
 			11
@@ -264,7 +266,7 @@ func _make_label(text: String, font_size: int) -> Label:
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_font_size_override("font_size", _scaled_font(font_size))
 	return label
 
 
@@ -277,6 +279,8 @@ func _make_separator() -> HSeparator:
 func _add_button(parent: Node, text: String, callback: Callable) -> void:
 	var button := Button.new()
 	button.text = text
+	button.custom_minimum_size = Vector2(0, 36)
+	button.add_theme_font_size_override("font_size", _scaled_font(13))
 	button.pressed.connect(callback)
 	parent.add_child(button)
 
@@ -285,3 +289,47 @@ func _clear_container(container: Node) -> void:
 	for child in container.get_children():
 		container.remove_child(child)
 		child.free()
+
+
+func _display_tuning(tuning_result: String) -> String:
+	match tuning_result:
+		"Gate":
+			return "闸门"
+		"Prime":
+			return "预充"
+		"Echo":
+			return "复写"
+		"Surge":
+			return "脉冲"
+	return tuning_result
+
+
+func _display_state(state: String) -> String:
+	match state:
+		"Natural Hit":
+			return "自然命中"
+		"Blocked Bounce":
+			return "阻挡反弹"
+		"Valid Unit Hit":
+			return "有效单位命中"
+		"Split Return":
+			return "分裂回流"
+		"Recycle Return":
+			return "回收回流"
+		"Waste":
+			return "废弃"
+		"Logic Settlement":
+			return "逻辑结算"
+	return state
+
+
+func _display_chain(chain: String) -> String:
+	return chain \
+		.replace("Launch", "发射仓") \
+		.replace("Tuning", "调校仓") \
+		.replace("Unit", "单位仓") \
+		.replace("Queue", "队列")
+
+
+func _scaled_font(font_size: int) -> int:
+	return int(round(float(font_size) * UI_SCALE))

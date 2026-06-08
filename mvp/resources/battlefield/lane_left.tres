@@ -5,8 +5,8 @@
 [resource]
 script = ExtResource("1")
 lane_id = &"left"
-display_name = "Left"
+display_name = "左路"
 order_index = 0
 is_default_deploy_lane = false
 max_danger_tier = 3
-placeholder_note = "M0 lane placeholder. No path, gate, units, or danger calculation implemented."
+placeholder_note = "M0 路线占位。"
