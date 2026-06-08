@@ -432,10 +432,12 @@ func _display_event_state(state) -> String:
 
 
 func _display_value(value) -> String:
+	if value is bool:
+		return "是" if value else "否"
 	if value is Dictionary:
 		var parts: Array[String] = []
 		for key in (value as Dictionary).keys().slice(0, min(5, (value as Dictionary).size())):
-			parts.append("%s=%s" % [_display_telemetry_key(key), _display_value((value as Dictionary)[key])])
+			parts.append("%s=%s" % [_display_data_key(key), _display_value((value as Dictionary)[key])])
 		if (value as Dictionary).size() > parts.size():
 			parts.append("...")
 		return "{%s}" % ", ".join(parts)
@@ -449,6 +451,29 @@ func _display_value(value) -> String:
 		return "[%s]" % ", ".join(parts)
 	var text := str(value)
 	return text \
+		.replace("hive.vein_mother", "巢脉母") \
+		.replace("hive.acid_crown_mother", "酸冠母") \
+		.replace("hive.short_fang", "短牙虫") \
+		.replace("hive.shield_shell", "盾壳虫") \
+		.replace("hive.acid_sac", "酸囊虫") \
+		.replace("hive.crush_shell_beast", "碾壳兽") \
+		.replace("enemy.grunt", "敌方步兵") \
+		.replace("enemy.raider", "敌方突袭者") \
+		.replace("enemy.brute", "敌方重兵") \
+		.replace("pool_pocket", "池袋") \
+		.replace("prime_charge", "预充强化") \
+		.replace("slot_primer", "槽位底火") \
+		.replace("front_recycle", "前线回收") \
+		.replace("junk_sieve", "废料筛") \
+		.replace("surge_buffer", "脉冲缓冲") \
+		.replace("queue_brace", "队列支架") \
+		.replace("muster_pair", "集结成双") \
+		.replace("echo_latch", "复写锁扣") \
+		.replace("pool_polluter", "池污染者") \
+		.replace("echo_breaker", "复写破坏者") \
+		.replace("stagger_punisher", "断档惩罚者") \
+		.replace("first_shop", "第一商店") \
+		.replace("endpoint_prep", "终点准备") \
 		.replace("Guardian Select", "守护者选择") \
 		.replace("First Reward", "第一奖励") \
 		.replace("Second Reward", "第二奖励") \
@@ -456,6 +481,38 @@ func _display_value(value) -> String:
 		.replace("Result Page", "结算页") \
 		.replace("Shop / Gold / Rest", "商店 / 金币 / 休整") \
 		.replace("Battle 3 with counter", "第三战（带反制）") \
+		.replace("Battle 1", "第一战") \
+		.replace("Battle 2", "第二战") \
+		.replace("Battle 4", "第四战") \
+		.replace("Battle 5", "第五战") \
+		.replace("Reward / Shop", "奖励 / 商店") \
+		.replace("Second Reward", "第二奖励") \
+		.replace("Reward", "奖励") \
+		.replace("Shop", "商店") \
+		.replace("Natural Hit", "自然命中") \
+		.replace("Blocked Bounce", "阻挡反弹") \
+		.replace("Valid Unit Hit", "有效单位命中") \
+		.replace("Split Return", "分裂回流") \
+		.replace("Recycle Return", "回收回流") \
+		.replace("Waste", "废弃") \
+		.replace("Logic Settlement", "逻辑结算") \
+		.replace("Tuning Path", "调校路径") \
+		.replace("capacity", "容量") \
+		.replace("pollution", "污染") \
+		.replace("value_bonus", "价值加成") \
+		.replace("repeat_value", "重复价值") \
+		.replace("target_lock", "目标锁定") \
+		.replace("charge_buffer", "充能缓冲") \
+		.replace("progress_floor", "进度底线") \
+		.replace("empty_gap_response", "空窗响应") \
+		.replace("empty_gap", "空窗") \
+		.replace("merge_window", "合并窗口") \
+		.replace("fire_behavior", "发射行为") \
+		.replace("return_position", "回流位置") \
+		.replace("player_win", "玩家胜利") \
+		.replace("player_loss", "玩家失败") \
+		.replace("player", "玩家侧") \
+		.replace("enemy", "敌方侧") \
 		.replace("Guardian", "守护者") \
 		.replace("Launch", "发射") \
 		.replace("Tuning", "调校") \
@@ -472,8 +529,6 @@ func _display_value(value) -> String:
 		.replace("Left", "左路") \
 		.replace("Mid", "中路") \
 		.replace("Right", "右路") \
-		.replace("player_win", "玩家胜利") \
-		.replace("player_loss", "玩家失败") \
 		.replace("win", "胜利") \
 		.replace("loss", "失败") \
 		.replace("Anchor", "锚点") \
@@ -484,6 +539,143 @@ func _display_value(value) -> String:
 		.replace("reached_endpoint", "到达终点") \
 		.replace("victory", "胜利") \
 		.replace("ending_hp", "结束生命")
+
+
+func _display_data_key(key) -> String:
+	match str(key):
+		"queue_entry_id":
+			return "队列条目"
+		"source_slot", "source_slot_id", "source_slot_label":
+			return "来源槽"
+		"tuning_result":
+			return "调校结果"
+		"trigger_chain":
+			return "触发链"
+		"recent_machine_events":
+			return "近期机器事件"
+		"slot_id":
+			return "单位槽"
+		"label":
+			return "标签"
+		"progress_current":
+			return "当前进度"
+		"progress_required":
+			return "需求进度"
+		"exposure_start_seconds":
+			return "开始暴露秒数"
+		"full_exposure_seconds":
+			return "完全暴露秒数"
+		"exposure_ratio":
+			return "暴露比例"
+		"accepting_hit":
+			return "接受命中"
+		"selected_lane", "deploy_lane", "lane":
+			return "部署路线"
+		"changed_lane":
+			return "是否改路"
+		"Left":
+			return "左路"
+		"Mid":
+			return "中路"
+		"Right":
+			return "右路"
+		"current_hp":
+			return "当前生命"
+		"rest_records":
+			return "休整记录"
+		"window":
+			return "窗口"
+		"gold_spent":
+			return "花费金币"
+		"gold_before":
+			return "之前金币"
+		"gold_after":
+			return "之后金币"
+		"hp_before":
+			return "之前生命"
+		"hp_after":
+			return "之后生命"
+		"hp_restored":
+			return "恢复生命"
+		"counter_id":
+			return "反制"
+		"display_name":
+			return "显示名"
+		"battle_number", "battle":
+			return "战斗编号"
+		"warning":
+			return "预警"
+		"target_component":
+			return "目标组件"
+		"visible_effect":
+			return "可见效果"
+		"log_record":
+			return "日志记录"
+		"modifier_id":
+			return "修改项"
+		"source_pool":
+			return "来源池"
+		"warehouse":
+			return "仓"
+		"operation":
+			return "操作"
+		"role_tag", "offer_role":
+			return "职责"
+		"player_read":
+			return "玩家读法"
+		"reason":
+			return "原因"
+		"inventory":
+			return "库存"
+		"purchase":
+			return "购买"
+		"rest":
+			return "休整"
+		"gold":
+			return "金币"
+		"debug_first_pass_balance":
+			return "调试首版平衡"
+		"outcome":
+			return "结果"
+		"primary_axis_payoff", "payoff":
+			return "主轴收益"
+		"break_reason":
+			return "失败原因"
+		"counter":
+			return "反制"
+		"player_guardian_hp":
+			return "玩家守护者生命"
+		"endpoint_guardian_hp":
+			return "终点守护者生命"
+		"reached_endpoint":
+			return "到达终点"
+		"victory":
+			return "胜利"
+		"ending_hp":
+			return "结束生命"
+		"share":
+			return "占比"
+		"debug_key_entry_count":
+			return "关键条目数"
+		"unit_id", "unit_name":
+			return "单位"
+		"impact":
+			return "影响"
+		"result":
+			return "结果"
+		"chain_id":
+			return "链路"
+		"component":
+			return "组件"
+		"state":
+			return "状态"
+		"description":
+			return "说明"
+		"data":
+			return "数据"
+		"time":
+			return "时间"
+	return _display_telemetry_key(key)
 
 
 func _scaled_font(font_size: int) -> int:
