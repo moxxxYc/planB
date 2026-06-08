@@ -13,6 +13,8 @@ Level 4: 导出烟测（桌面 / Web）
 Level 5: 自动化测试 / CI
 ```
 
+验证工具：**优先用 GoPeak MCP（`gopeak`）跑场景 / 读诊断 / 抓报错 / 截图自检（见第 10 节）**；没有 MCP 时回退 CLI 脚本（第 2 节）。
+
 ---
 
 ## 2. Headless 检查
@@ -157,3 +159,30 @@ mkdir -p build/desktop
 ```
 
 没有实际运行的验证写 `Not run: 原因`，不能写“应该可以”。
+
+---
+
+## 10. GoPeak MCP（gopeak）验证工作流
+
+本项目首选用 **GoPeak**（MCP server 名 `gopeak`）做验证。它给 AI 一个 `edit → run → inspect → fix` 闭环，能覆盖前面大部分验证层级。
+
+调用 MCP 工具前先按规范读它的工具 schema，再调用；下面只给能力到验证层级的映射，具体工具名以 `tools/list` 为准（compact profile 默认只暴露核心工具，需要更多能力时按 GoPeak 文档激活对应 capability group）。
+
+| 验证层级 | 用 GoPeak 怎么做 |
+|---|---|
+| Level 0 静态检查 | GDScript LSP 诊断（`lsp_*`）读编译/类型错误 |
+| Level 1 启动 | 启动编辑器 / 读 Godot 版本 |
+| Level 2 场景烟测 | 运行 / 停止指定场景，读调试输出 |
+| Level 3 玩法烟测 | 运行时读场景树、调用方法、注入输入、**截图**（球机物理、三路接战、Deploy 高亮可截图自检） |
+| 调试 | DAP 断点 / 单步 / 调用栈 |
+
+前提（没满足时相应能力不可用，要在汇报里写清楚）：
+
+- 已建 `mvp/project.godot`。
+- Godot 工程里启用了 GoPeak 的编辑器/运行时插件（`godot_mcp_editor`、`godot_mcp_runtime`）。
+- 需要 LSP / DAP 时，Godot 对应服务端口已开。
+- `GODOT_PATH` 指向 Godot 4.6。
+
+回退：上述前提没满足、或只需快速 headless 烟测时，用第 2 节的 `verify_godot.sh`。
+
+汇报验证结果时写清是**用 GoPeak 跑的还是脚本跑的**，截图/诊断/运行日志作为证据；没真跑写 `Not run: 原因`，不要因为"有 MCP"就假设验证通过。

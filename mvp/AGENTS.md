@@ -128,7 +128,30 @@ AI agent 不得擅自执行以下操作：
 
 ---
 
-## 6. Godot 代码基线
+## 6. 工具与技能分工（vibe coding 整体原则）
+
+本项目的开发由"设计 / 工程 / 验证 / 通用编码纪律"四层协作，各有归属，不能互相越界：
+
+| 层 | 用什么 | 管什么 |
+|---|---|---|
+| 设计 canon | gstack-game 技能链 + 根 `AGENTS.md` + `docs/*` | 做什么 / 不做什么、玩法规则、平衡口径（**设计阶段**） |
+| Godot 工程实现 | `mvp/AGENTS.md` + `mvp/docs/agent/*` | 代码怎么写、目录/场景/Signal/Resource 规范 |
+| 验证 | **GoPeak MCP（`gopeak`）优先**，回退 `verify_godot.sh` | 跑场景、读诊断、抓报错、截图自检（见第 8 节） |
+| 通用编码纪律 | superpowers（**仅实现阶段、Codex 内**） | 规划、调试、验证纪律、code review、git 流程 |
+
+superpowers 使用边界（重要，详见 `09-ai-coding-workflow.md`）：
+
+- **可用且与本规范同向**：`writing-plans` / `executing-plans`、`systematic-debugging`、`verification-before-completion`、`requesting/receiving-code-review`、`using-git-worktrees`、`finishing-a-development-branch`。
+- **`test-driven-development` 仅对纯逻辑层**（伤害结算、队列间隔、价格带、路径坐标、波次/配置解析）。球机物理、手感、场景接线、视觉、时序**不强行 TDD**，靠 GoPeak 跑起来+截图验证。
+- **不要用 `brainstorming` 碰游戏设计**。设计走 gstack-game 和设计 canon；设计阶段禁止用 superpowers 代替 gstack-game。
+- **`subagent-driven-development` 长自主跑要带人工检查点**：球机是手感驱动，agent 判断不了手感，且不得擅自替用户做决定。
+- **Cursor 内不加载 superpowers**（用户已在 Cursor 禁用）；它只在 Codex 实现阶段生效。
+
+冲突优先级：**设计 canon > 本项目 Godot 工程规则（`mvp/AGENTS.md` + `docs/agent/*`） > superpowers 等通用工程教条**。通用教条与 Godot 现实或项目 canon 冲突时，以项目文档为准。
+
+---
+
+## 7. Godot 代码基线
 
 - 使用 GDScript，Godot 4.6 API。
 - 球机/单位/投射等物理对象按 `05-gameplay-patterns.md` 选型（默认 `RigidBody2D` / `CharacterBody2D` / `Area2D`，由该对象职责决定）。
@@ -141,7 +164,7 @@ AI agent 不得擅自执行以下操作：
 
 ---
 
-## 7. 验证要求
+## 8. 验证要求
 
 最低验证梯度：
 
@@ -153,17 +176,22 @@ Level 3: 玩法烟测 — 人工或自动跑通本任务核心路径。
 Level 4: 导出烟测 — 导出相关任务尽量导出目标平台并运行。
 ```
 
-可使用（`GODOT_BIN` 指向 Godot 4.6 可执行文件）：
+验证工具优先级：
+
+- **优先用 GoPeak MCP（`gopeak`）** 驱动验证——运行场景、读取脚本诊断、抓运行时报错、截图自检。它能直接覆盖 Level 1/2/3，是本项目首选验证手段。
+- **回退**：没有 MCP 或只需快速 headless 烟测时，用 CLI 脚本（`GODOT_BIN` 指向 Godot 4.6）：
 
 ```bash
 GODOT_BIN=/path/to/Godot ./mvp/tools/verify_godot.sh
 ```
 
+GoPeak 的具体用法和前提见 `mvp/docs/agent/08-testing-validation.md` 第 10 节。
+
 如果 `mvp/project.godot` 尚不存在，`verify_godot.sh` 会报告 `Not run` 并以非 0 状态退出；这不算 Level 1 通过。创建 Godot 工程后，Level 1 必须真实打开 `mvp/` 工程并退出。
 
 ---
 
-## 8. 何时要求人工确认
+## 9. 何时要求人工确认
 
 遇到以下情况必须停止并要求确认，不能自行决定：
 
@@ -178,7 +206,7 @@ GODOT_BIN=/path/to/Godot ./mvp/tools/verify_godot.sh
 
 ---
 
-## 9. 分层文档索引
+## 10. 分层文档索引
 
 - `mvp/docs/agent/README.md` — 使用说明和维护规则
 - `mvp/docs/agent/01-project-structure.md` — 项目结构、命名、版本控制

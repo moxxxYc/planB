@@ -19,10 +19,12 @@ AI agent 必须采用“读现状 → 小计划 → 小改动 → 验证 → 汇
 需要读哪些设计文档（docs/*.md）？这次改动是否触碰设计 canon？
 是否会改 project.godot / autoload / input / export / 物理层？
 是否会动仓库根 AGENTS.md / docs/ / .gitignore？（默认不动，要动先确认）
-如何验证？（桌面 / Web）
+如何验证？（桌面 / Web）用什么验证？（优先 GoPeak MCP `gopeak`，回退 verify_godot.sh）
 ```
 
 如果无法回答，先检查文件，不要猜。
+
+验证手段优先级：有 GoPeak MCP（`gopeak`）时，优先用它运行场景、读 LSP 诊断、抓运行时报错、截图自检；没有或前提不满足时回退 `verify_godot.sh`。具体见 `08-testing-validation.md` 第 10 节。汇报时写清是用 MCP 还是脚本验证的，没真跑写 `Not run: 原因`。
 
 ---
 
@@ -129,3 +131,36 @@ Not run: 原因
 ```
 
 不能写“应该可以”当成验证结果。
+
+---
+
+## 10. 工具与技能边界（gopeak / gstack-game / superpowers）
+
+本项目分四层协作，整体原则见 `mvp/AGENTS.md` 第 6 节，这里给实现阶段的可操作边界。
+
+### 10.1 各层归属
+
+- **设计 canon** → gstack-game + 根 `AGENTS.md` + `docs/*`：决定做什么/不做什么。实现阶段不在代码里改设计。
+- **Godot 工程实现** → `mvp/AGENTS.md` + 本目录：决定代码怎么写。
+- **验证** → 优先 GoPeak MCP（`gopeak`），回退 `verify_godot.sh`，见 `08-testing-validation.md`。
+- **通用编码纪律** → superpowers（仅 Codex 实现阶段；Cursor 已禁用，不在 Cursor 加载）。
+
+### 10.2 superpowers 在本项目的使用边界
+
+superpowers 是引擎无关的通用工程纪律技能包，进入实现阶段可用，但按下面边界用：
+
+| superpowers skill | 在 planB 的用法 |
+|---|---|
+| `writing-plans` / `executing-plans` | ✅ 直接用，和"小步、最小改动"同向 |
+| `systematic-debugging` | ✅ 直接用，根因优先 |
+| `verification-before-completion` | ✅ 直接用，强化"亲自跑、没跑写 `Not run`" |
+| `requesting/receiving-code-review`、`using-git-worktrees`、`finishing-a-development-branch` | ✅ 通用流程纪律，可用 |
+| `test-driven-development` | ⚠️ **仅对纯逻辑层**：伤害结算、队列部署间隔、价格带、路径坐标换算、波次/配置解析。球机物理、手感、场景接线、视觉、时序**不强行 TDD**，用 GoPeak 跑起来 + 截图验证 |
+| `brainstorming` | ⛔ **不用于游戏设计**。设计走 gstack-game 和设计 canon；最多用于实现方案的小取舍 |
+| `subagent-driven-development` / `dispatching-parallel-agents` | ⚠️ 可用于加速，但**必须带人工检查点**：球机是手感驱动，agent 判断不了手感；且不得擅自替用户做决定 |
+
+### 10.3 冲突优先级
+
+**设计 canon > 本项目 Godot 工程规则 > superpowers 等通用工程教条。**
+
+当 superpowers 的通用做法（尤其 TDD 教条、brainstorming）与 Godot 现实或项目 canon 冲突时，以项目文档为准，不要为了贴合通用流程去给"测不了的物理/手感"硬写测试，或重开已锁的设计。
