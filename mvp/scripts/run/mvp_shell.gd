@@ -30,8 +30,8 @@ func _build_layout() -> void:
 	root.add_child(title)
 
 	root.add_child(_make_label(
-		"Godot 4.6 shell for M0 only. It names current docs, terms, data placeholders, "
-		+ "and a debug session stepper without implementing M1-M3 gameplay.",
+		"Godot 4.6 shell for current-doc MVP implementation. M0 data placeholders remain, "
+		+ "and M1 adds a scoped machine causality debug scene without M2/M3 systems.",
 		16
 	))
 
@@ -71,6 +71,11 @@ func _build_layout() -> void:
 	button.pressed.connect(_on_step_pressed)
 	root.add_child(button)
 
+	var machine_button := Button.new()
+	machine_button.text = "Open M1 Machine Causality Debug"
+	machine_button.pressed.connect(_on_machine_debug_pressed)
+	root.add_child(machine_button)
+
 
 func _make_label(text: String, font_size: int) -> Label:
 	var label := Label.new()
@@ -99,6 +104,10 @@ func _add_catalog_line(grid: GridContainer, label_text: String, prefix: String) 
 func _on_step_pressed() -> void:
 	_step_index = (_step_index + 1) % Manifest.SESSION_STEPS.size()
 	_refresh_step()
+
+
+func _on_machine_debug_pressed() -> void:
+	get_tree().change_scene_to_file("res://scenes/ball_machine/machine_causality_debug.tscn")
 
 
 func _refresh_step() -> void:

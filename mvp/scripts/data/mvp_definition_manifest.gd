@@ -3,10 +3,14 @@ extends RefCounted
 
 const REQUIRED_SCENES := [
 	"res://scenes/run/mvp_shell.tscn",
+	"res://scenes/ball_machine/machine_causality_debug.tscn",
 ]
 
 const REQUIRED_SCRIPTS := [
 	"res://scripts/run/mvp_shell.gd",
+	"res://scripts/ball_machine/machine_causality_model.gd",
+	"res://scripts/ball_machine/machine_causality_view.gd",
+	"res://scripts/ball_machine/machine_causality_debug.gd",
 	"res://scripts/data/machine_component_definition.gd",
 	"res://scripts/data/battle_lane_definition.gd",
 	"res://scripts/data/unit_template_definition.gd",
@@ -92,6 +96,7 @@ const SOURCE_DOCS := [
 	"docs/neutral-modifiers.md",
 	"docs/mvp-learning-checkpoints.md",
 	"docs/ball-machine-physical.md",
+	"docs/DESIGN.md",
 ]
 
 const SESSION_STEPS := [

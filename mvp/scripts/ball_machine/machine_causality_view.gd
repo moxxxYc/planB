@@ -1,0 +1,229 @@
+class_name MachineCausalityView
+extends Control
+
+const ModelScript := preload("res://scripts/ball_machine/machine_causality_model.gd")
+
+const COLOR_BG := Color("#171a18")
+const COLOR_PANEL := Color("#252923")
+const COLOR_PANEL_DIM := Color("#1c201d")
+const COLOR_TEXT := Color("#e8e1d2")
+const COLOR_LAUNCH := Color("#7bcb6b")
+const COLOR_TUNING := Color("#e6b450")
+const COLOR_UNIT := Color("#c58be8")
+const COLOR_ACTIVE := Color("#f4f0d8")
+const COLOR_WARNING := Color("#e84b4b")
+const COLOR_BLOCKER := Color(0.9, 0.9, 0.9, 0.28)
+
+var model: RefCounted = null
+
+
+func _ready() -> void:
+	custom_minimum_size = Vector2(760, 640)
+
+
+func set_model(next_model: RefCounted) -> void:
+	model = next_model
+	queue_redraw()
+
+
+func _draw() -> void:
+	if model == null:
+		return
+
+	var bounds := Rect2(Vector2.ZERO, size)
+	draw_rect(bounds, COLOR_BG, true)
+
+	var supply: Dictionary = model.get_supply_summary()
+	_draw_supply(Rect2(24, 18, 690, 72), supply)
+	_draw_board(
+		Rect2(24, 108, 690, 128),
+		"Launch",
+		["Tuning", "Split", "Recycle", "Waste"],
+		COLOR_LAUNCH
+	)
+	_draw_board(
+		Rect2(24, 254, 690, 128),
+		"Tuning",
+		model.TUNING_RESULTS,
+		COLOR_TUNING
+	)
+	_draw_unit_board(Rect2(24, 400, 690, 178))
+	_draw_queue_bridge(Rect2(438, 590, 276, 38))
+	_draw_active_ball()
+
+
+func _draw_supply(rect: Rect2, supply: Dictionary) -> void:
+	draw_rect(rect, COLOR_PANEL, true)
+	draw_rect(rect, COLOR_LAUNCH, false, 2.0)
+	_draw_text("Forge / Pool / Launcher", rect.position + Vector2(14, 22), 18, COLOR_TEXT)
+	_draw_text("Forge", rect.position + Vector2(18, 54), 14, COLOR_LAUNCH)
+
+	var pool_origin := rect.position + Vector2(116, 44)
+	var pool_count: int = supply.get("pool_count", 0)
+	var pool_capacity: int = supply.get("pool_capacity", 5)
+	for index in range(pool_capacity):
+		var pos: Vector2 = pool_origin + Vector2(index * 24.0, 0.0)
+		var color: Color = COLOR_LAUNCH if index < pool_count else Color(0.45, 0.48, 0.44, 1.0)
+		draw_circle(pos, 8.0, color)
+		draw_arc(pos, 10.0, 0.0, TAU, 24, COLOR_TEXT, 1.0)
+
+	_draw_text("Pool %d / %d" % [pool_count, pool_capacity], rect.position + Vector2(258, 54), 14, COLOR_TEXT)
+	_draw_text("Launcher", rect.position + Vector2(390, 54), 14, COLOR_LAUNCH)
+	draw_line(rect.position + Vector2(472, 48), rect.position + Vector2(548, 28), COLOR_ACTIVE, 3.0)
+	draw_circle(rect.position + Vector2(558, 26), 6.0, COLOR_ACTIVE)
+
+
+func _draw_board(rect: Rect2, title: String, slots: Array, accent: Color) -> void:
+	draw_rect(rect, COLOR_PANEL_DIM, true)
+	draw_rect(rect, accent, false, 2.0)
+	_draw_text(title, rect.position + Vector2(14, 24), 18, accent)
+
+	for row in range(3):
+		for col in range(8):
+			var peg_pos := rect.position + Vector2(96 + col * 58 + ((row % 2) * 22), 38 + row * 24)
+			draw_circle(peg_pos, 4.5, Color(0.62, 0.62, 0.57, 1.0))
+
+	var slot_width: float = (rect.size.x - 28.0) / float(slots.size())
+	for index in range(slots.size()):
+		var slot_rect := Rect2(
+			rect.position + Vector2(14 + index * slot_width, rect.size.y - 42),
+			Vector2(slot_width - 8, 28)
+		)
+		var slot_name: String = slots[index]
+		var fill: Color = accent.darkened(0.32)
+		if title == "Tuning" and slot_name == model.selected_tuning_result:
+			fill = accent
+		draw_rect(slot_rect, fill, true)
+		draw_rect(slot_rect, accent, false, 1.0)
+		_draw_text(slot_name, slot_rect.position + Vector2(6, 19), 12, COLOR_TEXT)
+
+
+func _draw_unit_board(rect: Rect2) -> void:
+	draw_rect(rect, COLOR_PANEL_DIM, true)
+	draw_rect(rect, COLOR_UNIT, false, 2.0)
+	_draw_text("Unit", rect.position + Vector2(14, 24), 18, COLOR_UNIT)
+
+	for row in range(3):
+		for col in range(8):
+			var peg_pos := rect.position + Vector2(96 + col * 58 + ((row % 2) * 22), 38 + row * 21)
+			draw_circle(peg_pos, 4.0, Color(0.62, 0.62, 0.57, 1.0))
+
+	var slots: Array = model.get_unit_slots()
+	var slot_width: float = (rect.size.x - 28.0) / 4.0
+	for index in range(slots.size()):
+		var slot: Dictionary = slots[index]
+		var slot_rect := Rect2(
+			rect.position + Vector2(14 + index * slot_width, rect.size.y - 78),
+			Vector2(slot_width - 8, 62)
+		)
+		var exposed_ratio: float = slot["exposure_ratio"]
+		draw_rect(slot_rect, COLOR_UNIT.darkened(0.42), true)
+		draw_rect(slot_rect, COLOR_UNIT, false, 1.0)
+
+		if exposed_ratio < 1.0:
+			var blocker_width: float = slot_rect.size.x * (1.0 - exposed_ratio)
+			var blocker := Rect2(
+				slot_rect.position + Vector2(slot_rect.size.x - blocker_width, 0),
+				Vector2(blocker_width, slot_rect.size.y)
+			)
+			draw_rect(blocker, COLOR_BLOCKER, true)
+			draw_line(blocker.position, blocker.position + Vector2(0, blocker.size.y), COLOR_WARNING, 2.0)
+
+		var progress_current: int = slot["progress_current"]
+		var progress_required: int = slot["progress_required"]
+		var progress_ratio: float = clamp(float(progress_current) / float(progress_required), 0.0, 1.0)
+		var progress_rect := Rect2(
+			slot_rect.position + Vector2(6, slot_rect.size.y - 13),
+			Vector2((slot_rect.size.x - 12) * progress_ratio, 7)
+		)
+		draw_rect(progress_rect, COLOR_ACTIVE, true)
+
+		_draw_text("S%d" % slot["slot_id"], slot_rect.position + Vector2(6, 17), 13, COLOR_TEXT)
+		_draw_text(
+			"%d / %d" % [progress_current, progress_required],
+			slot_rect.position + Vector2(6, 35),
+			12,
+			COLOR_TEXT
+		)
+		_draw_text(
+			"full %.0fs" % slot["full_exposure_seconds"],
+			slot_rect.position + Vector2(6, 52),
+			11,
+			COLOR_TEXT.darkened(0.18)
+		)
+
+	_draw_text(
+		"Exposure baseline: 0s / 24s / 54s / 96s",
+		rect.position + Vector2(352, 24),
+		13,
+		COLOR_TEXT
+	)
+
+
+func _draw_queue_bridge(rect: Rect2) -> void:
+	draw_rect(rect, Color("#20211d"), true)
+	draw_rect(rect, COLOR_UNIT, false, 1.0)
+	var queue_entries: Array = model.queue_entries
+	var text := "Queue empty"
+	if not queue_entries.is_empty():
+		var entry: Dictionary = queue_entries[queue_entries.size() - 1]
+		text = "%s  S%d  %s" % [
+			entry.get("queue_entry_id", ""),
+			entry.get("source_slot_id", 0),
+			entry.get("tuning_result", ""),
+		]
+	_draw_text(text, rect.position + Vector2(10, 25), 13, COLOR_TEXT)
+
+
+func _draw_active_ball() -> void:
+	var ball: Dictionary = model.active_ball
+	var center := _active_ball_position(ball)
+	var state: String = ball.get("state", "")
+	var color := COLOR_ACTIVE
+	if state == "Blocked Bounce":
+		color = COLOR_WARNING
+	draw_circle(center, 10.0, color)
+	draw_arc(center, 14.0, 0.0, TAU, 28, COLOR_TEXT, 2.0)
+	draw_line(center - Vector2(28, 11), center - Vector2(8, 4), color, 2.0)
+	_draw_text("active ball", center + Vector2(16, 4), 12, COLOR_TEXT)
+	if state == "Blocked Bounce":
+		draw_arc(center + Vector2(18, -4), 18.0, PI * 0.05, PI * 0.8, 18, COLOR_WARNING, 2.0)
+
+
+func _active_ball_position(ball: Dictionary) -> Vector2:
+	var board: String = ball.get("board", "Launch")
+	var target: String = ball.get("target", "")
+	match board:
+		"Forge":
+			return Vector2(70, 60)
+		"Pool":
+			return Vector2(170, 62)
+		"Launcher":
+			return Vector2(560, 26)
+		"Tuning":
+			var tuning_index: int = max(0, int(model.TUNING_RESULTS.find(target)))
+			return Vector2(124 + tuning_index * 166, 352)
+		"Unit":
+			var slot_id: int = _slot_id_from_target(target)
+			return Vector2(106 + (slot_id - 1) * 166, 512)
+		_:
+			return Vector2(576, 208)
+
+
+func _slot_id_from_target(target: String) -> int:
+	for slot_id in [1, 2, 3, 4]:
+		if target.contains(str(slot_id)):
+			return slot_id
+	return 1
+
+
+func _draw_text(text: String, draw_position: Vector2, font_size: int, color: Color) -> void:
+	draw_string(
+		get_theme_default_font(),
+		draw_position,
+		text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0,
+		font_size,
+		color
+	)
