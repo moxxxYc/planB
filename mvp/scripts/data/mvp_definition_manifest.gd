@@ -3,12 +3,15 @@ extends RefCounted
 
 const REQUIRED_SCENES := [
 	"res://scenes/run/mvp_shell.tscn",
+	"res://scenes/run/mvp_session_debug.tscn",
 	"res://scenes/ball_machine/machine_causality_debug.tscn",
 	"res://scenes/battlefield/battlefield_deploy_debug.tscn",
 ]
 
 const REQUIRED_SCRIPTS := [
 	"res://scripts/run/mvp_shell.gd",
+	"res://scripts/run/mvp_session_model.gd",
+	"res://scripts/run/mvp_session_debug.gd",
 	"res://scripts/ball_machine/machine_causality_model.gd",
 	"res://scripts/ball_machine/machine_causality_view.gd",
 	"res://scripts/ball_machine/machine_causality_debug.gd",
@@ -118,38 +121,38 @@ const SESSION_STEPS := [
 	},
 	{
 		"id": "guardian_choice",
-		"label": "Guardian Choice Placeholder",
-		"summary": "Choose between 巢脉母 and 酸冠母 before Battle 1. No UI flow implemented yet.",
+		"label": "Guardian Select",
+		"summary": "Choose between 巢脉母 and 酸冠母 before Battle 1. Choice persists for the run.",
 	},
 	{
-		"id": "battle_shell",
-		"label": "M2 Battlefield / Deploy Loop",
-		"summary": "M1 queue entries can deploy to direct-click Left / Mid / Right lanes with placeholder combat.",
+		"id": "battle_1",
+		"label": "Battle 1",
+		"summary": "M1 queue entries deploy through M2 lanes and record the first machine-chain sample.",
 	},
 	{
-		"id": "reward_shell",
-		"label": "First Reward Placeholder",
-		"summary": "Names Pool Pocket, Prime Charge, and Slot Primer as axis anchors.",
+		"id": "first_reward",
+		"label": "First Reward",
+		"summary": "Pool Pocket, Prime Charge, and Slot Primer anchor Launch / Tuning / Unit.",
 	},
 	{
-		"id": "shop_shell",
-		"label": "Shop Placeholder",
-		"summary": "Names Gold, one neutral modifier purchase cap, and rest as future session state.",
+		"id": "shop_gold_rest",
+		"label": "Shop / Gold / Rest",
+		"summary": "First-pass Gold faucet, one neutral modifier purchase cap, and Rest records are implemented.",
 	},
 	{
-		"id": "counter_shell",
-		"label": "Counter Placeholder",
-		"summary": "Names Pool Polluter, Echo Breaker, and Stagger Punisher without applying effects.",
+		"id": "counter",
+		"label": "Counter Battles",
+		"summary": "Pool Polluter, Echo Breaker, and Stagger Punisher expose warning, target, effect, and log records.",
 	},
 	{
-		"id": "endpoint_shell",
-		"label": "Endpoint Placeholder",
-		"summary": "Names Telegraphed Sweep and endpoint outcome as future battle shell state.",
+		"id": "endpoint",
+		"label": "Endpoint",
+		"summary": "Endpoint Guardian uses Telegraphed Sweep warning and records win/loss conclusion.",
 	},
 	{
-		"id": "result_shell",
-		"label": "Result Page Placeholder",
-		"summary": "Names main axis, rewards, shop, Guardian, counters, Deploy Lane impact, and next watch tag.",
+		"id": "result_page",
+		"label": "Result Page",
+		"summary": "Result page fields are populated from real M3 run data and checkpoint telemetry.",
 	},
 ]
 
