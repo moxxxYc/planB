@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UnitTemplateDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/unit_template_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+unit_id = &"hive.short_fang"
+display_name = "短牙虫"
+slot_id = 1
+progress_required = 3
+hp = 6
+attack_damage = 1
+attack_interval = 0.7
+attack_range = 1.5
+move_speed = 10.0
+role_note = "稳定补线，低需求、低承诺，快速接线。"
+placeholder_note = "First-pass duty values from current docs; not final balance."

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="MachineComponentDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/machine_component_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+component_id = &"unit.queue"
+warehouse = "Unit"
+display_name = "Queue"
+component_kind = "fifo_deploy_queue"
+placeholder_note = "M0 placeholder for FIFO queue and Deploy Lane interface."

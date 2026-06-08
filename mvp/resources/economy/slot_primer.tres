@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ModifierDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/modifier_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+modifier_id = &"slot_primer"
+display_name = "Slot Primer"
+source_pool = "Reward / Shop"
+warehouse = "Unit"
+target_component = "Unit.Slot.progress_floor"
+operation = "set floor"
+role_tag = "Anchor"
+player_read = "Unit anchor slot"
+placeholder_note = "M0 data placeholder only."

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ModifierDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/modifier_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+modifier_id = &"pool_pocket"
+display_name = "Pool Pocket"
+source_pool = "Reward / Shop"
+warehouse = "Launch"
+target_component = "Launch.Pool.capacity"
+operation = "add"
+role_tag = "Anchor"
+player_read = "Launch sustained flow"
+placeholder_note = "M0 data placeholder only."

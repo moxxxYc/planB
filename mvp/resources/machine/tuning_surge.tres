@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="MachineComponentDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/machine_component_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+component_id = &"tuning.surge"
+warehouse = "Tuning"
+display_name = "Surge"
+component_kind = "tuning_slot"
+placeholder_note = "Fast landing placeholder. No queue delay effect implemented."

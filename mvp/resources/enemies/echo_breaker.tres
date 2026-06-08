@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="CounterDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/counter_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+counter_id = &"echo_breaker"
+display_name = "Echo Breaker"
+target_component = "Tuning.Echo"
+warning_seconds = 4.0
+active_seconds = 14.0
+visible_effect = "Echo crack warning, then one Echo copy downgraded to Gate settlement."
+placeholder_note = "M0 data placeholder only."

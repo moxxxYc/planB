@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="BattleLaneDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/battle_lane_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+lane_id = &"left"
+display_name = "Left"
+order_index = 0
+is_default_deploy_lane = false
+max_danger_tier = 3
+placeholder_note = "M0 lane placeholder. No path, gate, units, or danger calculation implemented."

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ResultFieldDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/result_field_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+field_id = &"result.next_watch_tag"
+checkpoint = "Endpoint"
+display_name = "下一局观察标签"
+purpose = "Record one next-run watch tag after failure without resource compensation."

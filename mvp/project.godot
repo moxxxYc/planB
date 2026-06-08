@@ -1,0 +1,20 @@
+; Engine configuration file.
+; Godot project root is this mvp/ directory.
+
+config_version=5
+
+[application]
+
+config/name="PlanB MVP v0"
+run/main_scene="res://scenes/run/mvp_shell.tscn"
+config/features=PackedStringArray("4.6")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ModifierDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/modifier_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+modifier_id = &"surge_buffer"
+display_name = "Surge Buffer"
+source_pool = "Shop"
+warehouse = "Tuning"
+target_component = "Tuning.Surge.charge_buffer"
+operation = "trigger"
+role_tag = "Patch"
+player_read = "Tuning fast landing"
+placeholder_note = "M0 data placeholder only."

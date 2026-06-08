@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ModifierDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/modifier_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+modifier_id = &"junk_sieve"
+display_name = "Junk Sieve"
+source_pool = "Shop"
+warehouse = "Launch"
+target_component = "Launch.Junk.fire_behavior"
+operation = "convert"
+role_tag = "Patch"
+player_read = "Launch pollution patch"
+placeholder_note = "M0 data placeholder only."

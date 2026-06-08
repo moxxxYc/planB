@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ModifierDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/modifier_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+modifier_id = &"prime_charge"
+display_name = "Prime Charge"
+source_pool = "Reward / Shop"
+warehouse = "Tuning"
+target_component = "Tuning.Prime.value_bonus"
+operation = "add"
+role_tag = "Anchor"
+player_read = "Tuning high-value hit"
+placeholder_note = "M0 data placeholder only."

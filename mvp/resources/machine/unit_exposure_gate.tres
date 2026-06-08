@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="MachineComponentDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/machine_component_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+component_id = &"unit.slot_exposure_gate"
+warehouse = "Unit"
+display_name = "Unit.Slot.Exposure Gate"
+component_kind = "slot_visibility"
+placeholder_note = "M0 placeholder for low-to-high slot exposure. No physics blocker implemented."

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ResultFieldDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/result_field_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+field_id = &"result.deploy_lane"
+checkpoint = "Endpoint"
+display_name = "Deploy Lane 影响"
+purpose = "Record whether key lane choices changed deployment outcomes."

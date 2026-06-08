@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ModifierDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/modifier_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+modifier_id = &"queue_brace"
+display_name = "Queue Brace"
+source_pool = "Shop"
+warehouse = "Unit"
+target_component = "Unit.Queue.empty_gap_response"
+operation = "trigger"
+role_tag = "Patch"
+player_read = "Unit gap patch"
+placeholder_note = "M0 data placeholder only."

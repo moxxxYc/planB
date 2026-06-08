@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ModifierDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/modifier_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+modifier_id = &"echo_latch"
+display_name = "Echo Latch"
+source_pool = "Second Reward"
+warehouse = "Tuning"
+target_component = "Tuning.Echo.target_lock"
+operation = "replace"
+role_tag = "Deepen"
+player_read = "Tuning repeated hit"
+placeholder_note = "M0 data placeholder only."

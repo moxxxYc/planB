@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GuardianDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/guardian_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+guardian_id = &"hive.acid_crown_mother"
+display_name = "酸冠母"
+race = "Hive"
+axis_lean = "Tuning"
+tactical_skill = "酸冠反喷"
+strategic_target = "Tuning.Prime"
+placeholder_note = "M0 placeholder. No tactical or strategic Guardian contract execution implemented."
