@@ -1,6 +1,5 @@
 .DS_Store
 
-# Godot local/import cache
+# Godot 本地/导入缓存（按 Godot 4 惯例：忽略 .godot/，但提交各资源旁的 *.import）
 .godot/
-*.import
 *.translation

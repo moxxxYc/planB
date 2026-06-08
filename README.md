@@ -4,7 +4,10 @@ planB 当前仍没有可运行实现、包脚本、生成资源或自动验证�
 
 ## MVP 开发目录
 
-- `mvp/`：MVP v0 的当前实现目录。MVP 阶段的工程代码、场景、配置和验证入口都应放在这个目录下。
+- `mvp/`：MVP v0 的当前实现目录。MVP 阶段的工程代码、场景、配置和验证入口都应放在这个目录下（Godot 工程根 = `mvp/`，Godot 4.6）。
+- `mvp/AGENTS.md`：`mvp/` 实现目录的工程规则（vibe coding 规范），只管怎么改代码，不是设计权威。
+- `mvp/docs/agent/`：分层工程文档（项目结构、场景架构、GDScript、Signal/Autoload、玩法实现模式、平台导出性能、资产、测试验证、AI 执行协议）。
+- `mvp/tools/verify_godot.sh`：Godot headless 烟测入口。
 - `mvp/.gitkeep`：空目录占位文件，便于在尚未创建工程文件前提交目录。
 - `docs/archive/prototypes/` 不是当前实现来源，不要从旧 prototype 恢复代码或验证假设。
 
