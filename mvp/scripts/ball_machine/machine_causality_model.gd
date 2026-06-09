@@ -54,6 +54,25 @@ const BOARD_NAMES := [
 
 const POOL_CAPACITY := 5
 const BASE_DEPLOY_DELAY_SECONDS := 0.5
+const AUTO_LAUNCH_INTERVAL_SECONDS := 1.3
+const AUTO_PHASE_SECONDS := 0.35
+const MOTION_TRAIL_LIMIT := 18
+
+const AUTO_TUNING_SEQUENCE := [
+	"Gate",
+	"Prime",
+	"Gate",
+	"Echo",
+	"Surge",
+]
+
+const AUTO_SLOT_SEQUENCE := [
+	1,
+	1,
+	1,
+	2,
+	1,
+]
 
 var battle_time_seconds: float = 0.0
 var selected_tuning_result: String = "Gate"
@@ -62,8 +81,14 @@ var active_ball: Dictionary = {}
 var unit_progress: Dictionary = {}
 var queue_entries: Array[Dictionary] = []
 var event_log: Array[Dictionary] = []
+var auto_running := false
+var cannon_phase: float = 0.0
+var motion_trail: Array[Vector2] = []
 
 var _chain_index := 0
+var _auto_sequence_index := 0
+var _launch_timer_seconds: float = 0.0
+var _flight: Dictionary = {}
 
 
 func _init() -> void:
@@ -85,17 +110,72 @@ func reset() -> void:
 		unit_progress[slot_id] = 0
 	queue_entries.clear()
 	event_log.clear()
+	auto_running = false
+	cannon_phase = 0.0
+	motion_trail.clear()
 	_chain_index = 0
+	_auto_sequence_index = 0
+	_launch_timer_seconds = 0.0
+	_flight = {
+		"in_flight": false,
+		"phase": "Idle",
+		"phase_elapsed": 0.0,
+		"chain_id": "",
+		"tuning_result": "Gate",
+		"slot_id": 1,
+	}
 
 
 func set_battle_time(seconds: float) -> void:
 	battle_time_seconds = max(0.0, seconds)
 
 
+func set_auto_running(enabled: bool) -> void:
+	auto_running = enabled
+	if enabled and not bool(_flight.get("in_flight", false)):
+		_launch_timer_seconds = min(_launch_timer_seconds, 0.05)
+
+
+func step_simulation(delta: float) -> void:
+	var step: float = clamp(delta, 0.0, 0.2)
+	if step <= 0.0:
+		return
+
+	battle_time_seconds += step
+	cannon_phase = fmod(cannon_phase + step * 2.4, TAU)
+
+	if auto_running:
+		_launch_timer_seconds = max(0.0, _launch_timer_seconds - step)
+		if _launch_timer_seconds <= 0.0 and not bool(_flight.get("in_flight", false)):
+			_start_dynamic_chain()
+
+	if bool(_flight.get("in_flight", false)):
+		_advance_dynamic_chain(step)
+
+	_record_motion_sample(_motion_position())
+
+
+func get_motion_summary() -> Dictionary:
+	return {
+		"auto_running": auto_running,
+		"in_flight": bool(_flight.get("in_flight", false)),
+		"active_board": _active_motion_board(),
+		"phase": str(_flight.get("phase", "Idle")),
+		"phase_progress": _phase_progress(),
+		"ball_position": _motion_position(),
+		"trail": motion_trail.duplicate(),
+		"cannon_angle": sin(cannon_phase) * 0.38,
+		"chain_id": str(_flight.get("chain_id", "")),
+		"tuning_result": str(_flight.get("tuning_result", selected_tuning_result)),
+		"slot_id": int(_flight.get("slot_id", 1)),
+	}
+
+
 func force_tuning_result(tuning_result: String) -> bool:
 	if not TUNING_RESULTS.has(tuning_result):
 		return false
 
+	_stop_dynamic_chain()
 	selected_tuning_result = tuning_result
 	var chain_id := _new_chain_id()
 	var event := _record_event(
@@ -113,6 +193,7 @@ func force_unit_slot_hit(slot_id: int, tuning_result: String = "") -> Dictionary
 	if not _is_valid_slot(slot_id):
 		return {}
 
+	_stop_dynamic_chain()
 	var result := selected_tuning_result if tuning_result.is_empty() else tuning_result
 	if not TUNING_RESULTS.has(result):
 		return {}
@@ -127,6 +208,7 @@ func force_unit_slot_queue(slot_id: int, tuning_result: String = "Gate") -> Dict
 	if not TUNING_RESULTS.has(tuning_result):
 		return {}
 
+	_stop_dynamic_chain()
 	battle_time_seconds = max(battle_time_seconds, float(UNIT_FULL_EXPOSURE_SECONDS[slot_id]))
 	var required: int = UNIT_REQUIREMENTS[slot_id]
 	var hit_value := _progress_for_tuning(tuning_result)
@@ -139,6 +221,7 @@ func force_blocked_bounce(slot_id: int) -> Dictionary:
 	if not _is_valid_slot(slot_id):
 		return {}
 
+	_stop_dynamic_chain()
 	var full_time: float = UNIT_FULL_EXPOSURE_SECONDS[slot_id]
 	if full_time <= 0.0:
 		slot_id = 2
@@ -176,6 +259,7 @@ func force_settlement_state(state: String) -> Dictionary:
 	if not SETTLEMENT_STATES.has(state):
 		return {}
 
+	_stop_dynamic_chain()
 	var chain_id := _new_chain_id()
 	var component := "Launch"
 	var description := ""
@@ -209,6 +293,7 @@ func run_forced_chain(tuning_result: String, slot_id: int) -> Dictionary:
 	if not TUNING_RESULTS.has(tuning_result) or not _is_valid_slot(slot_id):
 		return {}
 
+	_stop_dynamic_chain()
 	var chain_id := _new_chain_id()
 	_record_chain_intro(chain_id)
 	selected_tuning_result = tuning_result
@@ -316,6 +401,7 @@ func get_debug_summary() -> Dictionary:
 		"boards": BOARD_NAMES.duplicate(),
 		"tuning_results": TUNING_RESULTS.duplicate(),
 		"unit_slots": get_unit_slots(),
+		"motion": get_motion_summary(),
 		"debug_controls": [
 			"force_tuning_result",
 			"force_unit_slot_hit",
@@ -328,6 +414,210 @@ func get_debug_summary() -> Dictionary:
 		"queue_entries": queue_entries.duplicate(true),
 		"event_log": event_log.duplicate(true),
 	}
+
+
+func _start_dynamic_chain() -> void:
+	var tuning_result: String = AUTO_TUNING_SEQUENCE[
+		_auto_sequence_index % AUTO_TUNING_SEQUENCE.size()
+	]
+	var slot_id: int = AUTO_SLOT_SEQUENCE[_auto_sequence_index % AUTO_SLOT_SEQUENCE.size()]
+	_auto_sequence_index += 1
+
+	var chain_id := _new_chain_id()
+	selected_tuning_result = tuning_result
+	_record_chain_intro(chain_id)
+	_flight = {
+		"in_flight": true,
+		"phase": "Launch",
+		"phase_elapsed": 0.0,
+		"chain_id": chain_id,
+		"tuning_result": tuning_result,
+		"slot_id": slot_id,
+	}
+	active_ball = _make_active_ball("Launch", "Tuning Path", "Natural Hit", chain_id)
+	motion_trail.clear()
+	_record_motion_sample(_motion_position())
+
+
+func _advance_dynamic_chain(delta: float) -> void:
+	_flight["phase_elapsed"] = float(_flight.get("phase_elapsed", 0.0)) + delta
+	if float(_flight["phase_elapsed"]) < AUTO_PHASE_SECONDS:
+		return
+
+	var overflow: float = float(_flight["phase_elapsed"]) - AUTO_PHASE_SECONDS
+	_flight["phase_elapsed"] = 0.0
+
+	match str(_flight.get("phase", "Launch")):
+		"Launch":
+			_finish_dynamic_launch_phase()
+		"Tuning":
+			_finish_dynamic_tuning_phase()
+		"Unit":
+			_finish_dynamic_unit_phase()
+		_:
+			_stop_dynamic_chain()
+
+	if overflow > 0.0 and bool(_flight.get("in_flight", false)):
+		_advance_dynamic_chain(overflow)
+
+
+func _finish_dynamic_launch_phase() -> void:
+	var chain_id := str(_flight.get("chain_id", ""))
+	_record_event(
+		"Launch",
+		"Natural Hit",
+		"发射仓动态球路自然落入调校入口。",
+		{"launch_result": "Tuning Path"},
+		chain_id
+	)
+	_flight["phase"] = "Tuning"
+	active_ball = _make_active_ball(
+		"Tuning",
+		str(_flight.get("tuning_result", "Gate")),
+		"Natural Hit",
+		chain_id
+	)
+
+
+func _finish_dynamic_tuning_phase() -> void:
+	var tuning_result := str(_flight.get("tuning_result", "Gate"))
+	var chain_id := str(_flight.get("chain_id", ""))
+	selected_tuning_result = tuning_result
+	_record_event(
+		"Tuning",
+		"Natural Hit",
+		"调校%s槽在动态球路中标记了这颗球。" % _display_tuning(tuning_result),
+		{"tuning_result": tuning_result},
+		chain_id
+	)
+	if tuning_result != "Gate":
+		_record_event(
+			"Tuning",
+			"Logic Settlement",
+			_tuning_logic_description(tuning_result),
+			{
+				"tuning_result": tuning_result,
+				"progress_value": _progress_for_tuning(tuning_result),
+			},
+			chain_id
+		)
+	_flight["phase"] = "Unit"
+	active_ball = _make_active_ball(
+		"Unit",
+		"Slot %d" % int(_flight.get("slot_id", 1)),
+		"Natural Hit",
+		chain_id
+	)
+
+
+func _finish_dynamic_unit_phase() -> void:
+	var slot_id := int(_flight.get("slot_id", 1))
+	var tuning_result := str(_flight.get("tuning_result", "Gate"))
+	var chain_id := str(_flight.get("chain_id", ""))
+
+	if not is_slot_accepting_hit(slot_id):
+		var blocked := _record_event(
+			"Unit",
+			"Blocked Bounce",
+			"单位槽 %d 的动态球在 %.1f 秒被暴露闸门弹开。" % [
+				slot_id,
+				battle_time_seconds,
+			],
+			{
+				"slot_id": slot_id,
+				"exposure_ratio": get_slot_exposure_ratio(slot_id),
+			},
+			chain_id
+		)
+		active_ball = _make_active_ball("Unit", "Slot %d" % slot_id, blocked["state"], chain_id)
+	else:
+		_apply_unit_hit(slot_id, tuning_result, chain_id)
+
+	_flight["in_flight"] = false
+	_flight["phase"] = "Idle"
+	_flight["phase_elapsed"] = 0.0
+	_launch_timer_seconds = AUTO_LAUNCH_INTERVAL_SECONDS
+
+
+func _stop_dynamic_chain() -> void:
+	_flight["in_flight"] = false
+	_flight["phase"] = "Idle"
+	_flight["phase_elapsed"] = 0.0
+
+
+func _phase_progress() -> float:
+	if not bool(_flight.get("in_flight", false)):
+		return 0.0
+	return clamp(float(_flight.get("phase_elapsed", 0.0)) / AUTO_PHASE_SECONDS, 0.0, 1.0)
+
+
+func _active_motion_board() -> String:
+	if bool(_flight.get("in_flight", false)):
+		return str(_flight.get("phase", "Launch"))
+	return str(active_ball.get("board", "Launch"))
+
+
+func _motion_position() -> Vector2:
+	if not bool(_flight.get("in_flight", false)):
+		return _resting_ball_position()
+
+	var progress := _phase_progress()
+	var wobble := sin(progress * TAU * 2.0 + cannon_phase) * 22.0
+	match str(_flight.get("phase", "Launch")):
+		"Launch":
+			var start := Vector2(560, 126)
+			var end := Vector2(348 + wobble * 0.25, 216)
+			return start.lerp(end, progress) + Vector2(wobble, sin(progress * TAU) * 10.0)
+		"Tuning":
+			var tuning_index: int = max(
+				0,
+				int(TUNING_RESULTS.find(str(_flight.get("tuning_result", "Gate"))))
+			)
+			var start := Vector2(360 + wobble * 0.2, 266)
+			var end := Vector2(124 + tuning_index * 166, 352)
+			return start.lerp(end, progress) + Vector2(wobble * 0.55, sin(progress * TAU) * 9.0)
+		"Unit":
+			var slot_id := int(_flight.get("slot_id", 1))
+			var start := Vector2(350 + wobble * 0.2, 412)
+			var end := Vector2(106 + (slot_id - 1) * 166, 512)
+			var bounce_y := -22.0 * sin(progress * PI) if not is_slot_accepting_hit(slot_id) else 0.0
+			return start.lerp(end, progress) + Vector2(wobble * 0.45, bounce_y)
+
+	return _resting_ball_position()
+
+
+func _resting_ball_position() -> Vector2:
+	var board: String = active_ball.get("board", "Launch")
+	var target: String = active_ball.get("target", "")
+	match board:
+		"Forge":
+			return Vector2(70, 60)
+		"Pool":
+			return Vector2(170, 62)
+		"Launcher":
+			return Vector2(560, 26)
+		"Tuning":
+			var tuning_index: int = max(0, int(TUNING_RESULTS.find(target)))
+			return Vector2(124 + tuning_index * 166, 352)
+		"Unit":
+			var slot_id: int = _slot_id_from_target(target)
+			return Vector2(106 + (slot_id - 1) * 166, 512)
+		_:
+			return Vector2(576, 208)
+
+
+func _slot_id_from_target(target: String) -> int:
+	for slot_id in [1, 2, 3, 4]:
+		if target.contains(str(slot_id)):
+			return slot_id
+	return 1
+
+
+func _record_motion_sample(position: Vector2) -> void:
+	if motion_trail.is_empty() or motion_trail[motion_trail.size() - 1].distance_to(position) > 1.0:
+		motion_trail.append(position)
+	while motion_trail.size() > MOTION_TRAIL_LIMIT:
+		motion_trail.pop_front()
 
 
 func _record_chain_intro(chain_id: String) -> void:

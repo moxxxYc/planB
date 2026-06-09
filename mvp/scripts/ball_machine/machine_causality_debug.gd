@@ -9,16 +9,31 @@ const UI_SCALE := 1.24
 var _model: RefCounted = ModelScript.new()
 var _view: Control
 var _supply_label: Label
+var _auto_label: Label
 var _time_label: Label
 var _tuning_label: Label
+var _motion_label: Label
 var _slot_list: VBoxContainer
 var _queue_list: VBoxContainer
 var _log_list: VBoxContainer
 var _built := false
+var _refresh_elapsed: float = 0.0
 
 
 func _ready() -> void:
 	_ensure_built()
+
+
+func _process(delta: float) -> void:
+	if not _built:
+		return
+	_model.step_simulation(delta)
+	_refresh_elapsed += delta
+	if _refresh_elapsed >= 0.08:
+		_refresh_elapsed = 0.0
+		_refresh()
+	else:
+		_view.queue_redraw()
 
 
 func verify_scene_build() -> bool:
@@ -79,7 +94,7 @@ func _ensure_built() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build_layout()
 	_model.set_battle_time(0.0)
-	_model.force_unit_slot_queue(1, "Gate")
+	_model.set_auto_running(true)
 	_refresh()
 
 
@@ -112,12 +127,23 @@ func _build_layout() -> void:
 	side.add_child(_make_label("M1 机器因果调试", 23))
 	_supply_label = _make_label("", 14)
 	side.add_child(_supply_label)
+	_auto_label = _make_label("", 13)
+	side.add_child(_auto_label)
 	_time_label = _make_label("", 14)
 	side.add_child(_time_label)
 	_tuning_label = _make_label("", 14)
 	side.add_child(_tuning_label)
+	_motion_label = _make_label("", 13)
+	side.add_child(_motion_label)
 
 	side.add_child(_make_separator())
+	side.add_child(_make_label("自动球机", 16))
+	var auto_row := HBoxContainer.new()
+	auto_row.add_theme_constant_override("separation", 6)
+	side.add_child(auto_row)
+	_add_button(auto_row, "运行 / 暂停", Callable(self, "_on_auto_toggle_pressed"))
+	_add_button(auto_row, "步进 0.5 秒", Callable(self, "_on_step_pressed"))
+
 	side.add_child(_make_label("战斗时间", 16))
 	var time_row := HBoxContainer.new()
 	time_row.add_theme_constant_override("separation", 6)
@@ -183,8 +209,18 @@ func _refresh() -> void:
 		supply["pool_count"],
 		supply["pool_capacity"],
 	]
+	var motion: Dictionary = _model.get_motion_summary()
+	_auto_label.text = "自动球机：%s | 炮台摆动 %.1f°" % [
+		"运行中" if motion["auto_running"] else "暂停",
+		rad_to_deg(float(motion["cannon_angle"])),
+	]
 	_time_label.text = "战斗时间：%.0f 秒" % _model.battle_time_seconds
 	_tuning_label.text = "当前调校：%s" % _display_tuning(_model.selected_tuning_result)
+	_motion_label.text = "当前运动：%s | 阶段 %.0f%% | 链 %s" % [
+		_display_board(str(motion["active_board"])),
+		float(motion["phase_progress"]) * 100.0,
+		str(motion["chain_id"]),
+	]
 
 	_clear_container(_slot_list)
 	for slot in _model.get_unit_slots():
@@ -236,28 +272,46 @@ func _on_time_pressed(seconds: int) -> void:
 	_refresh()
 
 
+func _on_auto_toggle_pressed() -> void:
+	var motion: Dictionary = _model.get_motion_summary()
+	_model.set_auto_running(not bool(motion["auto_running"]))
+	_refresh()
+
+
+func _on_step_pressed() -> void:
+	_model.set_auto_running(false)
+	for _index in range(10):
+		_model.step_simulation(0.05)
+	_refresh()
+
+
 func _on_tuning_pressed(tuning_result: String) -> void:
+	_model.set_auto_running(false)
 	_model.force_tuning_result(tuning_result)
 	_refresh()
 
 
 func _on_slot_pressed(slot_id: int) -> void:
+	_model.set_auto_running(false)
 	_model.force_unit_slot_queue(slot_id, _model.selected_tuning_result)
 	_refresh()
 
 
 func _on_blocked_pressed() -> void:
+	_model.set_auto_running(false)
 	_model.force_blocked_bounce(4)
 	_refresh()
 
 
 func _on_state_pressed(state: String) -> void:
+	_model.set_auto_running(false)
 	_model.force_settlement_state(state)
 	_refresh()
 
 
 func _on_reset_pressed() -> void:
 	_model.reset()
+	_model.set_auto_running(true)
 	_refresh()
 
 
@@ -321,6 +375,23 @@ func _display_state(state: String) -> String:
 		"Logic Settlement":
 			return "逻辑结算"
 	return state
+
+
+func _display_board(board_name: String) -> String:
+	match board_name:
+		"Launch":
+			return "发射仓"
+		"Tuning":
+			return "调校仓"
+		"Unit":
+			return "单位仓"
+		"Forge":
+			return "造球器"
+		"Pool":
+			return "球池"
+		"Launcher":
+			return "发射器"
+	return board_name
 
 
 func _display_chain(chain: String) -> String:

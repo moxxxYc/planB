@@ -73,6 +73,44 @@ func _check_model_behaviour(failures: Array[String]) -> void:
 		if event.get("state", "") != settlement_state:
 			failures.append("Could not force settlement state: %s" % settlement_state)
 
+	_check_dynamic_machine_loop(model, failures)
+
+
+func _check_dynamic_machine_loop(model, failures: Array[String]) -> void:
+	for method_name in ["set_auto_running", "step_simulation", "get_motion_summary"]:
+		if not model.has_method(method_name):
+			failures.append("M1 dynamic machine model missing %s()" % method_name)
+			return
+
+	model.reset()
+	model.set_auto_running(true)
+	var saw_launch_motion := false
+	var saw_tuning_motion := false
+	var saw_unit_motion := false
+	var previous_position := Vector2.INF
+	for _index in range(120):
+		model.step_simulation(0.05)
+		var motion: Dictionary = model.get_motion_summary()
+		var ball_position: Vector2 = motion.get("ball_position", Vector2.INF)
+		if previous_position != Vector2.INF and ball_position.distance_to(previous_position) > 0.01:
+			match str(motion.get("active_board", "")):
+				"Launch":
+					saw_launch_motion = true
+				"Tuning":
+					saw_tuning_motion = true
+				"Unit":
+					saw_unit_motion = true
+		previous_position = ball_position
+
+	if not saw_launch_motion:
+		failures.append("Dynamic machine did not show Launch board motion")
+	if not saw_tuning_motion:
+		failures.append("Dynamic machine did not show Tuning board motion")
+	if not saw_unit_motion:
+		failures.append("Dynamic machine did not show Unit board motion")
+	if model.queue_entries.is_empty():
+		failures.append("Dynamic machine loop did not create a queue entry")
+
 
 func _check_debug_scene(failures: Array[String]) -> void:
 	var packed := ResourceLoader.load(SCENE_PATH)

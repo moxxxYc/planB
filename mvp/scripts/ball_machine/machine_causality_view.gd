@@ -35,25 +35,30 @@ func _draw() -> void:
 	draw_rect(bounds, COLOR_BG, true)
 
 	var supply: Dictionary = model.get_supply_summary()
+	var motion: Dictionary = model.get_motion_summary()
+	var active_board := str(motion.get("active_board", "Launch"))
 	_draw_supply(Rect2(24, 18, 690, 72), supply)
 	_draw_board(
 		Rect2(24, 108, 690, 128),
 		"Launch",
 		["Tuning", "Split", "Recycle", "Waste"],
-		COLOR_LAUNCH
+		COLOR_LAUNCH,
+		active_board == "Launch"
 	)
 	_draw_board(
 		Rect2(24, 254, 690, 128),
 		"Tuning",
 		model.TUNING_RESULTS,
-		COLOR_TUNING
+		COLOR_TUNING,
+		active_board == "Tuning"
 	)
-	_draw_unit_board(Rect2(24, 400, 690, 178))
+	_draw_unit_board(Rect2(24, 400, 690, 178), active_board == "Unit")
 	_draw_queue_bridge(Rect2(438, 590, 276, 38))
 	_draw_active_ball()
 
 
 func _draw_supply(rect: Rect2, supply: Dictionary) -> void:
+	var motion: Dictionary = model.get_motion_summary()
 	draw_rect(rect, COLOR_PANEL, true)
 	draw_rect(rect, COLOR_LAUNCH, false, 2.0)
 	_draw_text("造球器 / 球池 / 发射器", rect.position + Vector2(14, 24), 18, COLOR_TEXT)
@@ -70,19 +75,28 @@ func _draw_supply(rect: Rect2, supply: Dictionary) -> void:
 
 	_draw_text("球池 %d / %d" % [pool_count, pool_capacity], rect.position + Vector2(258, 57), 14, COLOR_TEXT)
 	_draw_text("发射器", rect.position + Vector2(390, 57), 14, COLOR_LAUNCH)
-	draw_line(rect.position + Vector2(472, 48), rect.position + Vector2(548, 28), COLOR_ACTIVE, 3.0)
-	draw_circle(rect.position + Vector2(558, 26), 6.0, COLOR_ACTIVE)
+	var pivot := rect.position + Vector2(490, 46)
+	var cannon_angle := -0.22 + float(motion.get("cannon_angle", 0.0))
+	var barrel_end := pivot + Vector2(cos(cannon_angle), sin(cannon_angle)) * 78.0
+	draw_line(pivot, barrel_end, COLOR_ACTIVE, 4.0)
+	draw_circle(barrel_end, 6.0, COLOR_ACTIVE)
+	draw_arc(pivot, 42.0, -0.62, 0.18, 18, COLOR_LAUNCH.darkened(0.12), 1.5)
 
 
-func _draw_board(rect: Rect2, title: String, slots: Array, accent: Color) -> void:
-	draw_rect(rect, COLOR_PANEL_DIM, true)
-	draw_rect(rect, accent, false, 2.0)
+func _draw_board(rect: Rect2, title: String, slots: Array, accent: Color, is_active: bool) -> void:
+	var panel_color := COLOR_PANEL_DIM if is_active else Color("#151916")
+	var border_width := 3.0 if is_active else 1.0
+	draw_rect(rect, panel_color, true)
+	draw_rect(rect, accent, false, border_width)
 	_draw_text(_display_board(title), rect.position + Vector2(14, 24), 18, accent)
+	if is_active:
+		_draw_text("ACTIVE BALL", rect.position + Vector2(rect.size.x - 128, 24), 11, COLOR_ACTIVE)
 
 	for row in range(3):
 		for col in range(8):
 			var peg_pos := rect.position + Vector2(96 + col * 58 + ((row % 2) * 22), 38 + row * 24)
-			draw_circle(peg_pos, 4.5, Color(0.62, 0.62, 0.57, 1.0))
+			var peg_color := Color(0.62, 0.62, 0.57, 1.0) if is_active else Color(0.38, 0.4, 0.36, 1.0)
+			draw_circle(peg_pos, 4.5, peg_color)
 
 	var slot_width: float = (rect.size.x - 28.0) / float(slots.size())
 	for index in range(slots.size()):
@@ -99,15 +113,20 @@ func _draw_board(rect: Rect2, title: String, slots: Array, accent: Color) -> voi
 		_draw_text(_display_slot(slot_name), slot_rect.position + Vector2(6, 20), 12, COLOR_TEXT)
 
 
-func _draw_unit_board(rect: Rect2) -> void:
-	draw_rect(rect, COLOR_PANEL_DIM, true)
-	draw_rect(rect, COLOR_UNIT, false, 2.0)
+func _draw_unit_board(rect: Rect2, is_active: bool) -> void:
+	var panel_color := COLOR_PANEL_DIM if is_active else Color("#151916")
+	var border_width := 3.0 if is_active else 1.0
+	draw_rect(rect, panel_color, true)
+	draw_rect(rect, COLOR_UNIT, false, border_width)
 	_draw_text("单位仓", rect.position + Vector2(14, 24), 18, COLOR_UNIT)
+	if is_active:
+		_draw_text("ACTIVE BALL", rect.position + Vector2(rect.size.x - 128, 24), 11, COLOR_ACTIVE)
 
 	for row in range(3):
 		for col in range(8):
 			var peg_pos := rect.position + Vector2(96 + col * 58 + ((row % 2) * 22), 38 + row * 21)
-			draw_circle(peg_pos, 4.0, Color(0.62, 0.62, 0.57, 1.0))
+			var peg_color := Color(0.62, 0.62, 0.57, 1.0) if is_active else Color(0.38, 0.4, 0.36, 1.0)
+			draw_circle(peg_pos, 4.0, peg_color)
 
 	var slots: Array = model.get_unit_slots()
 	var slot_width: float = (rect.size.x - 28.0) / 4.0
@@ -177,15 +196,26 @@ func _draw_queue_bridge(rect: Rect2) -> void:
 
 
 func _draw_active_ball() -> void:
+	var motion: Dictionary = model.get_motion_summary()
 	var ball: Dictionary = model.active_ball
-	var center := _active_ball_position(ball)
+	var center: Vector2 = motion.get("ball_position", _active_ball_position(ball))
 	var state: String = ball.get("state", "")
+	var trail: Array = motion.get("trail", [])
+	for index in range(1, trail.size()):
+		var ratio := float(index) / float(max(1, trail.size() - 1))
+		var trail_color := COLOR_ACTIVE
+		trail_color.a = 0.18 + ratio * 0.42
+		draw_line(trail[index - 1], trail[index], trail_color, 2.0 + ratio * 1.2)
+
 	var color := COLOR_ACTIVE
 	if state == "Blocked Bounce":
 		color = COLOR_WARNING
 	draw_circle(center, 10.0, color)
 	draw_arc(center, 14.0, 0.0, TAU, 28, COLOR_TEXT, 2.0)
-	draw_line(center - Vector2(28, 11), center - Vector2(8, 4), color, 2.0)
+	if bool(motion.get("in_flight", false)):
+		draw_arc(center, 22.0, -0.8, 0.9, 16, color, 2.0)
+	else:
+		draw_line(center - Vector2(28, 11), center - Vector2(8, 4), color, 2.0)
 	_draw_text("当前球", center + Vector2(16, 4), 12, COLOR_TEXT)
 	if state == "Blocked Bounce":
 		draw_arc(center + Vector2(18, -4), 18.0, PI * 0.05, PI * 0.8, 18, COLOR_WARNING, 2.0)
