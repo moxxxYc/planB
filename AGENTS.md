@@ -2,6 +2,8 @@
 
 当前仓库是文档主导的 Godot MVP 项目。`mvp/` 是当前 Godot MVP v0 实现目录；正式设计来源仍在根目录和 `docs/` 下。旧 Web MVP、旧 Battle Lab、归档 prototype、归档生成资源、旧包脚本、旧验证探针和项目内旧本地技能在 2026-06-02 后不再作为当前方向的依据。
 
+当前阶段是 Phase 1 Toolchain Alignment：只收束 AI 开发入口、验证命令和工具职责；后续才进入 MVP Readability Sprint。当前 Godot 工程目标为 Godot 4.6、GDScript、Compatibility / `gl_compatibility`。
+
 当前正式文档：
 
 - `README.md`
@@ -106,4 +108,4 @@
 - 美术风格、资源生产或视觉反馈规范变更：更新 `docs/DESIGN.md` 和 `docs/PROGRESS.md`。
 - 实现工作开始前：先创建新的实现计划，不引用已删除实现；计划必须等待用户明确确认后才能执行。
 - 如果发现归档 prototype 或归档实现文件，默认忽略；只有用户明确要求考古时才读取。
-- 当前仓库没有 npm 命令、构建命令或自动验证命令。
+- 当前仓库没有 npm 命令或通用构建命令；Godot MVP 核心验证从仓库根目录运行 `bash mvp/tools/verify_all.sh`，可用 `GODOT_BIN=/path/to/godot` 指定 Godot 4.6 可执行文件。

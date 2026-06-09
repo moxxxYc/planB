@@ -179,15 +179,17 @@ Level 4: 导出烟测 — 导出相关任务尽量导出目标平台并运行。
 验证工具优先级：
 
 - **优先用 GoPeak MCP（`gopeak`）** 驱动验证——运行场景、读取脚本诊断、抓运行时报错、截图自检。它能直接覆盖 Level 1/2/3，是本项目首选验证手段。
-- **回退**：没有 MCP 或只需快速 headless 烟测时，用 CLI 脚本（`GODOT_BIN` 指向 Godot 4.6）：
+- **回退**：没有 MCP 或只需快速 headless 验证时，用统一 CLI 脚本（`GODOT_BIN` 指向 Godot 4.6）：
 
 ```bash
-GODOT_BIN=/path/to/Godot ./mvp/tools/verify_godot.sh
+GODOT_BIN=/path/to/Godot bash mvp/tools/verify_all.sh
 ```
+
+`mvp/tools/verify_godot.sh` 保留为兼容烟测入口；Phase 1 之后的主验证路线是从仓库根目录运行 `bash mvp/tools/verify_all.sh`。
 
 GoPeak 的具体用法和前提见 `mvp/docs/agent/08-testing-validation.md` 第 10 节。
 
-如果 `mvp/project.godot` 尚不存在，`verify_godot.sh` 会报告 `Not run` 并以非 0 状态退出；这不算 Level 1 通过。创建 Godot 工程后，Level 1 必须真实打开 `mvp/` 工程并退出。
+如果 `mvp/project.godot` 尚不存在，验证脚本会以非 0 状态退出；这不算 Level 1 通过。创建 Godot 工程后，Level 1 必须真实打开 `mvp/` 工程并退出。
 
 ---
 

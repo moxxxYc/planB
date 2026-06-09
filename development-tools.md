@@ -7,6 +7,7 @@
 ## 工具使用原则
 
 - 项目 `docs/` 和现有代码优先级最高。
+- 当前阶段是 Phase 1 Toolchain Alignment；工具链只做入口和验证收束，不迁移主栈、不扩玩法、不改核心 canon。
 - 任何真正开发前，必须先获得用户明确确认；确认前不得创建或修改代码、资产、脚本、Godot 场景、Web prototype 或其他实现文件。
 - 游戏 canon 和长期设计决策走 gstack-game 链路。
 - Godot 实现细节走 GodotPrompter 和本地 `mvp/docs/agent/` 工程文档。
@@ -176,15 +177,26 @@ GoPeak 的动态工具目录还能按需暴露更多 Godot 工具组，例如 LS
 |---|---|
 | Godot 4.6 | 当前 MVP 引擎目标，工程根目录在 `mvp/` |
 | GDScript | 主要实现语言 |
-| Compatibility renderer | 桌面 + Web 兼容性的基线渲染器 |
-| `mvp/tools/verify_godot.sh` | Godot headless 烟测入口 |
+| Compatibility / `gl_compatibility` | 桌面 + Web 兼容性的基线渲染器 |
+| `mvp/tools/verify_all.sh` | 从仓库根目录运行当前 MVP 核心验证的主入口 |
+| `mvp/tools/verify_godot.sh` | Godot headless 烟测兼容入口 |
 | `mvp/tools/verify_project.gd` | 项目级验证脚本 |
 | `mvp/tools/verify_machine_causality.gd` | 机器因果链 vertical 验证 |
 | `mvp/tools/verify_battlefield_deploy_loop.gd` | Deploy Lane 和战场循环验证 |
 | `mvp/tools/verify_mvp_session.gd` | MVP session 验证 |
 | `mvp/tools/verify_playable_session.gd` | playable session 验证 |
 
-当前文档有一处已知状态不一致：根 `AGENTS.md` 仍写着仓库没有构建或验证命令，但 `README.md` 和 `mvp/AGENTS.md` 已经描述了 `mvp/tools/verify_godot.sh`。这应当作为后续文档漂移单独处理，不能作为绕过用户确认门槛的理由。
+主验证命令：
+
+```bash
+bash mvp/tools/verify_all.sh
+```
+
+如 Godot 不在 `PATH`，使用：
+
+```bash
+GODOT_BIN=/path/to/godot bash mvp/tools/verify_all.sh
+```
 
 ## GitHub 和外部协作
 
