@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="PlanB MVP v0"
-run/main_scene="res://scenes/run/mvp_shell.tscn"
+config/name="PlanB"
+run/main_scene="res://scenes/ui/main_menu.tscn"
 config/features=PackedStringArray("4.6")
 
 [display]

@@ -16,6 +16,20 @@ const EXPECTED_TERMS := [
 	"Right",
 ]
 
+const EXPECTED_ART_ASSETS := [
+	"res://assets/ui/planb_logo.png",
+	"res://assets/ui/menu_key_art.png",
+	"res://assets/sprites/hive_short_fang.png",
+	"res://assets/sprites/hive_shield_shell.png",
+	"res://assets/sprites/hive_acid_sac.png",
+	"res://assets/sprites/hive_crush_shell_beast.png",
+	"res://assets/sprites/enemy_grunt.png",
+	"res://assets/sprites/enemy_raider.png",
+	"res://assets/sprites/enemy_brute.png",
+	"res://assets/sprites/guardian_vein_mother.png",
+	"res://assets/sprites/guardian_acid_crown_mother.png",
+]
+
 
 func _init() -> void:
 	var failures: Array[String] = []
@@ -25,6 +39,7 @@ func _init() -> void:
 	_check_required_paths(failures)
 	_check_required_terms(failures)
 	_check_main_scene_instantiates(failures)
+	_check_art_assets(failures)
 	_check_resource_category_counts(failures)
 
 	if not failures.is_empty():
@@ -33,7 +48,7 @@ func _init() -> void:
 		quit(1)
 		return
 
-	print("verify_project.gd passed: M0 skeleton scenes, scripts, and data placeholders loaded")
+	print("verify_project.gd passed: main menu, scenes, scripts, data, and demo art assets loaded")
 	quit(0)
 
 
@@ -44,11 +59,11 @@ func _check_file_exists(path: String, failures: Array[String]) -> void:
 
 func _check_project_setting(failures: Array[String]) -> void:
 	var main_scene: String = ProjectSettings.get_setting("application/run/main_scene", "")
-	if main_scene != "res://scenes/run/mvp_shell.tscn":
+	if main_scene != "res://scenes/ui/main_menu.tscn":
 		failures.append("Unexpected main scene: %s" % main_scene)
 
 	var project_name: String = ProjectSettings.get_setting("application/config/name", "")
-	if project_name != "PlanB MVP v0":
+	if project_name != "PlanB":
 		failures.append("Unexpected project name: %s" % project_name)
 
 
@@ -69,7 +84,7 @@ func _check_required_terms(failures: Array[String]) -> void:
 
 
 func _check_main_scene_instantiates(failures: Array[String]) -> void:
-	var packed := ResourceLoader.load("res://scenes/run/mvp_shell.tscn")
+	var packed := ResourceLoader.load("res://scenes/ui/main_menu.tscn")
 	if not packed is PackedScene:
 		failures.append("Main scene did not load as PackedScene")
 		return
@@ -79,7 +94,22 @@ func _check_main_scene_instantiates(failures: Array[String]) -> void:
 		failures.append("Main scene could not instantiate")
 		return
 
+	if not instance.has_method("verify_menu_build"):
+		failures.append("Main scene missing verify_menu_build()")
+	elif not instance.verify_menu_build():
+		failures.append("Main menu contract failed")
+
 	instance.free()
+
+
+func _check_art_assets(failures: Array[String]) -> void:
+	for path in EXPECTED_ART_ASSETS:
+		if not FileAccess.file_exists(path):
+			failures.append("Missing art asset file: %s" % path)
+			continue
+		var image := Image.load_from_file(path)
+		if image == null or image.is_empty():
+			failures.append("Art asset did not decode as image: %s" % path)
 
 
 func _check_resource_category_counts(failures: Array[String]) -> void:

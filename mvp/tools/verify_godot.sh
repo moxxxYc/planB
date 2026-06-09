@@ -51,6 +51,13 @@ else
   echo "[verify] 跳过 M3 完整 session 验证：未找到 tools/verify_mvp_session.gd"
 fi
 
+if [[ -f "$ROOT/tools/verify_playable_session.gd" ]]; then
+  echo "[verify] 运行 tools/verify_playable_session.gd"
+  "$GODOT_BIN" --headless --path "$ROOT" --script "res://tools/verify_playable_session.gd" --no-header
+else
+  echo "[verify] 跳过可玩短局验证：未找到 tools/verify_playable_session.gd"
+fi
+
 if [[ -f "$ROOT/export_presets.cfg" ]]; then
   echo "[verify] 找到 export_presets.cfg"
   echo "[verify] 手动测试导出可执行（preset 名按实际配置）:"

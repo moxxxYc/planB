@@ -39,9 +39,11 @@ var battle_time_seconds: float = 0.0
 var battle_state := "running"
 var player_guardian_hp := PLAYER_GUARDIAN_MAX_HP
 var enemy_guardian_hp := ENEMY_GUARDIAN_MAX_HP
+var player_guardian_template_id := "hive.vein_mother"
 var lanes: Dictionary = {}
 var deploy_queue: Array[Dictionary] = []
 var units: Array[Dictionary] = []
+var deployed_units_history: Array[Dictionary] = []
 var event_log: Array[Dictionary] = []
 
 var _deploy_timer_seconds: float = 0.0
@@ -59,8 +61,10 @@ func reset() -> void:
 	battle_state = "running"
 	player_guardian_hp = PLAYER_GUARDIAN_MAX_HP
 	enemy_guardian_hp = ENEMY_GUARDIAN_MAX_HP
+	player_guardian_template_id = "hive.vein_mother"
 	deploy_queue.clear()
 	units.clear()
+	deployed_units_history.clear()
 	event_log.clear()
 	_deploy_timer_seconds = 0.0
 	_unit_index = 0
@@ -99,6 +103,13 @@ func select_lane(lane) -> bool:
 
 func get_selected_lane_name() -> String:
 	return LANE_NAMES[selected_lane_id]
+
+
+func set_player_guardian_template_id(template_id: String) -> void:
+	if template_id == "hive.acid_crown_mother":
+		player_guardian_template_id = template_id
+	else:
+		player_guardian_template_id = "hive.vein_mother"
 
 
 func enqueue_machine_queue_entry(queue_entry: Dictionary) -> bool:
@@ -141,6 +152,7 @@ func deploy_next_queue_entry() -> Dictionary:
 	var entry: Dictionary = deploy_queue.pop_front()
 	var lane_id := selected_lane_id
 	var unit := _spawn_player_unit_from_queue(entry, lane_id)
+	deployed_units_history.append(unit.duplicate(true))
 	_record_event(
 		"queue deployed",
 		"队列条目 %s 已部署到%s。" % [
@@ -155,6 +167,13 @@ func deploy_next_queue_entry() -> Dictionary:
 	)
 	_update_lane_states_and_danger()
 	return unit.duplicate(true)
+
+
+func get_deployed_units_history() -> Array[Dictionary]:
+	var results: Array[Dictionary] = []
+	for unit in deployed_units_history:
+		results.append(unit.duplicate(true))
+	return results
 
 
 func spawn_enemy(lane, enemy_name := "Enemy Grunt", path_pos := ENEMY_SPAWN_POS) -> Dictionary:
@@ -280,6 +299,7 @@ func get_debug_summary() -> Dictionary:
 		"units": units.duplicate(true),
 		"player_guardian_hp": player_guardian_hp,
 		"player_guardian_max_hp": PLAYER_GUARDIAN_MAX_HP,
+		"player_guardian_template_id": player_guardian_template_id,
 		"enemy_guardian_hp": enemy_guardian_hp,
 		"enemy_guardian_max_hp": ENEMY_GUARDIAN_MAX_HP,
 		"event_log": event_log.duplicate(true),
@@ -399,6 +419,8 @@ func _make_unit_from_resource(
 		"attack_cooldown": 0.0,
 		"state": "marching",
 		"source_queue_entry_id": str(source_entry.get("queue_entry_id", "")),
+		"source_slot_id": int(source_entry.get("source_slot_id", 0)),
+		"tuning_result": str(source_entry.get("tuning_result", "")),
 	}
 
 

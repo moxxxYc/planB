@@ -18,14 +18,27 @@ const COLOR_QUEUE := Color("#f0d35e")
 
 const LANE_ORDER := ["Left", "Mid", "Right"]
 const TEXT_SCALE := 1.18
+const SPRITE_PATHS := {
+	"hive.short_fang": "res://assets/sprites/hive_short_fang.png",
+	"hive.shield_shell": "res://assets/sprites/hive_shield_shell.png",
+	"hive.acid_sac": "res://assets/sprites/hive_acid_sac.png",
+	"hive.crush_shell_beast": "res://assets/sprites/hive_crush_shell_beast.png",
+	"enemy.grunt": "res://assets/sprites/enemy_grunt.png",
+	"enemy.raider": "res://assets/sprites/enemy_raider.png",
+	"enemy.brute": "res://assets/sprites/enemy_brute.png",
+	"guardian.vein_mother": "res://assets/sprites/guardian_vein_mother.png",
+	"guardian.acid_crown_mother": "res://assets/sprites/guardian_acid_crown_mother.png",
+}
 
 var model: RefCounted = null
 var _lane_rects: Dictionary = {}
+var _sprite_textures: Dictionary = {}
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(1040, 760)
+	custom_minimum_size = Vector2(660, 500)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_load_sprite_textures()
 
 
 func set_model(next_model: RefCounted) -> void:
@@ -97,14 +110,19 @@ func _draw_guardians(summary: Dictionary) -> void:
 	var enemy_hp := int(summary.get("enemy_guardian_hp", 0))
 	var enemy_max := int(summary.get("enemy_guardian_max_hp", 1))
 
-	draw_circle(Vector2(44, top_y + 190), 28, COLOR_BASE)
-	draw_arc(Vector2(44, top_y + 190), 31, 0.0, TAU, 36, COLOR_PLAYER, 3.0)
+	var player_guardian_sprite := "guardian.vein_mother"
+	if str(summary.get("player_guardian_template_id", "")) == "hive.acid_crown_mother":
+		player_guardian_sprite = "guardian.acid_crown_mother"
+	_draw_guardian_sprite(player_guardian_sprite, Vector2(44, top_y + 190), COLOR_PLAYER)
 	_draw_text("玩家守护者", Vector2(18, top_y + 232), 12, COLOR_TEXT)
 	_draw_text("生命 %d / %d" % [player_hp, player_max], Vector2(18, top_y + 250), 12, COLOR_PLAYER)
 
 	var enemy_x := size.x - 48.0
-	draw_circle(Vector2(enemy_x, top_y + 190), 28, COLOR_BASE)
-	draw_arc(Vector2(enemy_x, top_y + 190), 31, 0.0, TAU, 36, COLOR_ENEMY, 3.0)
+	_draw_guardian_sprite(
+		"guardian.acid_crown_mother",
+		Vector2(enemy_x, top_y + 190),
+		COLOR_ENEMY
+	)
 	_draw_text("敌方守护者", Vector2(enemy_x - 82, top_y + 232), 12, COLOR_TEXT)
 	_draw_text("生命 %d / %d" % [enemy_hp, enemy_max], Vector2(enemy_x - 82, top_y + 250), 12, COLOR_ENEMY)
 
@@ -173,8 +191,7 @@ func _draw_units(summary: Dictionary) -> void:
 		if int(unit.get("max_hp", 1)) >= 20:
 			radius = 12.0
 
-		draw_circle(Vector2(x, y), radius, color)
-		draw_arc(Vector2(x, y), radius + 2.5, 0.0, TAU, 24, COLOR_TEXT, 1.5)
+		_draw_unit_sprite(unit, Vector2(x, y), radius, color)
 		if str(unit.get("state", "")) != "marching":
 			draw_arc(Vector2(x, y), radius + 7.0, PI * 0.1, PI * 1.2, 18, color, 2.0)
 
@@ -226,6 +243,33 @@ func _draw_lane_danger(rect: Rect2, tier: int) -> void:
 		draw_rect(rect.grow(-2.0), COLOR_ENEMY, false, 2.0)
 
 
+func _draw_guardian_sprite(sprite_id: String, center: Vector2, accent: Color) -> void:
+	var texture := _sprite_textures.get(sprite_id) as Texture2D
+	if texture == null:
+		draw_circle(center, 28, COLOR_BASE)
+		draw_arc(center, 31, 0.0, TAU, 36, accent, 3.0)
+		return
+
+	var sprite_rect := Rect2(center - Vector2(33, 33), Vector2(66, 66))
+	draw_texture_rect(texture, sprite_rect, false)
+	draw_arc(center, 34, 0.0, TAU, 36, accent, 3.0)
+
+
+func _draw_unit_sprite(unit: Dictionary, center: Vector2, radius: float, fallback_color: Color) -> void:
+	var texture := _sprite_textures.get(str(unit.get("template_id", ""))) as Texture2D
+	if texture == null:
+		draw_circle(center, radius, fallback_color)
+		draw_arc(center, radius + 2.5, 0.0, TAU, 24, COLOR_TEXT, 1.5)
+		return
+
+	var sprite_size := Vector2(radius * 4.3, radius * 3.5)
+	if int(unit.get("max_hp", 1)) >= 20:
+		sprite_size = Vector2(radius * 4.8, radius * 3.8)
+	var sprite_rect := Rect2(center - sprite_size * 0.5, sprite_size)
+	draw_texture_rect(texture, sprite_rect, false)
+	draw_arc(center, max(sprite_size.x, sprite_size.y) * 0.33, 0.0, TAU, 24, COLOR_TEXT, 1.2)
+
+
 func _draw_text(text: String, draw_position: Vector2, font_size: int, color: Color) -> void:
 	draw_string(
 		get_theme_default_font(),
@@ -236,6 +280,20 @@ func _draw_text(text: String, draw_position: Vector2, font_size: int, color: Col
 		_scaled_font(font_size),
 		color
 	)
+
+
+func _load_sprite_textures() -> void:
+	for sprite_id in SPRITE_PATHS.keys():
+		var texture := _load_texture_from_file(str(SPRITE_PATHS[sprite_id]))
+		if texture != null:
+			_sprite_textures[str(sprite_id)] = texture
+
+
+func _load_texture_from_file(path: String) -> Texture2D:
+	var image := Image.load_from_file(path)
+	if image == null or image.is_empty():
+		return null
+	return ImageTexture.create_from_image(image)
 
 
 func _display_lane(lane) -> String:

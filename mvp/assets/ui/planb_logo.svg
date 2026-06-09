@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="220" viewBox="0 0 720 220">
+  <rect width="720" height="220" rx="18" fill="#151916"/>
+  <path d="M36 168 L112 52 L188 168 Z" fill="#7BCB6B" opacity="0.92"/>
+  <path d="M112 52 L188 168 L256 64 L322 168" fill="none" stroke="#E6B450" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M350 60 h88 q44 0 44 44 q0 42 -44 42 h-38 v38 h-50z" fill="#E8E1D2"/>
+  <path d="M408 94 h24 q12 0 12 12 q0 12 -12 12 h-24z" fill="#151916"/>
+  <path d="M500 60 h52 q82 0 82 62 q0 62 -82 62 h-52z" fill="#C58BE8"/>
+  <path d="M548 98 h14 q30 0 30 24 q0 24 -30 24 h-14z" fill="#151916"/>
+  <text x="36" y="204" fill="#E8E1D2" font-family="Arial, Helvetica, sans-serif" font-size="22" letter-spacing="6">MACHINE FRONTLINE</text>
+</svg>

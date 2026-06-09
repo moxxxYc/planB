@@ -1,6 +1,6 @@
 # 进度与决策日志
 
-**最后更新：** 2026-06-08
+**最后更新：** 2026-06-09
 **仓库状态：** 纯文档态，无当前正式实现。
 
 ## 当前正式文档
@@ -16,11 +16,12 @@
 - `docs/guardian-system.md`
 - `docs/mvp-learning-checkpoints.md`
 - `docs/mvp-scope.md`
+- `docs/DESIGN.md`
 - `docs/PROGRESS.md`
 
-当前 MVP v0 实现前置文档：
+当前美术与资源生产基线：
 
-- `docs/DESIGN.md`：MVP v0 `/implementation-handoff` 前置设计系统，记录 art direction、color / shape tokens、HUD components、animation / audio vocabulary；它是实现假设，不是最终美术 canon。
+- `docs/DESIGN.md`：已确认的 MVP v0 美术风格、资源生产约束和视觉反馈规范。全局风格为 `Modular 2.5D Readable War-Table Sprites / 模块化 2.5D 可读战争台资源风格`；采用 race-neutral base chassis + race skin layer + unit / Guardian sprite layer。它锁定生产方向，不锁最终资产清单、最终色值、最终字体、最终音频或最终混音。
 
 当前候选草案：
 
@@ -47,7 +48,7 @@
 - Hive 第一种族数值采用职责带口径：先保住 4 个 Unit slot 和 2 个 `Player Guardian` 的战场职责，再用战斗时长、失败率和软阈值护栏修正强度。
 - 第一批中立机器修正已经完成 MVP 文档态口径收束：第一次奖励三轴锚点、第一次商店候选池、`Echo Latch` 位置、第二次奖励生成规则、Gold faucet、价格带、职责带平衡口径和休整结果页口径已确认；精确 playtest 后最终平衡仍未定。
 - 球机物理表现层已吸收 2026-06-08 `/plan-design-review` 的候选收口内容：战中 1 秒扫视信息层级、物理反馈状态语法、灰阶 / 色盲可读规则、`Peglin` 仅作为结构参考的视觉身份约束，以及 5 个候选决策。该文已确认作为 MVP v0 handoff 实现假设，仍是候选草案，不参与正式文档权威顺序。
-- `docs/DESIGN.md` 已创建为 MVP v0 `/implementation-handoff` 前置设计系统，约束第一版视觉、形状、HUD、动效和音频词汇；最终美术资源和最终音频资产仍未定。
+- `docs/DESIGN.md` 已确认当前美术与资源生产基线：全局底盘保持中性可换皮，Hive 只是第一种族 skin layer；后续 AI 资产必须按 sprite sheet / VFX 帧 / Godot 可拆分资源约束生产。
 - `Overdrive` 不属于 MVP 基础按钮。
 - Guardian 是固定基地对象，也可以作为开局构筑锚点，但不是第四主系统。
 - Guardian 的战术技能和战略技能在单局开始后固定，不解锁、不升级、不换状态。
@@ -420,19 +421,36 @@
   - 包含 animation / audio vocabulary：Natural Hit、Forced Redirect、Distribution Shift、Blocked Bounce、Valid Unit Hit、Split Return、Recycle Return、Waste、Logic Settlement、Counter Disruption、Deploy Birth 和 Lane Danger Up。
 - MVP v0 可以进入 `/implementation-handoff`。handoff 应引用当前正式文档、候选草案、`docs/DESIGN.md` 和 `/plan-design-review` artifact；handoff 只写构建目标、体验要求、占位边界和验收标准，不写游戏代码。
 
+## 2026-06-09
+
+- 确认当前美术风格为 `Modular 2.5D Readable War-Table Sprites / 模块化 2.5D 可读战争台资源风格`。
+- 确认全局美术不绑定 Hive：
+  - 全局固定的是 race-neutral `Global Base Chassis`：中性 2.5D / 正交战争台、左侧三板球机、右侧三路战场、Queue bridge、`Deploy Lane`、路线危险和机器反馈语义。
+  - Hive 是 `Race Skin Layer`：虫壳 trim、酸液导轨、巢脉回流、Hive 单位和 Guardian sprite、局部 VFX。它不能替换三板球机、三路战场、通用标签或基础 UI 语义。
+  - 后续其他种族必须通过 skin kit 替换材质、单位剪影、Guardian、局部 VFX 和命名效果，不新增隐藏核心球机规则。
+- 确认后续资源生产必须考虑 AI 生成序列帧和 Godot 拼动作：
+  - 单位和 Guardian 使用稳定 2.5D 剪影，低到中等细节，2-3 个主材质区，减少细碎花纹、半透明丝线和跨帧易漂移结构。
+  - 推荐帧数起点：小型单位 idle 4-6、move 6-8、attack 4-6、hit 2-3、death 4-6；Guardian 和大型单位可略高。
+  - UI、球机底盘、路线、选路、危险提示、active ball、反制警示优先拆成 Godot 可复用模块、9-slice 面板、独立 sprite、shader 或 tween，不把整屏烘成一张图。
+- 生成并保留当前风格参考图：
+  - `docs/gstack-artifacts/planb-production-style-global-base-chassis-20260609.png`
+  - `docs/gstack-artifacts/planb-production-style-hive-skin-applied-20260609.png`
+  - `docs/gstack-artifacts/planb-production-style-sprite-sheet-feasibility-20260609.png`
+- 明确上一轮 `planb-artstyle-a/b/c-20260609.png` 只作为错误边界参考：它们过度偏 Hive，不作为全局风格依据。
+
 ## 当前未定
 
 - 中立修正的精确 playtest 后最终平衡。
-- Hive 4 个 Unit slot 的最终美术资源、攻击频率和 playtest 后最终平衡。
+- Hive 4 个 Unit slot 的最终 sprite sheet、攻击频率和 playtest 后最终平衡。
 - 两个 Guardian 的 playtest 后最终数值。MVP 实现输入使用已确认的职责带口径和 first-pass 参数。
 - `Unit.Slot.Exposure Gate` 暴露开始到完全暴露之间的插值方式。
 - 球机物理层的层间随机范围、钉子 / 活动块布局、炮台摆动参数、球物理参数与同屏球数、回流与 Exposure 挡板物理形态、各 Guardian / 修正 / 反制的具体物理表现（见 `docs/ball-machine-physical.md`），以及是否提升为正式规则。
-- `docs/DESIGN.md` 的最终字体、图标、插画、材质、音频资产、精确色值、布局比例和无障碍对比仍需实现后验证。
+- `docs/DESIGN.md` 已确认生产风格基线；最终字体、图标、具体种族 skin kit、sprite sheet 尺寸、pivot、碰撞区域、音频资产、精确色值、布局比例和无障碍对比仍需实现后验证。
 
 ## 下一步
 
 下一步可以进入 `/implementation-handoff`。这一步仍然不写游戏代码，只把当前设计输入翻译成可执行构建包：
 
 1. 以当前正式文档和 MVP v0 实现假设生成 handoff。
-2. 在 handoff 中明确 `docs/ball-machine-physical.md` 和 `docs/DESIGN.md` 是 MVP v0 输入，不是最终 canon。
+2. 在 handoff 中明确 `docs/ball-machine-physical.md` 是 MVP v0 物理表现输入；`docs/DESIGN.md` 是已确认的视觉与资源生产基线，但具体资产仍需导入和视觉 QA 验证。
 3. 如实现需要，再收束 `Unit.Slot.Exposure Gate` 暴露插值方式。

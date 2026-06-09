@@ -22,6 +22,7 @@ planB 当前仍没有可运行实现、包脚本、生成资源或自动验证�
 - `docs/guardian-system.md`：Guardian 通用系统规则，不放具体种族 Guardian。
 - `docs/mvp-learning-checkpoints.md`：MVP 玩家学习检查点、验收信号和失败信号。
 - `docs/mvp-scope.md`：第一版完整 MVP 的内容边界。
+- `docs/DESIGN.md`：已确认的 MVP v0 美术风格、资源生产约束和视觉反馈规范。
 - `docs/PROGRESS.md`：近期决策日志与下一步。
 - `AGENTS.md`：协作规则和文档权威顺序。
 
