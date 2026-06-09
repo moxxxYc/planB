@@ -1,7 +1,7 @@
 # 三仓机器规格
 
 **最后更新：** 2026-06-08
-**仓库状态：** 纯文档态，无当前正式实现。
+**仓库状态：** 文档主导，MVP v0 实现已在 `mvp/` 启动；本文不作为代码状态证明。
 **权威范围：** `Launch / Tuning / Unit` 三仓机器规则。
 
 本文只定义机器规则。战场规则见 `docs/battlefield-rules.md`，Guardian 规则见 `docs/guardian-system.md`。

@@ -1,9 +1,9 @@
 # planB 视觉与资源生产规范
 
 **最后更新：** 2026-06-09
-**文档状态：** 已确认的 MVP v0 美术风格与资源生产基线。
+**文档状态：** 已确认的 MVP v0 美术风格与资源生产基线；属于当前 MVP v0 实现输入，不是最终资产清单。
 
-本文定义当前实现不能临场发明的视觉风格、资源拆分方式和 AI 资产生产约束。它锁定的是**生产方向**，不是最终资产清单、最终色值、最终字体、最终音频或最终混音。玩法规则仍以 `docs/gdd.md`、`docs/machine-warehouses.md`、`docs/battlefield-rules.md`、`docs/deploy-lane-ui.md`、`docs/guardian-system.md`、`docs/mvp-scope.md`、`docs/mvp-learning-checkpoints.md` 和 `docs/neutral-modifiers.md` 为准。球机物理表现以 `docs/ball-machine-physical.md` 为 MVP v0 实现假设。
+本文定义当前实现不能临场发明的视觉风格、资源拆分方式和 AI 资产生产约束。它锁定的是**生产方向**，不是最终资产清单、最终色值、最终字体、最终音频或最终混音。玩法规则仍以 `docs/gdd.md`、`docs/machine-warehouses.md`、`docs/battlefield-rules.md`、`docs/deploy-lane-ui.md`、`docs/guardian-system.md`、`docs/mvp-scope.md`、`docs/mvp-hive-loadout.md`、`docs/rewards-economy.md` 和 `docs/mvp-learning-checkpoints.md` 为准。球机物理表现以 `docs/ball-machine-physical.md` 为 MVP v0 实现假设。
 
 ## 1. 风格锁定
 

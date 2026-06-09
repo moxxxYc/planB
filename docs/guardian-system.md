@@ -1,7 +1,7 @@
 # Guardian 通用系统
 
 **最后更新：** 2026-06-06
-**仓库状态：** 纯文档态，无当前正式实现。
+**仓库状态：** 文档主导，MVP v0 实现已在 `mvp/` 启动；本文不作为代码状态证明。
 **权威范围：** Guardian 通用机制，不包含具体种族 Guardian 设计。
 
 本文只定义 Guardian 作为系统的通用规则。战场表现见 `docs/battlefield-rules.md`，机器修正合同见 `docs/machine-warehouses.md`。

@@ -1,6 +1,6 @@
 ## 项目状态
 
-当前仓库是纯文档态。旧实现、生成资源、包脚本、验证探针和项目内本地技能在 2026-06-02 后不再作为当前方向的依据。
+当前仓库是文档主导的 Godot MVP 项目。`mvp/` 是当前 Godot MVP v0 实现目录；正式设计来源仍在根目录和 `docs/` 下。旧 Web MVP、旧 Battle Lab、归档 prototype、归档生成资源、旧包脚本、旧验证探针和项目内旧本地技能在 2026-06-02 后不再作为当前方向的依据。
 
 当前正式文档：
 
@@ -14,14 +14,15 @@
 - `docs/guardian-system.md`
 - `docs/mvp-learning-checkpoints.md`
 - `docs/mvp-scope.md`
+- `docs/mvp-hive-loadout.md`
+- `docs/rewards-economy.md`
 - `docs/DESIGN.md`
 - `docs/PROGRESS.md`
 - `AGENTS.md`
 
-当前候选草案：
+当前候选与实现输入：
 
-- `docs/neutral-modifiers.md`：记录已确认的中立奖励 / 商店结构、Gold faucet、价格带、职责带平衡口径和休整结果页口径。精确 playtest 后最终平衡未确认。
-- `docs/ball-machine-physical.md`：记录球机物理表现层候选草案（模型 A 真物理、三仓三块串联钉板结构，`Peglin` 仅作为结构参考、摆动炮台、override 物理化、左右分屏、同屏信息层级、物理反馈语法和灰阶可读规则）。叠加在 `docs/machine-warehouses.md` 逻辑之上，不改其规则。具体物理参数和各效果物理表现未定，未 playtest，未最终锁定。
+- `docs/ball-machine-physical.md`：MVP v0 实现输入。记录球机物理表现层候选草案（模型 A 真物理、三仓三块串联钉板结构，`Peglin` 仅作为结构参考、摆动炮台、override 物理化、左右分屏、同屏信息层级、物理反馈语法和灰阶可读规则）。叠加在 `docs/machine-warehouses.md` 逻辑之上，不改其规则。当前可作为 MVP v0 handoff / 实现假设；具体物理参数和各效果物理表现未定，未 playtest，未最终锁定为长期 canon。
 
 `docs/archive/` 是旧方向、过时计划、历史 skill 产物、旧 prototype 和旧实现假设的归档目录。除非被正式文档明确引用为当前规则，否则只当作背景材料。
 
@@ -49,6 +50,15 @@
 - Fast Prototype Lane 只用于快速验证，不直接产生正式 canon。进入该 lane 时先给出一句话验证假设、最小 playable slice、哪些内容是假数据 / 假 UI / 假平衡，以及退出判断；用户确认后才能开始实现。
 - Formal Design Lane 用于锁 canon、更新正式 GDD、决定长期系统、进入正式 Godot 实现计划或做 review / gate 结论。
 
+## Godot 开发技能优先级
+
+- 开发 Godot 相关功能时，优先加载 GodotPrompter 的 Godot skills。
+- 涉及需求澄清、规格、实现计划、测试策略、代码审查时，使用 Superpowers 的流程。
+- 如果 GodotPrompter 和 Superpowers 的建议冲突，先以项目已有 `docs/` 和现有代码为最高优先级。
+- 在项目已有 `docs/` 和现有代码没有明确约束的范围内，Godot API、场景树、资源、GDScript/C# 写法，以 GodotPrompter 为准。
+- 在项目已有 `docs/` 和现有代码没有明确约束的范围内，任务拆解、实现顺序、测试和 review 流程，以 Superpowers 为准。
+- 以上技能优先级不能绕过用户确认门槛；真正开发前仍必须等待用户明确确认。
+
 ## 文档权威顺序
 
 - `docs/gdd.md`：总设计与跨系统边界。
@@ -59,10 +69,12 @@
 - `docs/guardian-system.md`：Guardian 通用系统规则。
 - `docs/mvp-learning-checkpoints.md`：MVP 玩家学习检查点、验收信号和失败信号。
 - `docs/mvp-scope.md`：第一版 MVP 内容边界。
+- `docs/mvp-hive-loadout.md`：MVP v0 的 Hive 单位、Guardian、职责带和起始配置。
+- `docs/rewards-economy.md`：MVP v0 的奖励、商店、Gold、休整和中立修正候选。
 - `docs/DESIGN.md`：MVP v0 美术风格、资源生产约束和视觉反馈规范；不改写玩法规则。
 - `docs/PROGRESS.md`：近期决策日志，不是实现证明。
 
-候选草案不参与文档权威顺序，除非用户确认后再提升为正式规则。
+候选草案不参与文档权威顺序，除非用户确认后再提升为正式规则。MVP v0 实现输入可以指导当前 `mvp/` 构建，但不自动提升为长期 canon。
 
 如果文档冲突，先以更具体的规则文档为准，再更新 GDD 和 PROGRESS 消除冲突。
 
@@ -88,7 +100,8 @@
 - `Deploy Lane` UI 或选路规则变更：更新 `docs/deploy-lane-ui.md` 和 `docs/PROGRESS.md`。
 - Guardian 通用规则变更：更新 `docs/guardian-system.md` 和 `docs/PROGRESS.md`。
 - MVP 学习检查点变更：更新 `docs/mvp-learning-checkpoints.md` 和 `docs/PROGRESS.md`。
-- 中立奖励 / 商店修正候选变更：更新 `docs/neutral-modifiers.md` 和 `docs/PROGRESS.md`，用户确认后才能提升为正式规则。
+- Hive MVP loadout 变更：更新 `docs/mvp-hive-loadout.md` 和 `docs/PROGRESS.md`。
+- 奖励、商店、Gold、休整或中立修正候选变更：更新 `docs/rewards-economy.md` 和 `docs/PROGRESS.md`，精确 playtest 后最终平衡仍需标明未定。
 - MVP 范围变更：更新 `docs/mvp-scope.md` 和 `docs/PROGRESS.md`。
 - 美术风格、资源生产或视觉反馈规范变更：更新 `docs/DESIGN.md` 和 `docs/PROGRESS.md`。
 - 实现工作开始前：先创建新的实现计划，不引用已删除实现；计划必须等待用户明确确认后才能执行。

@@ -1,14 +1,14 @@
-# 球机物理层候选草案
+# 球机物理表现 MVP v0 输入
 
 **最后更新：** 2026-06-08
-**仓库状态：** 纯文档态，无当前正式实现。
-**草案状态：** 球机物理表现层的根决策已通过对话逐项确认，并已吸收 2026-06-08 `/plan-design-review` 提出的候选收口内容。用户已确认本文作为 MVP v0 的实现假设进入 `/implementation-handoff`，但这不等于最终 canon；钉子 / 活动块具体布局、层间随机范围、球物理参数和各 Guardian / 修正 / 反制的具体物理表现仍未定，未经 playtest，未最终锁定。
+**仓库状态：** 文档主导，MVP v0 实现已在 `mvp/` 启动；本文不作为代码状态证明。
+**文档状态：** MVP v0 实现输入。球机物理表现层的根决策已通过对话逐项确认，并已吸收 2026-06-08 `/plan-design-review` 提出的候选收口内容。用户已确认本文作为 MVP v0 的实现假设进入 `/implementation-handoff`，但这不等于最终 canon；钉子 / 活动块具体布局、层间随机范围、球物理参数和各 Guardian / 修正 / 反制的具体物理表现仍未定，未经 playtest，未最终锁定。
 
-本文只记录球机的**物理表现与运动形态**。机器逻辑结算规则仍以 `docs/machine-warehouses.md` 为准；本文叠加在其之上，不替代其结算定义。战场规则见 `docs/battlefield-rules.md`，Guardian 见 `docs/guardian-system.md`，中立修正见 `docs/neutral-modifiers.md`。
+本文只记录球机的**物理表现与运动形态**。机器逻辑结算规则仍以 `docs/machine-warehouses.md` 为准；本文叠加在其之上，不替代其结算定义。战场规则见 `docs/battlefield-rules.md`，Guardian 见 `docs/guardian-system.md`，奖励经济见 `docs/rewards-economy.md`。
 
 ## 0. 草案边界声明
 
-- 本文是候选草案，不参与文档权威顺序；当前确认状态是“进入 MVP v0 handoff 的实现假设”，不是“提升为最终正式规则”。
+- 本文是 MVP v0 实现输入，不参与长期 canon 的文档权威顺序；当前确认状态是“进入 MVP v0 handoff 的实现假设”，不是“提升为最终正式规则”。
 - 本文不新增机器逻辑规则，不改写 `Launch / Tuning / Unit`、`Gate / Prime / Echo / Surge`、`Unit slot`、`Queue`、`Deploy Lane` 的通用语义。
 - 本文记录的物理形态是"如何把现有机器逻辑做成真物理球机"的方向，不是最终实现规格。
 - 涉及的所有具体数值仍以 `docs/machine-warehouses.md` 的 first-pass 值为准；本文不发明新数值。

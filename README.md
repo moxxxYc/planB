@@ -1,6 +1,6 @@
 # planB
 
-planB 当前仍没有可运行实现、包脚本、生成资源或自动验证链。正式设计来源仍在根目录和 `docs/` 下；MVP v0 实现将在 `mvp/` 下开始。
+planB 当前是文档主导的 Godot MVP 项目。正式设计来源仍在根目录和 `docs/` 下；`mvp/` 是当前 Godot MVP v0 实现目录，但不替代设计文档的权威性。
 
 ## MVP 开发目录
 
@@ -22,14 +22,15 @@ planB 当前仍没有可运行实现、包脚本、生成资源或自动验证�
 - `docs/guardian-system.md`：Guardian 通用系统规则，不放具体种族 Guardian。
 - `docs/mvp-learning-checkpoints.md`：MVP 玩家学习检查点、验收信号和失败信号。
 - `docs/mvp-scope.md`：第一版完整 MVP 的内容边界。
+- `docs/mvp-hive-loadout.md`：MVP v0 的 Hive 单位、Guardian、职责带和起始配置。
+- `docs/rewards-economy.md`：MVP v0 的奖励、商店、Gold、休整和中立修正候选。
 - `docs/DESIGN.md`：已确认的 MVP v0 美术风格、资源生产约束和视觉反馈规范。
 - `docs/PROGRESS.md`：近期决策日志与下一步。
 - `AGENTS.md`：协作规则和文档权威顺序。
 
-## 候选草案
+## 候选与实现输入
 
-- `docs/neutral-modifiers.md`：记录已确认的中立奖励 / 商店结构、Gold faucet、价格带、职责带平衡口径和休整结果页口径。精确 playtest 后最终平衡未确认。
-- `docs/ball-machine-physical.md`：记录球机物理表现层候选草案（模型 A 真物理、三仓三块串联钉板结构，`Peglin` 仅作为结构参考、摆动炮台、override 物理化、左右分屏、同屏信息层级、物理反馈语法和灰阶可读规则）。具体物理参数和各效果物理表现未定，未 playtest，未最终锁定。
+- `docs/ball-machine-physical.md`：MVP v0 实现输入。记录球机物理表现层候选草案（模型 A 真物理、三仓三块串联钉板结构，`Peglin` 仅作为结构参考、摆动炮台、override 物理化、左右分屏、同屏信息层级、物理反馈语法和灰阶可读规则）。它可作为当前 MVP v0 handoff / 实现假设，但具体物理参数和各效果物理表现未定，未 playtest，未最终锁定为长期 canon。
 
 ## 归档内容
 
@@ -48,7 +49,7 @@ planB 当前仍没有可运行实现、包脚本、生成资源或自动验证�
 
 ## 当前状态
 
-- 仓库当前无实现代码作为正式来源。
+- 仓库已有 `mvp/` Godot MVP v0 实现目录；实现目录不是设计 canon，本 README 和 `docs/` 仍是设计来源。
 - 旧 Web MVP 和旧 Godot Battle Lab 假设都不能直接恢复为当前设计。
 - 旧 Godot prototype 已归档，不需要也不应该参与未来上下文扫描。
 - 正式机器术语是 `Launch / Tuning / Unit`。

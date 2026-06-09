@@ -1,7 +1,7 @@
 # planB 游戏设计总纲
 
 **最后更新：** 2026-06-08
-**仓库状态：** 纯文档态，无当前正式实现。
+**仓库状态：** 文档主导，MVP v0 实现已在 `mvp/` 启动；GDD 是设计总纲，不作为代码状态证明。
 **类型：** 球机驱动的自动战斗 Roguelite。
 **目标平台：** PC / 桌面优先。
 **正式单局目标：** 45-60 分钟。
@@ -41,12 +41,14 @@
 - `docs/guardian-system.md`：Guardian 通用系统。
 - `docs/mvp-learning-checkpoints.md`：MVP 玩家学习检查点、验收信号和失败信号。
 - `docs/mvp-scope.md`：第一版 MVP 范围。
+- `docs/mvp-hive-loadout.md`：MVP v0 的 Hive 单位、Guardian、职责带和起始配置。
+- `docs/rewards-economy.md`：MVP v0 的奖励、商店、Gold、休整和中立修正候选。
 - `docs/DESIGN.md`：MVP v0 美术风格、资源生产约束和视觉反馈规范。
 - `docs/PROGRESS.md`：近期决策日志。
 
-候选草案：
+候选与实现输入：
 
-- `docs/neutral-modifiers.md`：记录已确认的中立奖励 / 商店结构、Gold faucet、价格带、职责带平衡口径和休整结果页口径。精确 playtest 后最终平衡未确认。
+- `docs/ball-machine-physical.md`：MVP v0 实现输入。可指导当前 `mvp/` 的物理表现假设；具体参数和各效果物理表现仍未 playtest，未最终锁定为长期 canon。
 
 本 GDD 只保留总设计、跨系统边界、单局结构和风险判断。
 
@@ -129,7 +131,7 @@ Guardian 不能成为第四机器轴，不能变成英雄养成系统。详细�
 - 不做击杀、破门、快胜、剩余 HP 或战中 Gold 槽奖励。
 - 商店卖机器组件和构筑修正，不卖泛用大数值。
 - 奖励和商店效果必须声明影响哪个机器组件。
-- MVP 中立奖励 / 商店结构、Gold faucet、价格带、职责带平衡口径和休整结果页口径见 `docs/neutral-modifiers.md`；精确 playtest 后最终平衡仍未定。
+- MVP 奖励、商店、Gold faucet、价格带、休整和中立修正候选见 `docs/rewards-economy.md`；精确 playtest 后最终平衡仍未定。
 - MVP 第一版会话口径为 Battle 1 后给第一次奖励，Battle 2 后进入第一次商店。若前两战都是普通胜利，第一次商店通常是 12 Gold，并通过“最多购买 1 个中立修正”控制信息量和买穿风险，剩余 Gold 用于休整或保留到后续节点。
 - Battle 4 后给第二次奖励，用于主轴深化或补洞；第二次奖励不消耗 Gold，不开第二次商店。
 - 高 Gold 构筑可以存在，但必须是命名构筑，有机会成本和反制。
@@ -183,9 +185,9 @@ Guardian 不能成为第四机器轴，不能变成英雄养成系统。详细�
 - Hive MVP 机器包装采用视觉区分：不为 `Launch / Tuning / Unit`、`Gate / Prime / Echo / Surge`、`Unit slot`、`Queue` 或 `Deploy Lane` 设置 Hive 副名；Hive 特色通过虫壳、酸液、巢脉材质、图标风格、组件外观、运动反馈和命名效果表达。
 - Hive MVP 单位采用轻技能深度：每个单位只保留 1 个可见行为特征，不做主动技能、单位成长线、复杂状态或独立种族资源。单位行为必须服务球机读法，不能抢走 `Launch / Tuning / Unit` 的主系统位置。
 - Hive MVP 单位属性采用职责优先属性表，并使用中对比职责表作为第一版数值口径；只锁第一版核心属性起点，服务 4 个槽的职责读法，不在当前阶段追求完整战斗平衡表。
-- Hive 4 个 `Unit slot` 的第一版属性起点已确认：`短牙虫` hp 6 / damage 1 / 0.7s / range 1.5 / speed 10；`盾壳虫` hp 18 / damage 2 / 1.4s / range 1.5 / speed 6；`酸囊虫` hp 8 / damage 3 / 1.8s / range 7 / speed 7；`碾壳兽` hp 26 / damage 6 / 2.6s / range 2 / speed 5。具体表见 `docs/mvp-scope.md`。
+- Hive 4 个 `Unit slot` 的第一版属性起点已确认：`短牙虫` hp 6 / damage 1 / 0.7s / range 1.5 / speed 10；`盾壳虫` hp 18 / damage 2 / 1.4s / range 1.5 / speed 6；`酸囊虫` hp 8 / damage 3 / 1.8s / range 7 / speed 7；`碾壳兽` hp 26 / damage 6 / 2.6s / range 2 / speed 5。具体表见 `docs/mvp-hive-loadout.md`。
 - Hive 4 个 `Unit slot` 的第一版攻击几何已确认：`短牙虫` 和 `盾壳虫` 都是同路最近目标单体近战，不带隐藏行为；`酸囊虫` 弹道速度 14 路径单位/s，命中点同路溅射半径 2.5，最多命中主目标 + 2 个附近目标，目标死亡时打到目标死亡位置；`碾壳兽` 同路接战点横扫 3.5 路径单位，最多命中 3 个目标，不击退、不跨路。
-- Hive 第一种族数值采用职责带口径，不采用一次性精确终局表：`短牙虫` 快速接线但不抗压，`盾壳虫` 抗压但不推进，`酸囊虫` 破僵但不做持续炮台，`碾壳兽` 晚到翻线但不常驻清场；两个 `Player Guardian` 只能提供软轴倾向和弱守家，不能替代奖励、商店或持续稳线。具体职责带见 `docs/mvp-scope.md`。
+- Hive 第一种族数值采用职责带口径，不采用一次性精确终局表：`短牙虫` 快速接线但不抗压，`盾壳虫` 抗压但不推进，`酸囊虫` 破僵但不做持续炮台，`碾壳兽` 晚到翻线但不常驻清场；两个 `Player Guardian` 只能提供软轴倾向和弱守家，不能替代奖励、商店或持续稳线。具体职责带见 `docs/mvp-hive-loadout.md`。
 - Hive 4 个 `Unit slot` 的 MVP 职责骨架已确认：
   - Slot 1：`短牙虫`。稳定补线，低需求、低承诺，快速接线，低血低伤，近战轻咬，主要提供持续前线存在。可见行为特征为快速进入接战点，无额外状态。占位剪影为小体型、低伏身体、短牙前突。
   - Slot 2：`盾壳虫`。守线抗压，中低需求，较慢但更硬，近战稳定攻击，优先承受接战压力，减少漏兵。可见行为特征为接敌后更能站住，承受第一轮接触压力。占位剪影为宽壳、低重心、前盾状甲壳。

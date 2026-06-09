@@ -1,7 +1,7 @@
 # 进度与决策日志
 
 **最后更新：** 2026-06-09
-**仓库状态：** 纯文档态，无当前正式实现。
+**仓库状态：** 文档主导，MVP v0 实现已在 `mvp/` 启动；本文记录设计状态和决策日志，不作为代码状态证明。
 
 ## 当前正式文档
 
@@ -16,6 +16,8 @@
 - `docs/guardian-system.md`
 - `docs/mvp-learning-checkpoints.md`
 - `docs/mvp-scope.md`
+- `docs/mvp-hive-loadout.md`
+- `docs/rewards-economy.md`
 - `docs/DESIGN.md`
 - `docs/PROGRESS.md`
 
@@ -23,15 +25,15 @@
 
 - `docs/DESIGN.md`：已确认的 MVP v0 美术风格、资源生产约束和视觉反馈规范。全局风格为 `Modular 2.5D Readable War-Table Sprites / 模块化 2.5D 可读战争台资源风格`；采用 race-neutral base chassis + race skin layer + unit / Guardian sprite layer。它锁定生产方向，不锁最终资产清单、最终色值、最终字体、最终音频或最终混音。
 
-当前候选草案：
+当前候选与实现输入：
 
-- `docs/neutral-modifiers.md`：记录已确认的第一次奖励三轴锚点、第一次商店候选池、`Echo Latch` 位置、第二次奖励生成规则、Gold faucet、价格带、职责带平衡口径和休整结果页口径；精确 playtest 后最终平衡未确认。
-- `docs/ball-machine-physical.md`：记录球机物理表现层候选草案（模型 A 真物理、三仓三块串联钉板结构，`Peglin` 仅作为结构参考、摆动炮台、override 物理化、左右分屏、同屏信息层级、物理反馈语法和灰阶可读规则）；已确认作为 MVP v0 实现假设进入 `/implementation-handoff`，但不等于最终 canon，具体物理参数和各效果物理表现未定，未 playtest，未最终锁定。
+- `docs/ball-machine-physical.md`：MVP v0 实现输入。记录球机物理表现层候选草案（模型 A 真物理、三仓三块串联钉板结构，`Peglin` 仅作为结构参考、摆动炮台、override 物理化、左右分屏、同屏信息层级、物理反馈语法和灰阶可读规则）；已确认作为 MVP v0 实现假设进入 `/implementation-handoff`，但不等于最终 canon，具体物理参数和各效果物理表现未定，未 playtest，未最终锁定。
 
 旧方向、过时计划、历史 artifacts 和旧 prototype 已归档到 `docs/archive/`，不作为当前正式规则。
 
 ## 当前总状态
 
+- 仓库已经从纯文档态进入“文档主导 + Godot MVP v0 已启动”阶段；`mvp/` 是当前 Godot MVP v0 实现目录，但不替代 `docs/` 的设计权威。
 - 旧 Web MVP、旧脚本、旧验证命令和旧实现假设都不再作为当前设计依据。
 - 旧 Godot prototype 已归档到 `docs/archive/prototypes/`，完全过期，不再作为 build、验证、评审或路由信号。
 - 当前正在从基础机制整理转入 Hive 第一种族设计；`Caste Hive` 方向已确认，单位工作名、占位剪影、轻行为和第一版攻击几何已定，两个 Guardian 的身份、轴倾向、技能结构、技能方向、战术技能目标优先级和第一版战术技能范围已定，最终美术资源和最终数值仍未定。
@@ -47,7 +49,7 @@
 - MVP 第一轮 playtest 软阈值护栏已确认：10-20 局后观察 Guardian 选择率和成功率差距、Unit slot 关键队列贡献占比、以及连续空窗战斗。
 - Hive 第一种族数值采用职责带口径：先保住 4 个 Unit slot 和 2 个 `Player Guardian` 的战场职责，再用战斗时长、失败率和软阈值护栏修正强度。
 - 第一批中立机器修正已经完成 MVP 文档态口径收束：第一次奖励三轴锚点、第一次商店候选池、`Echo Latch` 位置、第二次奖励生成规则、Gold faucet、价格带、职责带平衡口径和休整结果页口径已确认；精确 playtest 后最终平衡仍未定。
-- 球机物理表现层已吸收 2026-06-08 `/plan-design-review` 的候选收口内容：战中 1 秒扫视信息层级、物理反馈状态语法、灰阶 / 色盲可读规则、`Peglin` 仅作为结构参考的视觉身份约束，以及 5 个候选决策。该文已确认作为 MVP v0 handoff 实现假设，仍是候选草案，不参与正式文档权威顺序。
+- 球机物理表现层已吸收 2026-06-08 `/plan-design-review` 的候选收口内容：战中 1 秒扫视信息层级、物理反馈状态语法、灰阶 / 色盲可读规则、`Peglin` 仅作为结构参考的视觉身份约束，以及 5 个候选决策。该文已确认作为 MVP v0 handoff 实现假设，属于当前 MVP v0 实现输入，但不参与长期 canon 的正式文档权威顺序。
 - `docs/DESIGN.md` 已确认当前美术与资源生产基线：全局底盘保持中性可换皮，Hive 只是第一种族 skin layer；后续 AI 资产必须按 sprite sheet / VFX 帧 / Godot 可拆分资源约束生产。
 - `Overdrive` 不属于 MVP 基础按钮。
 - Guardian 是固定基地对象，也可以作为开局构筑锚点，但不是第四主系统。
@@ -180,7 +182,7 @@
 
 ## 2026-06-05
 
-- 新增 `docs/neutral-modifiers.md` 作为候选草案。
+- 新增 `docs/rewards-economy.md` 作为候选草案。
 - 撤回“第一批中立奖励 / 商店机器修正已整体锁定”的表述，改为只记录候选并等待 gstack-game 逐项确认：
   - `Launch`：`Pool Pocket`、`Front Recycle`、`Junk Sieve`。
   - `Tuning`：`Prime Charge`、`Echo Latch`、`Surge Buffer`。
@@ -419,7 +421,7 @@
   - 包含 color / shape tokens：当前选路、路线危险、机器反制、active ball、Tuning 槽、Unit Exposure 和强制导轨均有颜色、形状和运动配对。
   - 包含 HUD components：Machine Strip、Forge / Pool / Launcher、Tuning Result、Unit Slots、Queue Bridge、Deploy Lane Overlay、Lane Danger、Guardian HUD、Reward Cards、Shop Cards、Result Page。
   - 包含 animation / audio vocabulary：Natural Hit、Forced Redirect、Distribution Shift、Blocked Bounce、Valid Unit Hit、Split Return、Recycle Return、Waste、Logic Settlement、Counter Disruption、Deploy Birth 和 Lane Danger Up。
-- MVP v0 可以进入 `/implementation-handoff`。handoff 应引用当前正式文档、候选草案、`docs/DESIGN.md` 和 `/plan-design-review` artifact；handoff 只写构建目标、体验要求、占位边界和验收标准，不写游戏代码。
+- MVP v0 可以进入 `/implementation-handoff`。handoff 应引用当前正式 canon、MVP v0 实现输入、候选草案中已确认可进入 MVP 的部分、`docs/DESIGN.md` 和 `/plan-design-review` artifact；handoff 只写构建目标、体验要求、占位边界和验收标准，不写游戏代码。
 
 ## 2026-06-09
 
@@ -437,6 +439,11 @@
   - `docs/gstack-artifacts/planb-production-style-hive-skin-applied-20260609.png`
   - `docs/gstack-artifacts/planb-production-style-sprite-sheet-feasibility-20260609.png`
 - 明确上一轮 `planb-artstyle-a/b/c-20260609.png` 只作为错误边界参考：它们过度偏 Hive，不作为全局风格依据。
+- 整理策划文档信息架构：
+  - 新增 `docs/mvp-hive-loadout.md`，从 `docs/mvp-scope.md` 拆出 Hive 单位、Guardian、Guardian Contract 和职责带调参口径。
+  - 将原中立修正候选文档改名为 `docs/rewards-economy.md`，作为 MVP v0 奖励、商店、Gold、休整和中立修正候选输入。
+  - 将 `docs/mvp-scope.md` 收束为 MVP 范围合同，只保留目标、硬上限、必须包含、明确不做和成功标准。
+  - 将 `docs/ball-machine-physical.md` 标题调整为“球机物理表现 MVP v0 输入”，明确它是当前实现输入但不是最终 canon。
 
 ## 当前未定
 
@@ -449,7 +456,7 @@
 
 ## 下一步
 
-下一步可以进入 `/implementation-handoff`。这一步仍然不写游戏代码，只把当前设计输入翻译成可执行构建包：
+下一步可以进入 `/implementation-handoff`。这一步仍然不新增游戏代码，只把当前设计输入翻译成可执行构建包：
 
 1. 以当前正式文档和 MVP v0 实现假设生成 handoff。
 2. 在 handoff 中明确 `docs/ball-machine-physical.md` 是 MVP v0 物理表现输入；`docs/DESIGN.md` 是已确认的视觉与资源生产基线，但具体资产仍需导入和视觉 QA 验证。
