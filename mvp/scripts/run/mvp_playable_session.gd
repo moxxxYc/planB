@@ -9,6 +9,28 @@ const UI_SCALE := 1.08
 const BATTLE_DURATION_SECONDS := 9.0
 const ENDPOINT_DURATION_SECONDS := 7.0
 const SIMULATION_SPEED := 2.6
+const DEFAULT_VIEWPORT_SIZE := Vector2i(1600, 900)
+const AUDIO_MIX_RATE := 22050
+const AUDIO_CUE_FREQUENCIES := {
+	"launch": 392.0,
+	"tuning_hit": 523.25,
+	"unit_created": 659.25,
+	"deploy": 330.0,
+	"lane_danger": 196.0,
+	"victory": 783.99,
+	"reward_picked": 587.33,
+	"result": 440.0,
+}
+const AUDIO_CUE_DURATIONS := {
+	"launch": 0.07,
+	"tuning_hit": 0.08,
+	"unit_created": 0.11,
+	"deploy": 0.07,
+	"lane_danger": 0.12,
+	"victory": 0.16,
+	"reward_picked": 0.12,
+	"result": 0.18,
+}
 
 var _session: RefCounted = SessionModelScript.new()
 var _machine_view: Control
@@ -22,6 +44,7 @@ var _result_list: VBoxContainer
 var _built := false
 
 var _phase := "guardian"
+var _visible_step := "Guardian Select"
 var _battle_running := false
 var _battle_number := 0
 var _battle_elapsed := 0.0
@@ -29,6 +52,14 @@ var _current_lane := "Mid"
 var _forwarded_machine_entries := 0
 var _deployed_start_index := 0
 var _selected_shop_purchase_id := ""
+var _endpoint_player_wins := true
+var _last_machine_event_count := 0
+var _last_battlefield_event_count := 0
+var _audio_players: Dictionary = {}
+var _audio_events: Array[String] = []
+var _audio_cue_counts: Dictionary = {}
+var _transition_beats: Array[String] = []
+var _phase_status_mismatches: Array[String] = []
 
 
 func _ready() -> void:
@@ -52,7 +83,35 @@ func verify_scene_build() -> bool:
 
 
 func run_minimal_player_session_for_verification() -> Dictionary:
+	return _run_player_session_for_verification(true)
+
+
+func run_loss_player_session_for_verification() -> Dictionary:
+	return _run_player_session_for_verification(false)
+
+
+func get_playable_feel_summary() -> Dictionary:
 	_ensure_built()
+	return {
+		"default_viewport_width": DEFAULT_VIEWPORT_SIZE.x,
+		"default_viewport_height": DEFAULT_VIEWPORT_SIZE.y,
+		"uses_scroll_containers": _has_scroll_container(self),
+		"has_visible_debug_framing": _has_visible_debug_framing(),
+		"audio_events": _audio_events.duplicate(),
+		"audio_cue_counts": _audio_cue_counts.duplicate(true),
+		"transition_beats": _transition_beats.duplicate(),
+		"phase_status_mismatches": _phase_status_mismatches.duplicate(),
+		"visible_step": _visible_step,
+		"machine_min_size": _machine_view.custom_minimum_size if _machine_view != null else Vector2.ZERO,
+		"battlefield_min_size": (
+			_battlefield_view.custom_minimum_size if _battlefield_view != null else Vector2.ZERO
+		),
+	}
+
+
+func _run_player_session_for_verification(player_wins: bool) -> Dictionary:
+	_ensure_built()
+	_endpoint_player_wins = player_wins
 	_on_guardian_choice("hive.vein_mother")
 	_run_current_battle_for_verification()
 	_on_first_reward_choice("pool_pocket")
@@ -73,6 +132,7 @@ func _ensure_built() -> void:
 		return
 	_built = true
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_build_audio_bank()
 	_build_layout()
 	_show_guardian_choices()
 	_refresh()
@@ -102,7 +162,7 @@ func _build_layout() -> void:
 	root.add_child(body)
 
 	var side_panel := PanelContainer.new()
-	side_panel.custom_minimum_size = Vector2(390, 0)
+	side_panel.custom_minimum_size = Vector2(320, 0)
 	body.add_child(side_panel)
 
 	var side := VBoxContainer.new()
@@ -138,29 +198,21 @@ func _build_layout() -> void:
 	views.add_theme_constant_override("separation", 8)
 	play_area.add_child(views)
 
-	var machine_scroll := ScrollContainer.new()
-	machine_scroll.custom_minimum_size = Vector2(500, 520)
-	machine_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	machine_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	views.add_child(machine_scroll)
-
 	_machine_view = MachineViewScript.new()
-	_machine_view.custom_minimum_size = Vector2(760, 610)
-	machine_scroll.add_child(_machine_view)
-
-	var battlefield_scroll := ScrollContainer.new()
-	battlefield_scroll.custom_minimum_size = Vector2(650, 520)
-	battlefield_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	battlefield_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	views.add_child(battlefield_scroll)
+	_machine_view.custom_minimum_size = Vector2(560, 500)
+	_machine_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_machine_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	views.add_child(_machine_view)
 
 	_battlefield_view = BattlefieldViewScript.new()
-	_battlefield_view.custom_minimum_size = Vector2(900, 610)
+	_battlefield_view.custom_minimum_size = Vector2(660, 500)
+	_battlefield_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_battlefield_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_battlefield_view.lane_clicked.connect(_on_lane_clicked)
-	battlefield_scroll.add_child(_battlefield_view)
+	views.add_child(_battlefield_view)
 
 	var result_panel := PanelContainer.new()
-	result_panel.custom_minimum_size = Vector2(0, 150)
+	result_panel.custom_minimum_size = Vector2(0, 118)
 	play_area.add_child(result_panel)
 
 	_result_list = VBoxContainer.new()
@@ -169,7 +221,7 @@ func _build_layout() -> void:
 
 
 func _show_guardian_choices() -> void:
-	_phase = "guardian"
+	_set_visible_phase("guardian", "Guardian Select")
 	_battle_running = false
 	_clear_container(_choice_panel)
 	_choice_panel.add_child(_make_label("选择 Player Guardian", 14))
@@ -184,15 +236,17 @@ func _show_guardian_choices() -> void:
 
 
 func _on_guardian_choice(guardian_id: String) -> void:
+	_reset_feel_runtime()
 	_session.start_new_run(guardian_id)
 	_session.telemetry["playable.guardian_choice_source"] = "player"
 	_current_lane = "Mid"
 	_forwarded_machine_entries = _session.machine_model.queue_entries.size()
+	_last_machine_event_count = _session.machine_model.event_log.size()
 	_start_battle(1)
 
 
 func _start_battle(battle_number: int) -> void:
-	_phase = "battle"
+	_set_visible_phase("battle", _battle_step_label(battle_number))
 	_battle_number = battle_number
 	_battle_elapsed = 0.0
 	_battle_running = true
@@ -200,17 +254,21 @@ func _start_battle(battle_number: int) -> void:
 	if battle_number == 3:
 		counter_id = _session.get_counter_id_for_current_axis()
 	_session.begin_playable_battle(battle_number, _current_lane, counter_id)
+	_last_battlefield_event_count = 0
+	_sync_audio_from_battlefield_events()
 	_forwarded_machine_entries = _session.machine_model.queue_entries.size()
 	_deployed_start_index = _session.battlefield_model.get_deployed_units_history().size()
-	_show_battle_status("Battle %d" % battle_number)
+	_show_battle_status(_battle_step_label(battle_number))
 
 
 func _start_endpoint() -> void:
-	_phase = "endpoint"
+	_set_visible_phase("endpoint", "Endpoint")
 	_battle_number = 6
 	_battle_elapsed = 0.0
 	_battle_running = true
 	_session.begin_playable_endpoint(_current_lane)
+	_last_battlefield_event_count = 0
+	_sync_audio_from_battlefield_events()
 	_forwarded_machine_entries = _session.machine_model.queue_entries.size()
 	_deployed_start_index = _session.battlefield_model.get_deployed_units_history().size()
 	_show_battle_status("Endpoint")
@@ -230,8 +288,10 @@ func _advance_battle(delta: float) -> void:
 	var step: float = max(0.0, delta) * SIMULATION_SPEED
 	_battle_elapsed += step
 	_session.machine_model.step_simulation(step)
+	_sync_audio_from_machine_events()
 	_forward_machine_queue_entries()
 	_session.battlefield_model.tick(step)
+	_sync_audio_from_battlefield_events()
 	_refresh()
 
 	var duration: float = ENDPOINT_DURATION_SECONDS if _phase == "endpoint" else BATTLE_DURATION_SECONDS
@@ -252,24 +312,30 @@ func _complete_current_battle() -> void:
 	_battle_running = false
 	var deployed := _deployed_units_since_battle_start()
 	if _phase == "endpoint":
-		_session.finish_playable_endpoint(true, deployed)
+		_session.finish_playable_endpoint(_endpoint_player_wins, deployed)
 		_session.telemetry["playable.endpoint_source"] = "scripted_visible_phase"
 		_session.build_result_page()
+		_record_transition_beat("endpoint_to_result")
 		_show_result_page()
 		return
 
 	var outcome := str(_session.battlefield_model.get_battle_state())
 	_session.finish_playable_battle(_battle_number, outcome, deployed)
+	_play_audio_cue("victory")
 	match _battle_number:
 		1:
+			_record_transition_beat("battle_1_to_first_reward")
 			_show_first_reward_choices()
 		2:
+			_record_transition_beat("battle_2_to_shop")
 			_show_shop_choices()
 		3:
 			_start_battle(4)
 		4:
+			_record_transition_beat("battle_4_to_second_reward")
 			_show_second_reward_choices()
 		5:
+			_record_transition_beat("battle_5_to_endpoint_prep")
 			_show_endpoint_prep_choices()
 		_:
 			_show_result_page()
@@ -284,8 +350,9 @@ func _deployed_units_since_battle_start() -> Array[Dictionary]:
 
 
 func _show_first_reward_choices() -> void:
-	_phase = "first_reward"
+	_set_visible_phase("first_reward", "First Reward")
 	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("战斗胜利 -> 奖励选择", 12))
 	_choice_panel.add_child(_make_label("第一次奖励：选择机器轴锚点", 14))
 	for reward in _session.get_first_reward_choices():
 		var reward_id := str(reward.get("modifier_id", ""))
@@ -302,14 +369,16 @@ func _show_first_reward_choices() -> void:
 
 
 func _on_first_reward_choice(reward_id: String) -> void:
+	_play_audio_cue("reward_picked")
 	_session.choose_first_reward(reward_id)
 	_session.telemetry["playable.first_reward_choice_source"] = "player"
 	_start_battle(2)
 
 
 func _show_shop_choices() -> void:
-	_phase = "shop"
+	_set_visible_phase("shop", "Shop / Gold / Rest")
 	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("战斗胜利 -> 商店 / 休整", 12))
 	_choice_panel.add_child(_make_label("第一次商店：选择 1 个中立机器修正", 14))
 	_choice_panel.add_child(_make_label("Gold：%d。购买后会进入休整选择。" % _session.gold, 11))
 	for item in _session.get_shop_choices():
@@ -344,8 +413,9 @@ func _on_rest_choice(buy_rest: bool) -> void:
 
 
 func _show_second_reward_choices() -> void:
-	_phase = "second_reward"
+	_set_visible_phase("second_reward", "Second Reward")
 	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("战斗胜利 -> 第二奖励", 12))
 	_choice_panel.add_child(_make_label("第二次奖励：深化主轴或补洞", 14))
 	for reward in _session.get_second_reward_choices():
 		var modifier_id := str(reward.get("modifier_id", ""))
@@ -362,14 +432,16 @@ func _show_second_reward_choices() -> void:
 
 
 func _on_second_reward_choice(modifier_id: String) -> void:
+	_play_audio_cue("reward_picked")
 	_session.choose_second_reward(modifier_id)
 	_session.telemetry["playable.second_reward_choice_source"] = "player"
 	_start_battle(5)
 
 
 func _show_endpoint_prep_choices() -> void:
-	_phase = "endpoint_prep"
+	_set_visible_phase("endpoint_prep", "Endpoint Prep")
 	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("战斗胜利 -> 终点前整备", 12))
 	_choice_panel.add_child(_make_label("终点前整备", 14))
 	_choice_panel.add_child(_make_label("此处不卖第二次商店，只允许休整或直接进入终点。", 11))
 	_add_button(_choice_panel, "终点前休整", Callable(self, "_on_endpoint_rest_choice").bind(true))
@@ -384,8 +456,10 @@ func _on_endpoint_rest_choice(buy_rest: bool) -> void:
 
 
 func _show_result_page() -> void:
-	_phase = "result"
+	_set_visible_phase("result", "Result Page")
+	_play_audio_cue("result")
 	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("终点完成 -> 结算页", 12))
 	_choice_panel.add_child(_make_label("结算页", 15))
 	_choice_panel.add_child(_make_label("本局已结束；结果页字段来自本局选择、部署、反制和终点记录。", 11))
 	_refresh()
@@ -395,6 +469,7 @@ func _on_lane_clicked(lane_name: String) -> void:
 	_current_lane = lane_name
 	_session.battlefield_model.select_lane(lane_name)
 	_session.telemetry["playable.deploy_lane_choice_source"] = "player"
+	_play_audio_cue("deploy")
 	_refresh()
 
 
@@ -414,7 +489,7 @@ func _refresh() -> void:
 	var summary: Dictionary = _session.get_run_summary()
 	_phase_label.text = "PlanB MVP v0 可玩短局 | %s" % _display_phase(_phase)
 	_status_label.text = "阶段：%s | Gold %d | Guardian HP %d/100 | Deploy Lane %s | 主轴 %s" % [
-		_display_step(summary.get("current_step", "Guardian Select")),
+		_display_step(_visible_step),
 		int(summary.get("gold", 0)),
 		int(summary.get("player_guardian_hp", 100)),
 		_display_lane(_current_lane),
@@ -429,7 +504,10 @@ func _refresh() -> void:
 	var events: Array = summary.get("event_log", [])
 	var start_index: int = max(0, events.size() - 8)
 	for event in events.slice(start_index):
-		_log_list.add_child(_make_label(str(event.get("description", "")), 9))
+		_log_list.add_child(_make_label(
+			_display_event_description(str(event.get("description", ""))),
+			9
+		))
 
 	_clear_container(_result_list)
 	var result_page: Dictionary = summary.get("result_page", {})
@@ -450,6 +528,7 @@ func _refresh() -> void:
 				"%s：%s" % [_display_result_key(key), result_page.get(key, "")],
 				10
 			))
+	_record_phase_status_check()
 
 
 func _make_label(text: String, font_size: int) -> Label:
@@ -480,6 +559,202 @@ func _clear_container(container: Node) -> void:
 	for child in container.get_children():
 		container.remove_child(child)
 		child.queue_free()
+
+
+func _build_audio_bank() -> void:
+	for cue_id in AUDIO_CUE_FREQUENCIES.keys():
+		var cue_name := str(cue_id)
+		var player := AudioStreamPlayer.new()
+		player.name = "AudioCue%s" % _cue_node_suffix(cue_name)
+		player.stream = _make_tone_stream(
+			float(AUDIO_CUE_FREQUENCIES[cue_name]),
+			float(AUDIO_CUE_DURATIONS[cue_name])
+		)
+		player.volume_db = -15.0
+		_audio_players[cue_name] = player
+		add_child(player)
+
+
+func _make_tone_stream(frequency: float, duration: float) -> AudioStreamWAV:
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = AUDIO_MIX_RATE
+	stream.stereo = false
+
+	var frame_count: int = max(1, int(round(duration * AUDIO_MIX_RATE)))
+	var data := PackedByteArray()
+	data.resize(frame_count * 2)
+	for frame in range(frame_count):
+		var progress := float(frame) / float(max(1, frame_count - 1))
+		var envelope := 1.0 - progress
+		var wave := sin(float(frame) * TAU * frequency / float(AUDIO_MIX_RATE))
+		var sample := int(clamp(wave * envelope * 0.34, -1.0, 1.0) * 32767.0)
+		var encoded := sample
+		if encoded < 0:
+			encoded = 65536 + encoded
+		data[frame * 2] = encoded & 0xff
+		data[frame * 2 + 1] = (encoded >> 8) & 0xff
+
+	stream.data = data
+	return stream
+
+
+func _play_audio_cue(cue_id: String) -> void:
+	if not _audio_players.has(cue_id):
+		return
+	_audio_events.append(cue_id)
+	_audio_cue_counts[cue_id] = int(_audio_cue_counts.get(cue_id, 0)) + 1
+	if not is_inside_tree():
+		return
+	var player := _audio_players[cue_id] as AudioStreamPlayer
+	if player != null:
+		player.stop()
+		player.play()
+
+
+func _sync_audio_from_machine_events() -> void:
+	var events: Array = _session.machine_model.event_log
+	while _last_machine_event_count < events.size():
+		var event: Dictionary = events[_last_machine_event_count]
+		_last_machine_event_count += 1
+		var component := str(event.get("component", ""))
+		var state := str(event.get("state", ""))
+		match component:
+			"Launcher", "Launch":
+				_play_audio_cue("launch")
+			"Tuning":
+				if state == "Natural Hit" or state == "Logic Settlement":
+					_play_audio_cue("tuning_hit")
+			"Queue":
+				_play_audio_cue("unit_created")
+
+
+func _sync_audio_from_battlefield_events() -> void:
+	var events: Array = _session.battlefield_model.event_log
+	while _last_battlefield_event_count < events.size():
+		var event: Dictionary = events[_last_battlefield_event_count]
+		_last_battlefield_event_count += 1
+		match str(event.get("state", "")):
+			"queue deployed":
+				_play_audio_cue("deploy")
+			"lane warning":
+				_play_audio_cue("lane_danger")
+
+
+func _reset_feel_runtime() -> void:
+	_audio_events.clear()
+	_audio_cue_counts.clear()
+	_transition_beats.clear()
+	_phase_status_mismatches.clear()
+	_last_machine_event_count = 0
+	_last_battlefield_event_count = 0
+
+
+func _set_visible_phase(next_phase: String, next_step: String) -> void:
+	_phase = next_phase
+	_visible_step = next_step
+
+
+func _battle_step_label(battle_number: int) -> String:
+	if battle_number == 3:
+		return "Battle 3 with counter"
+	return "Battle %d" % battle_number
+
+
+func _record_transition_beat(beat_id: String) -> void:
+	if not _transition_beats.has(beat_id):
+		_transition_beats.append(beat_id)
+
+
+func _record_phase_status_check() -> void:
+	var expected := _expected_step_for_phase()
+	if _visible_step == expected:
+		return
+	var mismatch := "%s expected %s got %s" % [_phase, expected, _visible_step]
+	if not _phase_status_mismatches.has(mismatch):
+		_phase_status_mismatches.append(mismatch)
+
+
+func _expected_step_for_phase() -> String:
+	match _phase:
+		"guardian":
+			return "Guardian Select"
+		"battle":
+			return _battle_step_label(_battle_number)
+		"first_reward":
+			return "First Reward"
+		"shop":
+			return "Shop / Gold / Rest"
+		"second_reward":
+			return "Second Reward"
+		"endpoint_prep":
+			return "Endpoint Prep"
+		"endpoint":
+			return "Endpoint"
+		"result":
+			return "Result Page"
+	return _visible_step
+
+
+func _has_scroll_container(node: Node) -> bool:
+	if node is ScrollContainer:
+		return true
+	for child in node.get_children():
+		if _has_scroll_container(child):
+			return true
+	return false
+
+
+func _has_visible_debug_framing() -> bool:
+	for text in _visible_text_snapshot():
+		var lower_text := str(text).to_lower()
+		if (
+			lower_text.contains("debug")
+			or str(text).contains("调试")
+			or str(text).contains("(DEBUG)")
+			or lower_text.contains("harness")
+			or str(text).contains("M3")
+			or str(text).contains("验证")
+		):
+			return true
+	return false
+
+
+func _visible_text_snapshot() -> Array[String]:
+	var texts: Array[String] = []
+	_collect_visible_text(self, texts)
+	return texts
+
+
+func _collect_visible_text(node: Node, texts: Array[String]) -> void:
+	if node is Label:
+		var label := node as Label
+		if label.visible and not label.text.is_empty():
+			texts.append(label.text)
+	elif node is Button:
+		var button := node as Button
+		if button.visible and not button.text.is_empty():
+			texts.append(button.text)
+	for child in node.get_children():
+		_collect_visible_text(child, texts)
+
+
+func _display_event_description(description: String) -> String:
+	return description \
+		.replace("按可玩短局节奏", "按本局节奏") \
+		.replace("金币水龙头为调试首版，非最终平衡。", "获得的 Gold 已计入本局。") \
+		.replace("调试首版水龙头，非最终平衡。", "Gold 已计入本局。") \
+		.replace("真实 M3 ", "") \
+		.replace("调试", "本局")
+
+
+func _cue_node_suffix(cue_id: String) -> String:
+	var suffix := ""
+	for part in cue_id.split("_"):
+		if part.is_empty():
+			continue
+		suffix += part.substr(0, 1).to_upper() + part.substr(1)
+	return suffix
 
 
 func _display_phase(phase: String) -> String:

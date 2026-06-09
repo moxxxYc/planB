@@ -14,12 +14,13 @@ const COLOR_ACTIVE := Color("#f4f0d8")
 const COLOR_WARNING := Color("#e84b4b")
 const COLOR_BLOCKER := Color(0.9, 0.9, 0.9, 0.28)
 const TEXT_SCALE := 1.22
+const DESIGN_SIZE := Vector2(760, 640)
 
 var model: RefCounted = null
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(980, 760)
+	custom_minimum_size = Vector2(560, 500)
 
 
 func set_model(next_model: RefCounted) -> void:
@@ -33,6 +34,12 @@ func _draw() -> void:
 
 	var bounds := Rect2(Vector2.ZERO, size)
 	draw_rect(bounds, COLOR_BG, true)
+	if size.x <= 0.0 or size.y <= 0.0:
+		return
+
+	var draw_scale: float = min(size.x / DESIGN_SIZE.x, size.y / DESIGN_SIZE.y)
+	var draw_offset: Vector2 = (size - DESIGN_SIZE * draw_scale) * 0.5
+	draw_set_transform(draw_offset, 0.0, Vector2(draw_scale, draw_scale))
 
 	var supply: Dictionary = model.get_supply_summary()
 	var motion: Dictionary = model.get_motion_summary()
@@ -55,6 +62,7 @@ func _draw() -> void:
 	_draw_unit_board(Rect2(24, 400, 690, 178), active_board == "Unit")
 	_draw_queue_bridge(Rect2(438, 590, 276, 38))
 	_draw_active_ball()
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_supply(rect: Rect2, supply: Dictionary) -> void:
