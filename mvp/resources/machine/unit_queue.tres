@@ -6,6 +6,6 @@
 script = ExtResource("1")
 component_id = &"unit.queue"
 warehouse = "Unit"
-display_name = "Queue"
+display_name = "队列"
 component_kind = "fifo_deploy_queue"
-placeholder_note = "M0 placeholder for FIFO queue and Deploy Lane interface."
+placeholder_note = "M0 先进先出队列和部署路线接口占位。"

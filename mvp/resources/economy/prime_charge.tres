@@ -5,11 +5,11 @@
 [resource]
 script = ExtResource("1")
 modifier_id = &"prime_charge"
-display_name = "Prime Charge"
+display_name = "预充强化"
 source_pool = "Reward / Shop"
 warehouse = "Tuning"
 target_component = "Tuning.Prime.value_bonus"
-operation = "add"
+operation = "增加"
 role_tag = "Anchor"
-player_read = "Tuning high-value hit"
-placeholder_note = "M0 data placeholder only."
+player_read = "调校仓高价值命中"
+placeholder_note = "M0 调试数据占位。"

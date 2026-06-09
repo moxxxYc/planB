@@ -6,6 +6,6 @@
 script = ExtResource("1")
 component_id = &"tuning.echo"
 warehouse = "Tuning"
-display_name = "Echo"
+display_name = "复写"
 component_kind = "tuning_slot"
-placeholder_note = "Repeat settlement placeholder. No copy settlement implemented."
+placeholder_note = "重复结算占位。"

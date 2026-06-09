@@ -3,13 +3,25 @@ extends RefCounted
 
 const REQUIRED_SCENES := [
 	"res://scenes/run/mvp_shell.tscn",
+	"res://scenes/run/mvp_session_debug.tscn",
+	"res://scenes/ball_machine/machine_causality_debug.tscn",
+	"res://scenes/battlefield/battlefield_deploy_debug.tscn",
 ]
 
 const REQUIRED_SCRIPTS := [
 	"res://scripts/run/mvp_shell.gd",
+	"res://scripts/run/mvp_session_model.gd",
+	"res://scripts/run/mvp_session_debug.gd",
+	"res://scripts/ball_machine/machine_causality_model.gd",
+	"res://scripts/ball_machine/machine_causality_view.gd",
+	"res://scripts/ball_machine/machine_causality_debug.gd",
+	"res://scripts/battlefield/battlefield_deploy_model.gd",
+	"res://scripts/battlefield/battlefield_deploy_view.gd",
+	"res://scripts/battlefield/battlefield_deploy_debug.gd",
 	"res://scripts/data/machine_component_definition.gd",
 	"res://scripts/data/battle_lane_definition.gd",
 	"res://scripts/data/unit_template_definition.gd",
+	"res://scripts/data/enemy_unit_template_definition.gd",
 	"res://scripts/data/guardian_definition.gd",
 	"res://scripts/data/modifier_definition.gd",
 	"res://scripts/data/counter_definition.gd",
@@ -47,6 +59,9 @@ const REQUIRED_RESOURCE_PATHS := [
 	"res://resources/enemies/pool_polluter.tres",
 	"res://resources/enemies/echo_breaker.tres",
 	"res://resources/enemies/stagger_punisher.tres",
+	"res://resources/enemies/enemy_grunt.tres",
+	"res://resources/enemies/enemy_raider.tres",
+	"res://resources/enemies/enemy_brute.tres",
 	"res://resources/run/result_main_axis.tres",
 	"res://resources/run/result_rewards.tres",
 	"res://resources/run/result_shop.tres",
@@ -74,6 +89,9 @@ const REQUIRED_TERMS := [
 	"盾壳虫",
 	"酸囊虫",
 	"碾壳兽",
+	"Enemy Grunt",
+	"Enemy Raider",
+	"Enemy Brute",
 ]
 
 const SOURCE_DOCS := [
@@ -92,48 +110,49 @@ const SOURCE_DOCS := [
 	"docs/neutral-modifiers.md",
 	"docs/mvp-learning-checkpoints.md",
 	"docs/ball-machine-physical.md",
+	"docs/DESIGN.md",
 ]
 
 const SESSION_STEPS := [
 	{
 		"id": "boot",
-		"label": "MVP Shell Boot",
-		"summary": "Project opened. No run state has been started.",
+		"label": "MVP 入口",
+		"summary": "工程已打开，尚未开始本局状态。",
 	},
 	{
 		"id": "guardian_choice",
-		"label": "Guardian Choice Placeholder",
-		"summary": "Choose between 巢脉母 and 酸冠母 before Battle 1. No UI flow implemented yet.",
+		"label": "守护者选择",
+		"summary": "在第一场战斗前选择巢脉母或酸冠母，选择后整局固定。",
 	},
 	{
-		"id": "battle_shell",
-		"label": "Battle Shell Placeholder",
-		"summary": "Names Launch / Tuning / Unit, current Deploy Lane, and three lanes without combat simulation.",
+		"id": "battle_1",
+		"label": "第一场战斗",
+		"summary": "M1 队列条目通过 M2 三路战场部署，并记录第一段机器因果样本。",
 	},
 	{
-		"id": "reward_shell",
-		"label": "First Reward Placeholder",
-		"summary": "Names Pool Pocket, Prime Charge, and Slot Primer as axis anchors.",
+		"id": "first_reward",
+		"label": "第一次奖励",
+		"summary": "池袋、预充强化、槽位底火分别锚定发射仓、调校仓、单位仓。",
 	},
 	{
-		"id": "shop_shell",
-		"label": "Shop Placeholder",
-		"summary": "Names Gold, one neutral modifier purchase cap, and rest as future session state.",
+		"id": "shop_gold_rest",
+		"label": "商店 / 金币 / 休整",
+		"summary": "已实现第一版调试金币来源、一个中立修正购买上限和休整记录。",
 	},
 	{
-		"id": "counter_shell",
-		"label": "Counter Placeholder",
-		"summary": "Names Pool Polluter, Echo Breaker, and Stagger Punisher without applying effects.",
+		"id": "counter",
+		"label": "反制战斗",
+		"summary": "池污染者、复写破坏者、断档惩罚者都有预警、目标、效果和日志记录。",
 	},
 	{
-		"id": "endpoint_shell",
-		"label": "Endpoint Placeholder",
-		"summary": "Names Telegraphed Sweep and endpoint outcome as future battle shell state.",
+		"id": "endpoint",
+		"label": "终点战",
+		"summary": "终点守护者使用预告横扫，并记录胜负结论。",
 	},
 	{
-		"id": "result_shell",
-		"label": "Result Page Placeholder",
-		"summary": "Names main axis, rewards, shop, Guardian, counters, Deploy Lane impact, and next watch tag.",
+		"id": "result_page",
+		"label": "结算页",
+		"summary": "结算页字段来自 M3 本局真实数据和检查点记录。",
 	},
 ]
 

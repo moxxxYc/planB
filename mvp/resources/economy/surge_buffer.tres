@@ -5,11 +5,11 @@
 [resource]
 script = ExtResource("1")
 modifier_id = &"surge_buffer"
-display_name = "Surge Buffer"
+display_name = "脉冲缓冲"
 source_pool = "Shop"
 warehouse = "Tuning"
 target_component = "Tuning.Surge.charge_buffer"
-operation = "trigger"
+operation = "触发"
 role_tag = "Patch"
-player_read = "Tuning fast landing"
-placeholder_note = "M0 data placeholder only."
+player_read = "调校仓快速落地"
+placeholder_note = "M0 调试数据占位。"

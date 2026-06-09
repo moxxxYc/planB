@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1")
 field_id = &"result.unit_contribution"
-checkpoint = "Unit slots"
-display_name = "Unit 槽贡献"
-purpose = "Record which Unit slots produced visible lane or Endpoint contribution."
+checkpoint = "单位槽"
+display_name = "单位槽贡献"
+purpose = "记录哪些单位槽产生了可见路线或终点战贡献。"

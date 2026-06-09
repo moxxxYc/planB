@@ -14,4 +14,4 @@ attack_interval = 1.4
 attack_range = 1.5
 move_speed = 6.0
 role_note = "守线抗压，中低需求，承受第一轮接触压力。"
-placeholder_note = "First-pass duty values from current docs; not final balance."
+placeholder_note = "当前文档的首版职责数值，非最终平衡。"

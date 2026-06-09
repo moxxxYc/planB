@@ -5,11 +5,11 @@
 [resource]
 script = ExtResource("1")
 modifier_id = &"muster_pair"
-display_name = "Muster Pair"
+display_name = "成对集结"
 source_pool = "Reward / Shop"
 warehouse = "Unit"
 target_component = "Unit.Queue.merge_window"
-operation = "trigger"
+operation = "触发"
 role_tag = "Deepen"
-player_read = "Unit batch release"
-placeholder_note = "M0 data placeholder only."
+player_read = "单位仓批量释放"
+placeholder_note = "M0 调试数据占位。"

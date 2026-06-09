@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1")
 counter_id = &"echo_breaker"
-display_name = "Echo Breaker"
+display_name = "复写破坏者"
 target_component = "Tuning.Echo"
 warning_seconds = 4.0
 active_seconds = 14.0
-visible_effect = "Echo crack warning, then one Echo copy downgraded to Gate settlement."
-placeholder_note = "M0 data placeholder only."
+visible_effect = "复写槽裂纹预警，随后一次复写结算降级为普通闸门结算。"
+placeholder_note = "M0 调试数据占位。"

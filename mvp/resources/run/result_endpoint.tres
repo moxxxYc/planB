@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1")
 field_id = &"result.endpoint"
-checkpoint = "Endpoint"
+checkpoint = "终点战"
 display_name = "终点战结论"
-purpose = "Record whether the main machine axis paid off or broke."
+purpose = "记录主机器轴是兑现还是断裂。"

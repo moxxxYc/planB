@@ -6,6 +6,6 @@
 script = ExtResource("1")
 component_id = &"launch.launcher"
 warehouse = "Launch"
-display_name = "Launcher"
+display_name = "发射器"
 component_kind = "ball_fire_cadence"
-placeholder_note = "M0 placeholder. No physical turret or firing cadence implemented."
+placeholder_note = "M0 占位。"

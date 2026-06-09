@@ -6,6 +6,6 @@
 script = ExtResource("1")
 component_id = &"launch.pool"
 warehouse = "Launch"
-display_name = "Pool"
+display_name = "球池"
 component_kind = "fifo_buffer"
-placeholder_note = "M0 placeholder for visible FIFO Pool, base capacity 5 before modifiers."
+placeholder_note = "M0 可见先进先出球池占位，基础容量 5。"

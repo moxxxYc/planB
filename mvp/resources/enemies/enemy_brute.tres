@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemyUnitTemplateDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_unit_template_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+enemy_id = &"enemy.brute"
+display_name = "敌方重兵"
+hp = 24
+attack_damage = 4
+attack_interval = 1.4
+attack_range = 3.0
+move_speed = 5.0
+role_note = "破门压力，不能高频出现。"
+placeholder_note = "M2 调试职责数值，非最终平衡。"

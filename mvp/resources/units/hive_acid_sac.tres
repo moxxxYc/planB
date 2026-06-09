@@ -14,4 +14,4 @@ attack_interval = 1.8
 attack_range = 7.0
 move_speed = 7.0
 role_note = "破僵持，短程酸液弹道，小范围溅射。"
-placeholder_note = "First-pass duty values from current docs; projectile behavior not implemented."
+placeholder_note = "当前文档的首版职责数值，弹道行为尚未实现。"

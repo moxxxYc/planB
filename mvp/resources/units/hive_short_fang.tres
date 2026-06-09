@@ -14,4 +14,4 @@ attack_interval = 0.7
 attack_range = 1.5
 move_speed = 10.0
 role_note = "稳定补线，低需求、低承诺，快速接线。"
-placeholder_note = "First-pass duty values from current docs; not final balance."
+placeholder_note = "当前文档的首版职责数值，非最终平衡。"

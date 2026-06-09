@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1")
 counter_id = &"pool_polluter"
-display_name = "Pool Polluter"
+display_name = "池污染者"
 target_component = "Launch.Pool"
 warning_seconds = 4.0
 active_seconds = 18.0
-visible_effect = "Junk Ball insertion warning and visible Pool capacity pressure."
-placeholder_note = "M0 data placeholder only."
+visible_effect = "废球插入预警，并在球池容量上形成可见压力。"
+placeholder_note = "M0 调试数据占位。"

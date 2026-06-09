@@ -5,11 +5,11 @@
 [resource]
 script = ExtResource("1")
 modifier_id = &"echo_latch"
-display_name = "Echo Latch"
+display_name = "复写锁扣"
 source_pool = "Second Reward"
 warehouse = "Tuning"
 target_component = "Tuning.Echo.target_lock"
-operation = "replace"
+operation = "替换"
 role_tag = "Deepen"
-player_read = "Tuning repeated hit"
-placeholder_note = "M0 data placeholder only."
+player_read = "调校仓重复重击"
+placeholder_note = "M0 调试数据占位。"
