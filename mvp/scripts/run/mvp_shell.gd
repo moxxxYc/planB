@@ -71,6 +71,7 @@ func _build_layout() -> void:
 	_add_button(root, "打开 M1 机器因果调试", Callable(self, "_on_machine_debug_pressed"))
 	_add_button(root, "打开 M2 战场 / 部署路线调试", Callable(self, "_on_battlefield_debug_pressed"))
 	_add_button(root, "打开 M3 完整短局调试", Callable(self, "_on_session_debug_pressed"))
+	_add_button(root, "开始 MVP v0 可玩短局", Callable(self, "_on_playable_session_pressed"))
 
 
 func _make_label(text: String, font_size: int) -> Label:
@@ -121,6 +122,10 @@ func _on_battlefield_debug_pressed() -> void:
 
 func _on_session_debug_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/run/mvp_session_debug.tscn")
+
+
+func _on_playable_session_pressed() -> void:
+	get_tree().change_scene_to_file("res://scenes/run/mvp_playable_session.tscn")
 
 
 func _refresh_step() -> void:

@@ -1,0 +1,594 @@
+class_name MvpPlayableSession
+extends Control
+
+const SessionModelScript := preload("res://scripts/run/mvp_session_model.gd")
+const MachineViewScript := preload("res://scripts/ball_machine/machine_causality_view.gd")
+const BattlefieldViewScript := preload("res://scripts/battlefield/battlefield_deploy_view.gd")
+
+const UI_SCALE := 1.08
+const BATTLE_DURATION_SECONDS := 9.0
+const ENDPOINT_DURATION_SECONDS := 7.0
+const SIMULATION_SPEED := 2.6
+
+var _session: RefCounted = SessionModelScript.new()
+var _machine_view: Control
+var _battlefield_view: Control
+var _status_label: Label
+var _phase_label: Label
+var _choice_panel: VBoxContainer
+var _flow_list: VBoxContainer
+var _log_list: VBoxContainer
+var _result_list: VBoxContainer
+var _built := false
+
+var _phase := "guardian"
+var _battle_running := false
+var _battle_number := 0
+var _battle_elapsed := 0.0
+var _current_lane := "Mid"
+var _forwarded_machine_entries := 0
+var _deployed_start_index := 0
+var _selected_shop_purchase_id := ""
+
+
+func _ready() -> void:
+	_ensure_built()
+
+
+func _process(delta: float) -> void:
+	if _battle_running:
+		_advance_battle(delta)
+
+
+func verify_scene_build() -> bool:
+	_ensure_built()
+	return (
+		_machine_view != null
+		and _battlefield_view != null
+		and _status_label != null
+		and _choice_panel != null
+		and _result_list != null
+	)
+
+
+func run_minimal_player_session_for_verification() -> Dictionary:
+	_ensure_built()
+	_on_guardian_choice("hive.vein_mother")
+	_run_current_battle_for_verification()
+	_on_first_reward_choice("pool_pocket")
+	_run_current_battle_for_verification()
+	_on_shop_purchase_choice("junk_sieve")
+	_on_rest_choice(true)
+	_run_current_battle_for_verification()
+	_run_current_battle_for_verification()
+	_on_second_reward_choice("front_recycle")
+	_run_current_battle_for_verification()
+	_on_endpoint_rest_choice(true)
+	_run_current_battle_for_verification()
+	return _session.get_run_summary()
+
+
+func _ensure_built() -> void:
+	if _built:
+		return
+	_built = true
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_build_layout()
+	_show_guardian_choices()
+	_refresh()
+
+
+func _build_layout() -> void:
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_top", 14)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_bottom", 14)
+	add_child(margin)
+
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 10)
+	margin.add_child(root)
+
+	_phase_label = _make_label("PlanB MVP v0 可玩短局", 20)
+	root.add_child(_phase_label)
+	_status_label = _make_label("", 12)
+	root.add_child(_status_label)
+
+	var body := HBoxContainer.new()
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 10)
+	root.add_child(body)
+
+	var side_panel := PanelContainer.new()
+	side_panel.custom_minimum_size = Vector2(390, 0)
+	body.add_child(side_panel)
+
+	var side := VBoxContainer.new()
+	side.add_theme_constant_override("separation", 8)
+	side_panel.add_child(side)
+
+	side.add_child(_make_label("玩家操作", 15))
+	_choice_panel = VBoxContainer.new()
+	_choice_panel.add_theme_constant_override("separation", 6)
+	side.add_child(_choice_panel)
+
+	side.add_child(_make_separator())
+	side.add_child(_make_label("流程", 14))
+	_flow_list = VBoxContainer.new()
+	_flow_list.add_theme_constant_override("separation", 2)
+	side.add_child(_flow_list)
+
+	side.add_child(_make_separator())
+	side.add_child(_make_label("事件", 14))
+	_log_list = VBoxContainer.new()
+	_log_list.add_theme_constant_override("separation", 2)
+	side.add_child(_log_list)
+
+	var play_area := VBoxContainer.new()
+	play_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	play_area.add_theme_constant_override("separation", 8)
+	body.add_child(play_area)
+
+	var views := HBoxContainer.new()
+	views.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	views.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	views.add_theme_constant_override("separation", 8)
+	play_area.add_child(views)
+
+	var machine_scroll := ScrollContainer.new()
+	machine_scroll.custom_minimum_size = Vector2(500, 520)
+	machine_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	machine_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	views.add_child(machine_scroll)
+
+	_machine_view = MachineViewScript.new()
+	_machine_view.custom_minimum_size = Vector2(760, 610)
+	machine_scroll.add_child(_machine_view)
+
+	var battlefield_scroll := ScrollContainer.new()
+	battlefield_scroll.custom_minimum_size = Vector2(650, 520)
+	battlefield_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	battlefield_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	views.add_child(battlefield_scroll)
+
+	_battlefield_view = BattlefieldViewScript.new()
+	_battlefield_view.custom_minimum_size = Vector2(900, 610)
+	_battlefield_view.lane_clicked.connect(_on_lane_clicked)
+	battlefield_scroll.add_child(_battlefield_view)
+
+	var result_panel := PanelContainer.new()
+	result_panel.custom_minimum_size = Vector2(0, 150)
+	play_area.add_child(result_panel)
+
+	_result_list = VBoxContainer.new()
+	_result_list.add_theme_constant_override("separation", 3)
+	result_panel.add_child(_result_list)
+
+
+func _show_guardian_choices() -> void:
+	_phase = "guardian"
+	_battle_running = false
+	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("选择 Player Guardian", 14))
+	for guardian in _session.get_available_guardians():
+		var guardian_id := str(guardian.get("guardian_id", ""))
+		var label := "%s | %s轴 | %s" % [
+			guardian.get("display_name", ""),
+			_display_axis(guardian.get("axis_lean", "")),
+			guardian.get("tactical_skill", ""),
+		]
+		_add_button(_choice_panel, label, Callable(self, "_on_guardian_choice").bind(guardian_id))
+
+
+func _on_guardian_choice(guardian_id: String) -> void:
+	_session.start_new_run(guardian_id)
+	_session.telemetry["playable.guardian_choice_source"] = "player"
+	_current_lane = "Mid"
+	_forwarded_machine_entries = _session.machine_model.queue_entries.size()
+	_start_battle(1)
+
+
+func _start_battle(battle_number: int) -> void:
+	_phase = "battle"
+	_battle_number = battle_number
+	_battle_elapsed = 0.0
+	_battle_running = true
+	var counter_id := ""
+	if battle_number == 3:
+		counter_id = _session.get_counter_id_for_current_axis()
+	_session.begin_playable_battle(battle_number, _current_lane, counter_id)
+	_forwarded_machine_entries = _session.machine_model.queue_entries.size()
+	_deployed_start_index = _session.battlefield_model.get_deployed_units_history().size()
+	_show_battle_status("Battle %d" % battle_number)
+
+
+func _start_endpoint() -> void:
+	_phase = "endpoint"
+	_battle_number = 6
+	_battle_elapsed = 0.0
+	_battle_running = true
+	_session.begin_playable_endpoint(_current_lane)
+	_forwarded_machine_entries = _session.machine_model.queue_entries.size()
+	_deployed_start_index = _session.battlefield_model.get_deployed_units_history().size()
+	_show_battle_status("Endpoint")
+
+
+func _show_battle_status(title: String) -> void:
+	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label(_display_step(title), 15))
+	_choice_panel.add_child(_make_label(
+		"球机自动运行；点击右侧战场路线直接切换 Deploy Lane。当前队列部署读取点击后的路线。",
+		11
+	))
+	_refresh()
+
+
+func _advance_battle(delta: float) -> void:
+	var step: float = max(0.0, delta) * SIMULATION_SPEED
+	_battle_elapsed += step
+	_session.machine_model.step_simulation(step)
+	_forward_machine_queue_entries()
+	_session.battlefield_model.tick(step)
+	_refresh()
+
+	var duration: float = ENDPOINT_DURATION_SECONDS if _phase == "endpoint" else BATTLE_DURATION_SECONDS
+	if _battle_elapsed >= duration:
+		_complete_current_battle()
+
+
+func _forward_machine_queue_entries() -> void:
+	var queue_entries: Array = _session.machine_model.queue_entries
+	while _forwarded_machine_entries < queue_entries.size():
+		var entry: Dictionary = queue_entries[_forwarded_machine_entries]
+		_session.battlefield_model.enqueue_machine_queue_entry(entry)
+		_forwarded_machine_entries += 1
+	_session.telemetry["playable.queue_entries_forwarded"] = _forwarded_machine_entries
+
+
+func _complete_current_battle() -> void:
+	_battle_running = false
+	var deployed := _deployed_units_since_battle_start()
+	if _phase == "endpoint":
+		_session.finish_playable_endpoint(true, deployed)
+		_session.telemetry["playable.endpoint_source"] = "scripted_visible_phase"
+		_session.build_result_page()
+		_show_result_page()
+		return
+
+	var outcome := str(_session.battlefield_model.get_battle_state())
+	_session.finish_playable_battle(_battle_number, outcome, deployed)
+	match _battle_number:
+		1:
+			_show_first_reward_choices()
+		2:
+			_show_shop_choices()
+		3:
+			_start_battle(4)
+		4:
+			_show_second_reward_choices()
+		5:
+			_show_endpoint_prep_choices()
+		_:
+			_show_result_page()
+
+
+func _deployed_units_since_battle_start() -> Array[Dictionary]:
+	var history: Array[Dictionary] = _session.battlefield_model.get_deployed_units_history()
+	var results: Array[Dictionary] = []
+	for index in range(_deployed_start_index, history.size()):
+		results.append(history[index])
+	return results
+
+
+func _show_first_reward_choices() -> void:
+	_phase = "first_reward"
+	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("第一次奖励：选择机器轴锚点", 14))
+	for reward in _session.get_first_reward_choices():
+		var reward_id := str(reward.get("modifier_id", ""))
+		_add_button(
+			_choice_panel,
+			"%s | %s轴 | %s" % [
+				reward.get("display_name", ""),
+				_display_axis(reward.get("warehouse", "")),
+				reward.get("operation", ""),
+			],
+			Callable(self, "_on_first_reward_choice").bind(reward_id)
+		)
+	_refresh()
+
+
+func _on_first_reward_choice(reward_id: String) -> void:
+	_session.choose_first_reward(reward_id)
+	_session.telemetry["playable.first_reward_choice_source"] = "player"
+	_start_battle(2)
+
+
+func _show_shop_choices() -> void:
+	_phase = "shop"
+	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("第一次商店：选择 1 个中立机器修正", 14))
+	_choice_panel.add_child(_make_label("Gold：%d。购买后会进入休整选择。" % _session.gold, 11))
+	for item in _session.get_shop_choices():
+		var modifier_id := str(item.get("modifier_id", ""))
+		_add_button(
+			_choice_panel,
+			"购买 %s | %s | %d Gold" % [
+				item.get("display_name", ""),
+				_display_role(item.get("role_tag", "")),
+				int(item.get("price", 0)),
+			],
+			Callable(self, "_on_shop_purchase_choice").bind(modifier_id)
+		)
+	_refresh()
+
+
+func _on_shop_purchase_choice(modifier_id: String) -> void:
+	_selected_shop_purchase_id = modifier_id
+	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("休整窗口", 14))
+	_choice_panel.add_child(_make_label("休整花费 3 Gold，恢复 20 Player Guardian HP。", 11))
+	_add_button(_choice_panel, "休整", Callable(self, "_on_rest_choice").bind(true))
+	_add_button(_choice_panel, "不休整", Callable(self, "_on_rest_choice").bind(false))
+
+
+func _on_rest_choice(buy_rest: bool) -> void:
+	_session.choose_shop_purchase(_selected_shop_purchase_id, buy_rest)
+	_session.telemetry["playable.shop_choice_source"] = "player"
+	_session.telemetry["playable.rest_choice_source"] = "player"
+	_selected_shop_purchase_id = ""
+	_start_battle(3)
+
+
+func _show_second_reward_choices() -> void:
+	_phase = "second_reward"
+	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("第二次奖励：深化主轴或补洞", 14))
+	for reward in _session.get_second_reward_choices():
+		var modifier_id := str(reward.get("modifier_id", ""))
+		_add_button(
+			_choice_panel,
+			"%s | %s | %s" % [
+				reward.get("display_name", ""),
+				reward.get("offer_role", ""),
+				reward.get("reason", ""),
+			],
+			Callable(self, "_on_second_reward_choice").bind(modifier_id)
+		)
+	_refresh()
+
+
+func _on_second_reward_choice(modifier_id: String) -> void:
+	_session.choose_second_reward(modifier_id)
+	_session.telemetry["playable.second_reward_choice_source"] = "player"
+	_start_battle(5)
+
+
+func _show_endpoint_prep_choices() -> void:
+	_phase = "endpoint_prep"
+	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("终点前整备", 14))
+	_choice_panel.add_child(_make_label("此处不卖第二次商店，只允许休整或直接进入终点。", 11))
+	_add_button(_choice_panel, "终点前休整", Callable(self, "_on_endpoint_rest_choice").bind(true))
+	_add_button(_choice_panel, "直接进入终点", Callable(self, "_on_endpoint_rest_choice").bind(false))
+	_refresh()
+
+
+func _on_endpoint_rest_choice(buy_rest: bool) -> void:
+	_session.run_endpoint_prep(buy_rest)
+	_session.telemetry["playable.rest_choice_source"] = "player"
+	_start_endpoint()
+
+
+func _show_result_page() -> void:
+	_phase = "result"
+	_clear_container(_choice_panel)
+	_choice_panel.add_child(_make_label("结算页", 15))
+	_choice_panel.add_child(_make_label("本局已结束；结果页字段来自本局选择、部署、反制和终点记录。", 11))
+	_refresh()
+
+
+func _on_lane_clicked(lane_name: String) -> void:
+	_current_lane = lane_name
+	_session.battlefield_model.select_lane(lane_name)
+	_session.telemetry["playable.deploy_lane_choice_source"] = "player"
+	_refresh()
+
+
+func _run_current_battle_for_verification() -> void:
+	for _step in range(240):
+		if not _battle_running:
+			return
+		_advance_battle(0.25)
+
+
+func _refresh() -> void:
+	if _machine_view != null:
+		_machine_view.set_model(_session.machine_model)
+	if _battlefield_view != null:
+		_battlefield_view.set_model(_session.battlefield_model)
+
+	var summary: Dictionary = _session.get_run_summary()
+	_phase_label.text = "PlanB MVP v0 可玩短局 | %s" % _display_phase(_phase)
+	_status_label.text = "阶段：%s | Gold %d | Guardian HP %d/100 | Deploy Lane %s | 主轴 %s" % [
+		_display_step(summary.get("current_step", "Guardian Select")),
+		int(summary.get("gold", 0)),
+		int(summary.get("player_guardian_hp", 100)),
+		_display_lane(_current_lane),
+		_display_axis(summary.get("main_axis", "")),
+	]
+
+	_clear_container(_flow_list)
+	for step in summary.get("flow_history", []):
+		_flow_list.add_child(_make_label("- %s" % _display_step(step), 10))
+
+	_clear_container(_log_list)
+	var events: Array = summary.get("event_log", [])
+	var start_index: int = max(0, events.size() - 8)
+	for event in events.slice(start_index):
+		_log_list.add_child(_make_label(str(event.get("description", "")), 9))
+
+	_clear_container(_result_list)
+	var result_page: Dictionary = summary.get("result_page", {})
+	if result_page.is_empty():
+		_result_list.add_child(_make_label("结算页会在 Endpoint 后显示。", 11))
+	else:
+		for key in [
+			"chosen_guardian",
+			"main_axis",
+			"key_rewards",
+			"shop_rest_choice",
+			"counter_target",
+			"deploy_lane_impact",
+			"endpoint_payoff_or_break_reason",
+			"next_run_watch_tag",
+		]:
+			_result_list.add_child(_make_label(
+				"%s：%s" % [_display_result_key(key), result_page.get(key, "")],
+				10
+			))
+
+
+func _make_label(text: String, font_size: int) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.add_theme_font_size_override("font_size", _scaled_font(font_size))
+	return label
+
+
+func _add_button(parent: Node, text: String, callback: Callable) -> void:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(0, 36)
+	button.add_theme_font_size_override("font_size", _scaled_font(11))
+	button.pressed.connect(callback)
+	parent.add_child(button)
+
+
+func _make_separator() -> HSeparator:
+	var separator := HSeparator.new()
+	separator.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return separator
+
+
+func _clear_container(container: Node) -> void:
+	for child in container.get_children():
+		container.remove_child(child)
+		child.queue_free()
+
+
+func _display_phase(phase: String) -> String:
+	match phase:
+		"guardian":
+			return "守护者选择"
+		"battle":
+			return "战斗"
+		"first_reward":
+			return "第一次奖励"
+		"shop":
+			return "商店 / 休整"
+		"second_reward":
+			return "第二次奖励"
+		"endpoint_prep":
+			return "终点准备"
+		"endpoint":
+			return "终点"
+		"result":
+			return "结算页"
+	return phase
+
+
+func _display_step(step) -> String:
+	match str(step):
+		"Guardian Select":
+			return "守护者选择"
+		"Battle 1":
+			return "第一战"
+		"Battle 2":
+			return "第二战"
+		"Battle 3 with counter":
+			return "第三战（反制）"
+		"Battle 4":
+			return "第四战"
+		"Battle 5":
+			return "第五战"
+		"First Reward":
+			return "第一奖励"
+		"Shop / Gold / Rest":
+			return "商店 / 金币 / 休整"
+		"Second Reward":
+			return "第二奖励"
+		"Endpoint Prep":
+			return "终点准备"
+		"Endpoint":
+			return "终点"
+		"Result Page":
+			return "结算页"
+		"Battle 6":
+			return "终点"
+	return str(step)
+
+
+func _display_axis(axis) -> String:
+	match str(axis):
+		"Launch":
+			return "发射"
+		"Tuning":
+			return "调校"
+		"Unit":
+			return "单位"
+	return str(axis)
+
+
+func _display_lane(lane) -> String:
+	match str(lane):
+		"Left", "left":
+			return "左路"
+		"Mid", "mid":
+			return "中路"
+		"Right", "right":
+			return "右路"
+	return str(lane)
+
+
+func _display_role(role) -> String:
+	match str(role):
+		"Patch":
+			return "补洞"
+		"Pivot":
+			return "转轴"
+		"Deepen":
+			return "深化"
+		"Anchor":
+			return "锚点"
+	return str(role)
+
+
+func _display_result_key(key) -> String:
+	match str(key):
+		"chosen_guardian":
+			return "选择的守护者"
+		"main_axis":
+			return "主轴"
+		"key_rewards":
+			return "关键奖励"
+		"shop_rest_choice":
+			return "商店 / 休整"
+		"counter_target":
+			return "反制目标"
+		"deploy_lane_impact":
+			return "Deploy Lane 影响"
+		"endpoint_payoff_or_break_reason":
+			return "终点收益 / 断裂"
+		"next_run_watch_tag":
+			return "下局观察标签"
+	return str(key)
+
+
+func _scaled_font(font_size: int) -> int:
+	return int(round(float(font_size) * UI_SCALE))

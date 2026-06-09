@@ -42,6 +42,7 @@ var enemy_guardian_hp := ENEMY_GUARDIAN_MAX_HP
 var lanes: Dictionary = {}
 var deploy_queue: Array[Dictionary] = []
 var units: Array[Dictionary] = []
+var deployed_units_history: Array[Dictionary] = []
 var event_log: Array[Dictionary] = []
 
 var _deploy_timer_seconds: float = 0.0
@@ -61,6 +62,7 @@ func reset() -> void:
 	enemy_guardian_hp = ENEMY_GUARDIAN_MAX_HP
 	deploy_queue.clear()
 	units.clear()
+	deployed_units_history.clear()
 	event_log.clear()
 	_deploy_timer_seconds = 0.0
 	_unit_index = 0
@@ -141,6 +143,7 @@ func deploy_next_queue_entry() -> Dictionary:
 	var entry: Dictionary = deploy_queue.pop_front()
 	var lane_id := selected_lane_id
 	var unit := _spawn_player_unit_from_queue(entry, lane_id)
+	deployed_units_history.append(unit.duplicate(true))
 	_record_event(
 		"queue deployed",
 		"队列条目 %s 已部署到%s。" % [
@@ -155,6 +158,13 @@ func deploy_next_queue_entry() -> Dictionary:
 	)
 	_update_lane_states_and_danger()
 	return unit.duplicate(true)
+
+
+func get_deployed_units_history() -> Array[Dictionary]:
+	var results: Array[Dictionary] = []
+	for unit in deployed_units_history:
+		results.append(unit.duplicate(true))
+	return results
 
 
 func spawn_enemy(lane, enemy_name := "Enemy Grunt", path_pos := ENEMY_SPAWN_POS) -> Dictionary:
@@ -399,6 +409,8 @@ func _make_unit_from_resource(
 		"attack_cooldown": 0.0,
 		"state": "marching",
 		"source_queue_entry_id": str(source_entry.get("queue_entry_id", "")),
+		"source_slot_id": int(source_entry.get("source_slot_id", 0)),
+		"tuning_result": str(source_entry.get("tuning_result", "")),
 	}
 
 
