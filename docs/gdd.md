@@ -41,6 +41,7 @@
 - `docs/guardian-system.md`：Guardian 通用系统。
 - `docs/mvp-learning-checkpoints.md`：MVP 玩家学习检查点、验收信号和失败信号。
 - `docs/mvp-scope.md`：第一版 MVP 范围。
+- `docs/DESIGN.md`：MVP v0 美术风格、资源生产约束和视觉反馈规范。
 - `docs/PROGRESS.md`：近期决策日志。
 
 候选草案：

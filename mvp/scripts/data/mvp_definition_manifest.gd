@@ -2,14 +2,18 @@ class_name MvpDefinitionManifest
 extends RefCounted
 
 const REQUIRED_SCENES := [
+	"res://scenes/ui/main_menu.tscn",
 	"res://scenes/run/mvp_shell.tscn",
+	"res://scenes/run/mvp_playable_session.tscn",
 	"res://scenes/run/mvp_session_debug.tscn",
 	"res://scenes/ball_machine/machine_causality_debug.tscn",
 	"res://scenes/battlefield/battlefield_deploy_debug.tscn",
 ]
 
 const REQUIRED_SCRIPTS := [
+	"res://scripts/ui/main_menu.gd",
 	"res://scripts/run/mvp_shell.gd",
+	"res://scripts/run/mvp_playable_session.gd",
 	"res://scripts/run/mvp_session_model.gd",
 	"res://scripts/run/mvp_session_debug.gd",
 	"res://scripts/ball_machine/machine_causality_model.gd",
@@ -71,6 +75,20 @@ const REQUIRED_RESOURCE_PATHS := [
 	"res://resources/run/result_deploy_lane.tres",
 	"res://resources/run/result_endpoint.tres",
 	"res://resources/run/result_next_watch_tag.tres",
+]
+
+const REQUIRED_ART_ASSETS := [
+	"res://assets/ui/planb_logo.png",
+	"res://assets/ui/menu_key_art.png",
+	"res://assets/sprites/hive_short_fang.png",
+	"res://assets/sprites/hive_shield_shell.png",
+	"res://assets/sprites/hive_acid_sac.png",
+	"res://assets/sprites/hive_crush_shell_beast.png",
+	"res://assets/sprites/enemy_grunt.png",
+	"res://assets/sprites/enemy_raider.png",
+	"res://assets/sprites/enemy_brute.png",
+	"res://assets/sprites/guardian_vein_mother.png",
+	"res://assets/sprites/guardian_acid_crown_mother.png",
 ]
 
 const REQUIRED_TERMS := [

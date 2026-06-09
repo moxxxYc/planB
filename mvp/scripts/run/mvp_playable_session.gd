@@ -239,6 +239,7 @@ func _on_guardian_choice(guardian_id: String) -> void:
 	_reset_feel_runtime()
 	_session.start_new_run(guardian_id)
 	_session.telemetry["playable.guardian_choice_source"] = "player"
+	_session.battlefield_model.set_player_guardian_template_id(guardian_id)
 	_current_lane = "Mid"
 	_forwarded_machine_entries = _session.machine_model.queue_entries.size()
 	_last_machine_event_count = _session.machine_model.event_log.size()

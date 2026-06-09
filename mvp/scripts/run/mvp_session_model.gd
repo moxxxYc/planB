@@ -448,6 +448,7 @@ func begin_playable_battle(
 	_enter_step(step_label)
 
 	battlefield_model.reset()
+	battlefield_model.set_player_guardian_template_id(str(chosen_guardian.get("guardian_id", "")))
 	battlefield_model.select_lane(lane_name)
 	machine_model.set_battle_time(float(_battle_time_anchor_for_battle(battle_number)))
 	machine_model.set_auto_running(true)
@@ -528,6 +529,7 @@ func finish_playable_battle(
 func begin_playable_endpoint(lane_name: String) -> Dictionary:
 	_enter_step("Endpoint")
 	battlefield_model.reset()
+	battlefield_model.set_player_guardian_template_id(str(chosen_guardian.get("guardian_id", "")))
 	battlefield_model.select_lane(lane_name)
 	battlefield_model.set_public_warning(lane_name, 2)
 	machine_model.set_battle_time(float(_battle_time_anchor_for_battle(6)))

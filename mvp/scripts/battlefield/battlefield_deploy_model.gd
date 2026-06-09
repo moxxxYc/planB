@@ -39,6 +39,7 @@ var battle_time_seconds: float = 0.0
 var battle_state := "running"
 var player_guardian_hp := PLAYER_GUARDIAN_MAX_HP
 var enemy_guardian_hp := ENEMY_GUARDIAN_MAX_HP
+var player_guardian_template_id := "hive.vein_mother"
 var lanes: Dictionary = {}
 var deploy_queue: Array[Dictionary] = []
 var units: Array[Dictionary] = []
@@ -60,6 +61,7 @@ func reset() -> void:
 	battle_state = "running"
 	player_guardian_hp = PLAYER_GUARDIAN_MAX_HP
 	enemy_guardian_hp = ENEMY_GUARDIAN_MAX_HP
+	player_guardian_template_id = "hive.vein_mother"
 	deploy_queue.clear()
 	units.clear()
 	deployed_units_history.clear()
@@ -101,6 +103,13 @@ func select_lane(lane) -> bool:
 
 func get_selected_lane_name() -> String:
 	return LANE_NAMES[selected_lane_id]
+
+
+func set_player_guardian_template_id(template_id: String) -> void:
+	if template_id == "hive.acid_crown_mother":
+		player_guardian_template_id = template_id
+	else:
+		player_guardian_template_id = "hive.vein_mother"
 
 
 func enqueue_machine_queue_entry(queue_entry: Dictionary) -> bool:
@@ -290,6 +299,7 @@ func get_debug_summary() -> Dictionary:
 		"units": units.duplicate(true),
 		"player_guardian_hp": player_guardian_hp,
 		"player_guardian_max_hp": PLAYER_GUARDIAN_MAX_HP,
+		"player_guardian_template_id": player_guardian_template_id,
 		"enemy_guardian_hp": enemy_guardian_hp,
 		"enemy_guardian_max_hp": ENEMY_GUARDIAN_MAX_HP,
 		"event_log": event_log.duplicate(true),

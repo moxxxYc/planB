@@ -54,9 +54,9 @@ const BOARD_NAMES := [
 
 const POOL_CAPACITY := 5
 const BASE_DEPLOY_DELAY_SECONDS := 0.5
-const AUTO_LAUNCH_INTERVAL_SECONDS := 1.3
-const AUTO_PHASE_SECONDS := 0.35
-const MOTION_TRAIL_LIMIT := 18
+const AUTO_LAUNCH_INTERVAL_SECONDS := 1.2
+const AUTO_PHASE_SECONDS := 0.65
+const MOTION_TRAIL_LIMIT := 28
 
 const AUTO_TUNING_SEQUENCE := [
 	"Gate",
@@ -142,7 +142,7 @@ func step_simulation(delta: float) -> void:
 		return
 
 	battle_time_seconds += step
-	cannon_phase = fmod(cannon_phase + step * 2.4, TAU)
+	cannon_phase = fmod(cannon_phase + step * 1.35, TAU)
 
 	if auto_running:
 		_launch_timer_seconds = max(0.0, _launch_timer_seconds - step)
@@ -562,28 +562,57 @@ func _motion_position() -> Vector2:
 		return _resting_ball_position()
 
 	var progress := _phase_progress()
-	var wobble := sin(progress * TAU * 2.0 + cannon_phase) * 22.0
 	match str(_flight.get("phase", "Launch")):
 		"Launch":
-			var start := Vector2(560, 126)
-			var end := Vector2(348 + wobble * 0.25, 216)
-			return start.lerp(end, progress) + Vector2(wobble, sin(progress * TAU) * 10.0)
+			return _polyline_position([
+				Vector2(92, 132),
+				Vector2(150, 176),
+				Vector2(226, 146),
+				Vector2(316, 194),
+				Vector2(438, 212),
+			], progress)
 		"Tuning":
 			var tuning_index: int = max(
 				0,
 				int(TUNING_RESULTS.find(str(_flight.get("tuning_result", "Gate"))))
 			)
-			var start := Vector2(360 + wobble * 0.2, 266)
-			var end := Vector2(124 + tuning_index * 166, 352)
-			return start.lerp(end, progress) + Vector2(wobble * 0.55, sin(progress * TAU) * 9.0)
+			var end_x := 108.0 + float(tuning_index) * 172.0
+			return _polyline_position([
+				Vector2(438, 270),
+				Vector2(344, 322),
+				Vector2(252, 288),
+				Vector2(end_x, 354),
+			], progress)
 		"Unit":
 			var slot_id := int(_flight.get("slot_id", 1))
-			var start := Vector2(350 + wobble * 0.2, 412)
 			var end := Vector2(106 + (slot_id - 1) * 166, 512)
-			var bounce_y := -22.0 * sin(progress * PI) if not is_slot_accepting_hit(slot_id) else 0.0
-			return start.lerp(end, progress) + Vector2(wobble * 0.45, bounce_y)
+			var final_point := end
+			if not is_slot_accepting_hit(slot_id):
+				final_point += Vector2(34, -42)
+			return _polyline_position([
+				Vector2(370, 430),
+				Vector2(292, 468),
+				Vector2(204 + float(slot_id) * 24.0, 444),
+				final_point,
+			], progress)
 
 	return _resting_ball_position()
+
+
+func _polyline_position(points: Array[Vector2], progress: float) -> Vector2:
+	if points.is_empty():
+		return Vector2.ZERO
+	if points.size() == 1:
+		return points[0]
+
+	var clamped_progress: float = clamp(progress, 0.0, 1.0)
+	var segment_count: int = points.size() - 1
+	var segment_progress: float = clamped_progress * float(segment_count)
+	var segment_index: int = min(segment_count - 1, int(floor(segment_progress)))
+	var local_progress: float = segment_progress - float(segment_index)
+	var from_point: Vector2 = points[segment_index]
+	var to_point: Vector2 = points[segment_index + 1]
+	return from_point.lerp(to_point, local_progress)
 
 
 func _resting_ball_position() -> Vector2:
@@ -591,11 +620,11 @@ func _resting_ball_position() -> Vector2:
 	var target: String = active_ball.get("target", "")
 	match board:
 		"Forge":
-			return Vector2(70, 60)
+			return Vector2(58, 44)
 		"Pool":
-			return Vector2(170, 62)
+			return Vector2(128, 54)
 		"Launcher":
-			return Vector2(560, 26)
+			return Vector2(92, 132)
 		"Tuning":
 			var tuning_index: int = max(0, int(TUNING_RESULTS.find(target)))
 			return Vector2(124 + tuning_index * 166, 352)

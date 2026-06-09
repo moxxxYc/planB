@@ -14,6 +14,7 @@
 - `docs/guardian-system.md`
 - `docs/mvp-learning-checkpoints.md`
 - `docs/mvp-scope.md`
+- `docs/DESIGN.md`
 - `docs/PROGRESS.md`
 - `AGENTS.md`
 
@@ -35,15 +36,18 @@
 - 不要恢复旧 Web MVP 或旧 Battle Lab 的实现假设。
 - 不要把归档 prototype 当作实现证明、验证命令来源或当前计划输入。
 - 如果未来进入实现，必须从当前正式文档重新写有范围约束的实现计划。
+- 任何真正开发前必须先获得用户明确确认。未经确认，不得创建、修改或恢复代码、资源、构建脚本、验证脚本、Godot/Web prototype 或其他实现文件；只能读取上下文、分析问题、提出候选方案、写用户明确要求的文档约束。
 - 优先长期清晰的项目结构，不为了表面连续性保留错误旧术语。
 
-## 游戏设计技能强制要求
+## 游戏设计技能和原型流程要求
 
-- 游戏设计、GDD、玩法规则、经济、平衡、UI 手感、种族、Guardian、奖励、商店、敌人、战场规则相关工作，必须优先使用本项目的 gstack-game 技能链路。
+- 游戏设计、GDD、玩法规则、经济、平衡、UI 手感、种族、Guardian、奖励、商店、敌人、战场规则相关工作，默认走项目的 gstack-game 技能链路；但快速验证场景可以先走轻量 Fast Prototype Lane，不强制完整评审链路。
 - 不要用 Superpowers 或通用 brainstorming 代替 gstack-game 的设计技能，除非用户明确要求进入工程实现、代码计划或通用软件开发流程。
 - 涉及玩法 canon 的新增、删改或锁定，必须先通过 gstack-game 设计流程提出候选、说明取舍，并等待用户确认。
 - 未经确认的设计内容只能标记为候选草案、假设或待确认，不能写成“已锁定”“正式规则”或实现输入。
 - 如果技能规则冲突，游戏设计场景下以 gstack-game 技能和本文件为准。
+- Fast Prototype Lane 只用于快速验证，不直接产生正式 canon。进入该 lane 时先给出一句话验证假设、最小 playable slice、哪些内容是假数据 / 假 UI / 假平衡，以及退出判断；用户确认后才能开始实现。
+- Formal Design Lane 用于锁 canon、更新正式 GDD、决定长期系统、进入正式 Godot 实现计划或做 review / gate 结论。
 
 ## 文档权威顺序
 
@@ -55,6 +59,7 @@
 - `docs/guardian-system.md`：Guardian 通用系统规则。
 - `docs/mvp-learning-checkpoints.md`：MVP 玩家学习检查点、验收信号和失败信号。
 - `docs/mvp-scope.md`：第一版 MVP 内容边界。
+- `docs/DESIGN.md`：MVP v0 美术风格、资源生产约束和视觉反馈规范；不改写玩法规则。
 - `docs/PROGRESS.md`：近期决策日志，不是实现证明。
 
 候选草案不参与文档权威顺序，除非用户确认后再提升为正式规则。
@@ -85,6 +90,7 @@
 - MVP 学习检查点变更：更新 `docs/mvp-learning-checkpoints.md` 和 `docs/PROGRESS.md`。
 - 中立奖励 / 商店修正候选变更：更新 `docs/neutral-modifiers.md` 和 `docs/PROGRESS.md`，用户确认后才能提升为正式规则。
 - MVP 范围变更：更新 `docs/mvp-scope.md` 和 `docs/PROGRESS.md`。
-- 实现工作开始前：先创建新的实现计划，不引用已删除实现。
+- 美术风格、资源生产或视觉反馈规范变更：更新 `docs/DESIGN.md` 和 `docs/PROGRESS.md`。
+- 实现工作开始前：先创建新的实现计划，不引用已删除实现；计划必须等待用户明确确认后才能执行。
 - 如果发现归档 prototype 或归档实现文件，默认忽略；只有用户明确要求考古时才读取。
 - 当前仓库没有 npm 命令、构建命令或自动验证命令。
