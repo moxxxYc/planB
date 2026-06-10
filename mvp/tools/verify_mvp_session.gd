@@ -1,8 +1,6 @@
 extends SceneTree
 
 const MODEL_PATH := "res://scripts/run/mvp_session_model.gd"
-const DEBUG_PATH := "res://scripts/run/mvp_session_debug.gd"
-const SCENE_PATH := "res://scenes/run/mvp_session_debug.tscn"
 
 const REQUIRED_FLOW := [
 	"Guardian Select",
@@ -67,7 +65,6 @@ func _init() -> void:
 	_check_paths(failures)
 	if failures.is_empty():
 		_check_model_full_run(failures)
-		_check_debug_scene(failures)
 
 	if not failures.is_empty():
 		for failure in failures:
@@ -75,34 +72,30 @@ func _init() -> void:
 		quit(1)
 		return
 
-	print("verify_mvp_session.gd passed: M3 complete session reaches real result telemetry")
+	print("verify_mvp_session.gd passed: complete session reaches result telemetry")
 	quit(0)
 
 
 func _check_paths(failures: Array[String]) -> void:
-	for path in [MODEL_PATH, DEBUG_PATH, SCENE_PATH]:
+	for path in [MODEL_PATH]:
 		if not ResourceLoader.exists(path):
-			failures.append("Missing M3 resource path: %s" % path)
+			failures.append("Missing session resource path: %s" % path)
 
 
 func _check_model_full_run(failures: Array[String]) -> void:
 	var script := ResourceLoader.load(MODEL_PATH)
 	if script == null:
-		failures.append("Could not load M3 session model script")
+		failures.append("Could not load session model script")
 		return
 
 	var model = script.new()
 	if model == null:
-		failures.append("Could not instantiate M3 session model")
+		failures.append("Could not instantiate session model")
 		return
 
-	if not model.has_method("run_debug_win_session"):
-		failures.append("M3 model missing run_debug_win_session()")
-		return
-
-	var result: Dictionary = model.run_debug_win_session("hive.vein_mother")
+	var result: Dictionary = _run_session(model, "hive.vein_mother", true)
 	if result.is_empty():
-		failures.append("M3 debug win session returned empty result")
+		failures.append("Win session returned empty result")
 		return
 
 	_check_flow(result, failures)
@@ -111,30 +104,51 @@ func _check_model_full_run(failures: Array[String]) -> void:
 	_check_phase2_readability_fields(result, failures)
 	_check_counter_coverage(model, failures)
 
+	var loss_model = script.new()
+	var loss_result: Dictionary = _run_session(loss_model, "hive.acid_crown_mother", false)
+	if str(loss_result.get("telemetry", {}).get("endpoint.outcome", "")) != "loss":
+		failures.append("Loss session did not produce loss endpoint outcome")
+
+
+func _run_session(model, guardian_id: String, player_wins: bool) -> Dictionary:
+	model.start_new_run(guardian_id)
+	model.run_battle(1)
+	model.choose_first_reward("")
+	model.run_battle(2)
+	model.run_first_shop()
+	model.run_battle(3, model.get_counter_id_for_current_axis())
+	model.run_battle(4)
+	model.choose_second_reward()
+	model.run_battle(5, model.get_counter_id_for_current_axis())
+	model.run_endpoint_prep()
+	model.run_endpoint(player_wins)
+	model.build_result_page()
+	return model.get_run_summary()
+
 
 func _check_flow(result: Dictionary, failures: Array[String]) -> void:
 	var flow: Array = result.get("flow_history", [])
 	for expected_step in REQUIRED_FLOW:
 		if not flow.has(expected_step):
-			failures.append("M3 flow missing step: %s" % expected_step)
+			failures.append("Session flow missing step: %s" % expected_step)
 
 
 func _check_result_fields(result: Dictionary, failures: Array[String]) -> void:
 	var result_page: Dictionary = result.get("result_page", {})
 	for field in REQUIRED_RESULT_FIELDS:
 		if not result_page.has(field):
-			failures.append("M3 result page missing field: %s" % field)
+			failures.append("Session result page missing field: %s" % field)
 		elif str(result_page[field]).is_empty():
-			failures.append("M3 result page field is empty: %s" % field)
+			failures.append("Session result page field is empty: %s" % field)
 
 
 func _check_telemetry_fields(result: Dictionary, failures: Array[String]) -> void:
 	var telemetry: Dictionary = result.get("telemetry", {})
 	for field in REQUIRED_TELEMETRY_FIELDS:
 		if not telemetry.has(field):
-			failures.append("M3 telemetry missing checkpoint field: %s" % field)
+			failures.append("Session telemetry missing checkpoint field: %s" % field)
 		elif str(telemetry[field]).is_empty():
-			failures.append("M3 telemetry checkpoint field is empty: %s" % field)
+			failures.append("Session telemetry checkpoint field is empty: %s" % field)
 
 
 func _check_phase2_readability_fields(result: Dictionary, failures: Array[String]) -> void:
@@ -167,14 +181,9 @@ func _check_phase2_readability_fields(result: Dictionary, failures: Array[String
 
 
 func _check_counter_coverage(model, failures: Array[String]) -> void:
-	if not model.has_method("run_counter_debug_cases"):
-		failures.append("M3 model missing run_counter_debug_cases()")
-		return
-
-	var cases: Array = model.run_counter_debug_cases()
 	var seen := {}
-	for counter_case in cases:
-		var counter_id := str(counter_case.get("counter_id", ""))
+	for counter_id in ["pool_polluter", "echo_breaker", "stagger_punisher"]:
+		var counter_case: Dictionary = model.apply_counter(counter_id, 0)
 		seen[counter_id] = true
 		for field in ["warning", "target_component", "visible_effect", "log_record"]:
 			if str(counter_case.get(field, "")).is_empty():
@@ -182,30 +191,4 @@ func _check_counter_coverage(model, failures: Array[String]) -> void:
 
 	for counter_id in ["pool_polluter", "echo_breaker", "stagger_punisher"]:
 		if not seen.has(counter_id):
-			failures.append("M3 counter debug coverage missing %s" % counter_id)
-
-
-func _check_debug_scene(failures: Array[String]) -> void:
-	var packed := ResourceLoader.load(SCENE_PATH)
-	if not packed is PackedScene:
-		failures.append("M3 debug scene did not load as PackedScene")
-		return
-
-	var instance := (packed as PackedScene).instantiate()
-	if instance == null:
-		failures.append("M3 debug scene could not instantiate")
-		return
-
-	if not instance.has_method("verify_scene_build"):
-		failures.append("M3 debug scene missing verify_scene_build()")
-	elif not instance.verify_scene_build():
-		failures.append("M3 debug scene UI build failed")
-
-	if not instance.has_method("run_full_debug_session_for_verification"):
-		failures.append("M3 debug scene missing run_full_debug_session_for_verification()")
-	else:
-		var result: Dictionary = instance.run_full_debug_session_for_verification()
-		if result.get("result_page", {}).is_empty():
-			failures.append("M3 debug scene did not reach result page")
-
-	instance.free()
+			failures.append("Session counter coverage missing %s" % counter_id)

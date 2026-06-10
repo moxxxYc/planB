@@ -67,7 +67,7 @@ func _draw() -> void:
 		_draw_text("没有战场模型", Vector2(24, 32), 18, COLOR_TEXT)
 		return
 
-	var summary: Dictionary = model.get_debug_summary()
+	var summary: Dictionary = model.get_state_snapshot()
 	_draw_header(summary)
 	_draw_guardians(summary)
 	_draw_lanes(summary)

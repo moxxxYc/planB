@@ -171,7 +171,7 @@ func get_motion_summary() -> Dictionary:
 	}
 
 
-func force_tuning_result(tuning_result: String) -> bool:
+func select_tuning_result(tuning_result: String) -> bool:
 	if not TUNING_RESULTS.has(tuning_result):
 		return false
 
@@ -181,7 +181,7 @@ func force_tuning_result(tuning_result: String) -> bool:
 	var event := _record_event(
 		"Tuning",
 		"Natural Hit",
-		"调试指定调校结果：%s" % _display_tuning(tuning_result),
+		"当前调校结果：%s" % _display_tuning(tuning_result),
 		{"tuning_result": tuning_result},
 		chain_id
 	)
@@ -189,7 +189,7 @@ func force_tuning_result(tuning_result: String) -> bool:
 	return true
 
 
-func force_unit_slot_hit(slot_id: int, tuning_result: String = "") -> Dictionary:
+func resolve_unit_slot_hit(slot_id: int, tuning_result: String = "") -> Dictionary:
 	if not _is_valid_slot(slot_id):
 		return {}
 
@@ -199,10 +199,10 @@ func force_unit_slot_hit(slot_id: int, tuning_result: String = "") -> Dictionary
 		return {}
 
 	battle_time_seconds = max(battle_time_seconds, float(UNIT_FULL_EXPOSURE_SECONDS[slot_id]))
-	return run_forced_chain(result, slot_id)
+	return run_machine_chain(result, slot_id)
 
 
-func force_unit_slot_queue(slot_id: int, tuning_result: String = "Gate") -> Dictionary:
+func create_unit_slot_queue(slot_id: int, tuning_result: String = "Gate") -> Dictionary:
 	if not _is_valid_slot(slot_id):
 		return {}
 	if not TUNING_RESULTS.has(tuning_result):
@@ -213,11 +213,11 @@ func force_unit_slot_queue(slot_id: int, tuning_result: String = "Gate") -> Dict
 	var required: int = UNIT_REQUIREMENTS[slot_id]
 	var hit_value := _progress_for_tuning(tuning_result)
 	unit_progress[slot_id] = max(0, required - hit_value)
-	var result := run_forced_chain(tuning_result, slot_id)
+	var result := run_machine_chain(tuning_result, slot_id)
 	return result.get("queue_entry", {})
 
 
-func force_blocked_bounce(slot_id: int) -> Dictionary:
+func create_blocked_bounce(slot_id: int) -> Dictionary:
 	if not _is_valid_slot(slot_id):
 		return {}
 
@@ -255,7 +255,7 @@ func force_blocked_bounce(slot_id: int) -> Dictionary:
 	return event
 
 
-func force_settlement_state(state: String) -> Dictionary:
+func apply_settlement_state(state: String) -> Dictionary:
 	if not SETTLEMENT_STATES.has(state):
 		return {}
 
@@ -282,14 +282,14 @@ func force_settlement_state(state: String) -> Dictionary:
 			description = "预充 / 复写 / 脉冲的结算会在物理球落定后显示。"
 			data = {"tuning_result": selected_tuning_result}
 		_:
-			description = "调试指定物理状态：%s。" % _display_state(state)
+			description = "当前物理状态：%s。" % _display_state(state)
 
 	var event := _record_event(component, state, description, data, chain_id)
 	active_ball = _make_active_ball(component, state, state, chain_id)
 	return event
 
 
-func run_forced_chain(tuning_result: String, slot_id: int) -> Dictionary:
+func run_machine_chain(tuning_result: String, slot_id: int) -> Dictionary:
 	if not TUNING_RESULTS.has(tuning_result) or not _is_valid_slot(slot_id):
 		return {}
 
@@ -396,21 +396,12 @@ func get_supply_summary() -> Dictionary:
 	}
 
 
-func get_debug_summary() -> Dictionary:
+func get_state_snapshot() -> Dictionary:
 	return {
 		"boards": BOARD_NAMES.duplicate(),
 		"tuning_results": TUNING_RESULTS.duplicate(),
 		"unit_slots": get_unit_slots(),
 		"motion": get_motion_summary(),
-		"debug_controls": [
-			"force_tuning_result",
-			"force_unit_slot_hit",
-			"force_blocked_bounce",
-			"force_split_return",
-			"force_recycle_return",
-			"force_waste",
-			"force_logic_settlement",
-		],
 		"queue_entries": queue_entries.duplicate(true),
 		"event_log": event_log.duplicate(true),
 	}
@@ -813,7 +804,7 @@ func _make_active_ball(board: String, target: String, state: String, chain_id: S
 
 func _new_chain_id() -> String:
 	_chain_index += 1
-	return "M1-%03d" % _chain_index
+	return "CHAIN-%03d" % _chain_index
 
 
 func _is_valid_slot(slot_id: int) -> bool:

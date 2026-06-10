@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="EnemyUnitTemplateDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyUnitTemplateDefinition" format=3 uid="uid://blawytb327f4t"]
 
-[ext_resource type="Script" path="res://scripts/data/enemy_unit_template_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://cbhndaybhlc1s" path="res://scripts/data/enemy_unit_template_definition.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
@@ -8,8 +8,7 @@ enemy_id = &"enemy.grunt"
 display_name = "敌方步兵"
 hp = 10
 attack_damage = 2
-attack_interval = 1.0
 attack_range = 3.0
 move_speed = 7.0
 role_note = "基础同路接战。"
-placeholder_note = "M2 调试职责数值，非最终平衡。"
+placeholder_note = "当前首版职责数值，仍需实测。"

@@ -1,13 +1,11 @@
-[gd_resource type="Resource" script_class="GuardianDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GuardianDefinition" format=3 uid="uid://dtxv3b5miyi8p"]
 
-[ext_resource type="Script" path="res://scripts/data/guardian_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://brdh3mhc4f2j3" path="res://scripts/data/guardian_definition.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 guardian_id = &"hive.vein_mother"
 display_name = "巢脉母"
-race = "Hive"
-axis_lean = "Launch"
 tactical_skill = "巢脉牵缚"
 strategic_target = "Launch.Recycle / Launch.Pool"
 placeholder_note = "M0 占位。战术和战略守护者合同尚未完整执行。"

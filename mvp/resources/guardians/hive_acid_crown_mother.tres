@@ -1,12 +1,11 @@
-[gd_resource type="Resource" script_class="GuardianDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GuardianDefinition" format=3 uid="uid://dxrxrt0pwoeby"]
 
-[ext_resource type="Script" path="res://scripts/data/guardian_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://brdh3mhc4f2j3" path="res://scripts/data/guardian_definition.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 guardian_id = &"hive.acid_crown_mother"
 display_name = "酸冠母"
-race = "Hive"
 axis_lean = "Tuning"
 tactical_skill = "酸冠反喷"
 strategic_target = "Tuning.Prime"

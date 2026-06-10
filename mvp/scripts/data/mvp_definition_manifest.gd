@@ -3,25 +3,17 @@ extends RefCounted
 
 const REQUIRED_SCENES := [
 	"res://scenes/ui/main_menu.tscn",
-	"res://scenes/run/mvp_shell.tscn",
 	"res://scenes/run/mvp_playable_session.tscn",
-	"res://scenes/run/mvp_session_debug.tscn",
-	"res://scenes/ball_machine/machine_causality_debug.tscn",
-	"res://scenes/battlefield/battlefield_deploy_debug.tscn",
 ]
 
 const REQUIRED_SCRIPTS := [
 	"res://scripts/ui/main_menu.gd",
-	"res://scripts/run/mvp_shell.gd",
 	"res://scripts/run/mvp_playable_session.gd",
 	"res://scripts/run/mvp_session_model.gd",
-	"res://scripts/run/mvp_session_debug.gd",
 	"res://scripts/ball_machine/machine_causality_model.gd",
 	"res://scripts/ball_machine/machine_causality_view.gd",
-	"res://scripts/ball_machine/machine_causality_debug.gd",
 	"res://scripts/battlefield/battlefield_deploy_model.gd",
 	"res://scripts/battlefield/battlefield_deploy_view.gd",
-	"res://scripts/battlefield/battlefield_deploy_debug.gd",
 	"res://scripts/data/machine_component_definition.gd",
 	"res://scripts/data/battle_lane_definition.gd",
 	"res://scripts/data/unit_template_definition.gd",
@@ -145,7 +137,7 @@ const SESSION_STEPS := [
 	{
 		"id": "battle_1",
 		"label": "第一场战斗",
-		"summary": "M1 队列条目通过 M2 三路战场部署，并记录第一段机器因果样本。",
+		"summary": "机器队列条目通过三路战场部署，并记录第一段机器因果样本。",
 	},
 	{
 		"id": "first_reward",
@@ -155,7 +147,7 @@ const SESSION_STEPS := [
 	{
 		"id": "shop_gold_rest",
 		"label": "商店 / 金币 / 休整",
-		"summary": "已实现第一版调试金币来源、一个中立修正购买上限和休整记录。",
+		"summary": "已实现第一版 Gold 来源、一个中立修正购买上限和休整记录。",
 	},
 	{
 		"id": "counter",
@@ -170,7 +162,7 @@ const SESSION_STEPS := [
 	{
 		"id": "result_page",
 		"label": "结算页",
-		"summary": "结算页字段来自 M3 本局真实数据和检查点记录。",
+		"summary": "结算页字段来自本局真实数据和检查点记录。",
 	},
 ]
 

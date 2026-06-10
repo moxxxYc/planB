@@ -2,7 +2,6 @@ class_name MvpMainMenu
 extends Control
 
 const PLAYABLE_SCENE_PATH := "res://scenes/run/mvp_playable_session.tscn"
-const DEBUG_SHELL_SCENE_PATH := "res://scenes/run/mvp_shell.tscn"
 const LOGO_PATH := "res://assets/ui/planb_logo.png"
 const KEY_ART_PATH := "res://assets/ui/menu_key_art.png"
 
@@ -20,7 +19,6 @@ var _built := false
 var _logo_texture: Texture2D
 var _key_art_texture: Texture2D
 var _start_button: Button
-var _debug_button: Button
 var _quit_button: Button
 var _asset_status: Dictionary = {}
 
@@ -29,23 +27,10 @@ func _ready() -> void:
 	_ensure_built()
 
 
-func verify_menu_build() -> bool:
-	_ensure_built()
-	return (
-		_start_button != null
-		and _debug_button != null
-		and _quit_button != null
-		and ResourceLoader.exists(PLAYABLE_SCENE_PATH)
-		and bool(_asset_status.get(LOGO_PATH, false))
-		and bool(_asset_status.get(KEY_ART_PATH, false))
-	)
-
-
 func get_menu_contract_summary() -> Dictionary:
 	_ensure_built()
 	return {
 		"playable_scene": PLAYABLE_SCENE_PATH,
-		"debug_shell_scene": DEBUG_SHELL_SCENE_PATH,
 		"has_start_button": _start_button != null,
 		"has_quit_button": _quit_button != null,
 		"asset_status": _asset_status.duplicate(),
@@ -122,10 +107,6 @@ func _build_layout() -> void:
 	_start_button.pressed.connect(_on_start_pressed)
 	left.add_child(_start_button)
 
-	_debug_button = _make_menu_button("开发入口", COLOR_TEXT_DIM)
-	_debug_button.pressed.connect(_on_debug_pressed)
-	left.add_child(_debug_button)
-
 	_quit_button = _make_menu_button("退出", COLOR_TEXT_DIM)
 	_quit_button.pressed.connect(_on_quit_pressed)
 	left.add_child(_quit_button)
@@ -169,10 +150,6 @@ func _make_menu_button(text: String, accent: Color) -> Button:
 
 func _on_start_pressed() -> void:
 	get_tree().change_scene_to_file(PLAYABLE_SCENE_PATH)
-
-
-func _on_debug_pressed() -> void:
-	get_tree().change_scene_to_file(DEBUG_SHELL_SCENE_PATH)
 
 
 func _on_quit_pressed() -> void:

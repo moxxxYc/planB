@@ -288,7 +288,7 @@ func get_recent_event_states() -> Array[String]:
 	return states
 
 
-func get_debug_summary() -> Dictionary:
+func get_state_snapshot() -> Dictionary:
 	_update_lane_states_and_danger()
 	return {
 		"battle_time_seconds": battle_time_seconds,
@@ -306,16 +306,16 @@ func get_debug_summary() -> Dictionary:
 	}
 
 
-func force_lane_state_for_debug(lane, state: String) -> bool:
+func create_lane_state_sample(lane, state: String) -> bool:
 	var lane_id := _normalize_lane_id(lane)
 	if lane_id == &"":
 		return false
 
 	match state:
 		"pushing":
-			_spawn_debug_player_unit(lane_id, 54.0)
+			_spawn_player_sample_unit(lane_id, 54.0)
 		"stalled":
-			_spawn_debug_player_unit(lane_id, 48.0)
+			_spawn_player_sample_unit(lane_id, 48.0)
 			spawn_enemy(LANE_NAMES[lane_id], "Enemy Grunt", 50.0)
 		"leaking":
 			spawn_enemy(LANE_NAMES[lane_id], "Enemy Raider", 18.0)
@@ -339,11 +339,11 @@ func force_lane_state_for_debug(lane, state: String) -> bool:
 	return true
 
 
-func has_debug_seen_lane_state(state: String) -> bool:
+func has_seen_lane_state(state: String) -> bool:
 	return _seen_lane_states.has(state)
 
 
-func force_battle_result_for_debug(next_state: String) -> bool:
+func resolve_battle_result(next_state: String) -> bool:
 	match next_state:
 		"player_win":
 			battle_state = "player_win"
@@ -373,18 +373,18 @@ func _spawn_player_unit_from_queue(entry: Dictionary, lane_id: StringName) -> Di
 	return unit
 
 
-func _spawn_debug_player_unit(lane_id: StringName, path_pos: float) -> Dictionary:
+func _spawn_player_sample_unit(lane_id: StringName, path_pos: float) -> Dictionary:
 	var unit := _make_unit_from_resource(
 		PLAYER_SIDE,
 		lane_id,
 		HIVE_UNIT_RESOURCES[2],
 		clamp(path_pos, PLAYER_SPAWN_POS, ENEMY_SPAWN_POS),
-		{"queue_entry_id": "debug", "source_slot_id": 2}
+		{"queue_entry_id": "sample", "source_slot_id": 2}
 	)
 	units.append(unit)
 	_record_event(
 		"unit spawned",
-		"调试蜂巢单位已放置到%s %.1f 位置。" % [_display_lane(lane_id), path_pos],
+		"蜂巢单位已放置到%s %.1f 位置。" % [_display_lane(lane_id), path_pos],
 		unit
 	)
 	return unit

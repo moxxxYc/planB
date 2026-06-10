@@ -3,8 +3,6 @@ extends SceneTree
 const M1_MODEL_PATH := "res://scripts/ball_machine/machine_causality_model.gd"
 const MODEL_PATH := "res://scripts/battlefield/battlefield_deploy_model.gd"
 const VIEW_PATH := "res://scripts/battlefield/battlefield_deploy_view.gd"
-const DEBUG_PATH := "res://scripts/battlefield/battlefield_deploy_debug.gd"
-const SCENE_PATH := "res://scenes/battlefield/battlefield_deploy_debug.tscn"
 
 const ENEMY_TEMPLATE_PATHS := [
 	"res://resources/enemies/enemy_grunt.tres",
@@ -19,7 +17,6 @@ func _init() -> void:
 	_check_paths(failures)
 	if failures.is_empty():
 		_check_model_behaviour(failures)
-		_check_debug_scene(failures)
 
 	if not failures.is_empty():
 		for failure in failures:
@@ -36,8 +33,6 @@ func _check_paths(failures: Array[String]) -> void:
 		M1_MODEL_PATH,
 		MODEL_PATH,
 		VIEW_PATH,
-		DEBUG_PATH,
-		SCENE_PATH,
 	]
 	required_paths.append_array(ENEMY_TEMPLATE_PATHS)
 
@@ -72,7 +67,7 @@ func _check_model_behaviour(failures: Array[String]) -> void:
 	model.reset()
 	if not model.select_lane("Left"):
 		failures.append("Could not select Left before queue deploy")
-	var queue_entry: Dictionary = m1_model.force_unit_slot_queue(1, "Gate")
+	var queue_entry: Dictionary = m1_model.create_unit_slot_queue(1, "Gate")
 	if queue_entry.is_empty():
 		failures.append("M1 did not create queue entry for M2")
 		return
@@ -102,14 +97,14 @@ func _check_model_behaviour(failures: Array[String]) -> void:
 
 func _check_lane_states_and_danger(model, failures: Array[String]) -> void:
 	model.reset()
-	model.force_lane_state_for_debug("Left", "pushing")
-	model.force_lane_state_for_debug("Mid", "stalled")
-	model.force_lane_state_for_debug("Right", "leaking")
-	model.force_lane_state_for_debug("Left", "gate broken")
-	model.force_lane_state_for_debug("Mid", "invading")
+	model.create_lane_state_sample("Left", "pushing")
+	model.create_lane_state_sample("Mid", "stalled")
+	model.create_lane_state_sample("Right", "leaking")
+	model.create_lane_state_sample("Left", "gate broken")
+	model.create_lane_state_sample("Mid", "invading")
 
 	for expected_state in ["pushing", "stalled", "leaking", "gate broken", "invading"]:
-		if not model.has_debug_seen_lane_state(expected_state):
+		if not model.has_seen_lane_state(expected_state):
 			failures.append("Lane state never became visible: %s" % expected_state)
 
 	model.reset()
@@ -129,7 +124,7 @@ func _check_lane_states_and_danger(model, failures: Array[String]) -> void:
 func _check_combat_resolution(model, m1_model, failures: Array[String]) -> void:
 	model.reset()
 	model.select_lane("Mid")
-	var queue_entry: Dictionary = m1_model.force_unit_slot_queue(2, "Prime")
+	var queue_entry: Dictionary = m1_model.create_unit_slot_queue(2, "Prime")
 	model.enqueue_machine_queue_entry(queue_entry)
 	model.deploy_next_queue_entry()
 	model.spawn_enemy("Mid", "Enemy Grunt", 18.0)
@@ -149,46 +144,9 @@ func _check_combat_resolution(model, m1_model, failures: Array[String]) -> void:
 	if not saw_death:
 		failures.append("Combat did not produce a unit death")
 
-	model.force_battle_result_for_debug("player_win")
+	model.resolve_battle_result("player_win")
 	if model.get_battle_state() != "player_win":
-		failures.append("Debug battle did not resolve to player_win")
-	model.force_battle_result_for_debug("player_loss")
+		failures.append("Battle did not resolve to player_win")
+	model.resolve_battle_result("player_loss")
 	if model.get_battle_state() != "player_loss":
-		failures.append("Debug battle did not resolve to player_loss")
-
-
-func _check_debug_scene(failures: Array[String]) -> void:
-	var packed := ResourceLoader.load(SCENE_PATH)
-	if not packed is PackedScene:
-		failures.append("M2 debug scene did not load as PackedScene")
-		return
-
-	var instance := (packed as PackedScene).instantiate()
-	if instance == null:
-		failures.append("M2 debug scene could not instantiate")
-		return
-
-	if not instance.has_method("verify_scene_build"):
-		failures.append("M2 debug scene missing verify_scene_build()")
-	elif not instance.verify_scene_build():
-		failures.append("M2 debug scene UI build failed")
-
-	if not instance.has_method("run_debug_control_for_verification"):
-		failures.append("M2 debug scene missing run_debug_control_for_verification()")
-	else:
-		for control_id in [
-			"Click Left",
-			"Click Mid",
-			"Click Right",
-			"Generate Queue Entry",
-			"Deploy Queue Head",
-			"Spawn Enemy",
-			"Step Battle",
-			"Resolve Win",
-			"Resolve Loss",
-		]:
-			var summary: Dictionary = instance.run_debug_control_for_verification(control_id)
-			if summary.is_empty():
-				failures.append("M2 debug control returned empty summary: %s" % control_id)
-
-	instance.free()
+		failures.append("Battle did not resolve to player_loss")

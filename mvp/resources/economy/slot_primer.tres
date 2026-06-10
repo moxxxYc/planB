@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="ModifierDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ModifierDefinition" format=3 uid="uid://bnkfg3svt5kbr"]
 
-[ext_resource type="Script" path="res://scripts/data/modifier_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://cav08rvk43m6s" path="res://scripts/data/modifier_definition.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
@@ -10,6 +10,5 @@ source_pool = "Reward / Shop"
 warehouse = "Unit"
 target_component = "Unit.Slot.progress_floor"
 operation = "设置下限"
-role_tag = "Anchor"
 player_read = "单位仓锚点槽位"
-placeholder_note = "M0 调试数据占位。"
+placeholder_note = "首版数据占位。"

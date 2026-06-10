@@ -42,7 +42,7 @@ const FLOW_STEPS := [
 	"Result Page",
 ]
 
-const GOLD_FAUCET_DEBUG := {
+const GOLD_FAUCET_FIRST_PASS := {
 	1: 6,
 	2: 6,
 	3: 8,
@@ -51,8 +51,8 @@ const GOLD_FAUCET_DEBUG := {
 	6: 0,
 }
 
-const REST_COST_DEBUG := 3
-const REST_HEAL_DEBUG := 20
+const REST_COST_FIRST_PASS := 3
+const REST_HEAL_FIRST_PASS := 20
 const PLAYER_GUARDIAN_MAX_HP := 100
 
 var machine_model: RefCounted = MachineModelScript.new()
@@ -117,7 +117,7 @@ func reset() -> void:
 
 func start_new_run(guardian_id: String = "hive.vein_mother") -> Dictionary:
 	reset()
-	telemetry["gold_faucet.debug_first_pass"] = "6 / 6 / 8 / 0 / 0 / 0，调试首版水龙头，非最终平衡。"
+	telemetry["gold_faucet.first_pass"] = "6 / 6 / 8 / 0 / 0 / 0，首版 Gold 来源，数值仍需实测。"
 	_enter_step("Guardian Select")
 	return choose_guardian(guardian_id)
 
@@ -146,38 +146,6 @@ func choose_guardian(guardian_id: String) -> Dictionary:
 		chosen_guardian
 	)
 	return chosen_guardian.duplicate(true)
-
-
-func run_debug_win_session(guardian_id: String = "hive.vein_mother") -> Dictionary:
-	start_new_run(guardian_id)
-	run_battle(1)
-	choose_first_reward(_default_first_reward_for_axis(main_axis))
-	run_battle(2)
-	run_first_shop()
-	run_battle(3, _counter_for_axis(main_axis))
-	run_battle(4)
-	choose_second_reward()
-	run_battle(5, _counter_for_axis(main_axis))
-	run_endpoint_prep()
-	run_endpoint(true)
-	build_result_page()
-	return get_run_summary()
-
-
-func run_debug_loss_session(guardian_id: String = "hive.acid_crown_mother") -> Dictionary:
-	start_new_run(guardian_id)
-	run_battle(1)
-	choose_first_reward(_default_first_reward_for_axis(main_axis))
-	run_battle(2)
-	run_first_shop()
-	run_battle(3, _counter_for_axis(main_axis))
-	run_battle(4)
-	choose_second_reward()
-	run_battle(5, _counter_for_axis(main_axis))
-	run_endpoint_prep()
-	run_endpoint(false)
-	build_result_page()
-	return get_run_summary()
 
 
 func run_battle(battle_number: int, counter_id: String = "", lane_name_override: String = "") -> Dictionary:
@@ -209,10 +177,10 @@ func run_battle(battle_number: int, counter_id: String = "", lane_name_override:
 		battlefield_model.tick(0.25)
 
 	var outcome := "player_win"
-	battlefield_model.force_battle_result_for_debug(outcome)
+	battlefield_model.resolve_battle_result(outcome)
 	if battle_number == 1:
 		_record_battle_readability_summary(battle_number, queue_entry, outcome)
-	_apply_debug_battle_pressure(battle_number)
+	_apply_battle_pressure(battle_number)
 	_apply_gold_faucet(battle_number, outcome)
 	_record_unit_contribution(queue_entry, lane_name, battle_number)
 	if battle_number == 2:
@@ -226,7 +194,7 @@ func run_battle(battle_number: int, counter_id: String = "", lane_name_override:
 
 	_log(
 		"battle resolved",
-		"第 %d 战结算为%s。金币水龙头为调试首版，非最终平衡。" % [
+		"第 %d 战结算为%s。首版 Gold 来源已计入本局。" % [
 			battle_number,
 			_display_outcome(outcome),
 		],
@@ -262,7 +230,7 @@ func choose_first_reward(reward_id: String) -> Dictionary:
 		first_reward["operation"],
 	]
 	telemetry["reward1.battlefield_expectation"] = first_reward["player_read"]
-	telemetry["reward1.battlefield_result"] = "调试战斗中在%s看到了：%s" % [
+	telemetry["reward1.battlefield_result"] = "战斗中在%s看到了：%s" % [
 		_display_lane(_lane_for_battle(2)),
 		first_reward["player_read"],
 	]
@@ -336,7 +304,7 @@ func choose_shop_purchase(purchase_id: String = "", buy_rest: bool = false) -> D
 			"gold_after": gold,
 			"purchase": shop_purchase,
 			"rest": rest_record,
-			"debug_first_pass_balance": true,
+			"first_pass_balance": true,
 		}
 	)
 	return {
@@ -419,9 +387,9 @@ func run_endpoint(player_wins: bool, lane_name_override: String = "Mid") -> Dict
 	var payoff := _endpoint_payoff_for_axis(main_axis, player_wins)
 	var break_reason := "" if player_wins else _break_reason_for_counter(endpoint_counter)
 	if player_wins:
-		battlefield_model.force_battle_result_for_debug("player_win")
+		battlefield_model.resolve_battle_result("player_win")
 	else:
-		battlefield_model.force_battle_result_for_debug("player_loss")
+		battlefield_model.resolve_battle_result("player_loss")
 		player_guardian_hp = 0
 
 	telemetry["endpoint.outcome"] = endpoint_outcome
@@ -473,7 +441,7 @@ func begin_playable_battle(
 	machine_model.set_battle_time(float(_battle_time_anchor_for_battle(battle_number)))
 	machine_model.set_auto_running(true)
 	if battle_number == 1:
-		var opening_queue_entry: Dictionary = machine_model.force_unit_slot_queue(1, "Gate")
+		var opening_queue_entry: Dictionary = machine_model.create_unit_slot_queue(1, "Gate")
 		if not opening_queue_entry.is_empty():
 			battlefield_model.enqueue_machine_queue_entry(opening_queue_entry)
 			_record_battle1_checkpoint(opening_queue_entry)
@@ -496,16 +464,16 @@ func finish_playable_battle(
 	outcome: String,
 	deployed_units: Array[Dictionary]
 ) -> Dictionary:
+	var final_outcome := outcome
+	if final_outcome != "player_win" and final_outcome != "player_loss":
+		return {}
+
 	machine_model.set_auto_running(false)
 
-	var final_outcome := outcome
-	if final_outcome != "player_loss":
-		final_outcome = "player_win"
-
 	if final_outcome == "player_win":
-		battlefield_model.force_battle_result_for_debug("player_win")
+		battlefield_model.resolve_battle_result("player_win")
 	else:
-		battlefield_model.force_battle_result_for_debug("player_loss")
+		battlefield_model.resolve_battle_result("player_loss")
 
 	if battle_number == 1:
 		var queue_entry := _first_queue_entry_from_deployed_units(deployed_units)
@@ -513,7 +481,7 @@ func finish_playable_battle(
 			_record_battle1_checkpoint(queue_entry)
 		_record_battle_readability_summary(battle_number, queue_entry, final_outcome)
 
-	_apply_debug_battle_pressure(battle_number)
+	_apply_battle_pressure(battle_number)
 	_apply_gold_faucet(battle_number, final_outcome)
 	for deployed in deployed_units:
 		_record_playable_deploy_lane_impact(battle_number, deployed)
@@ -536,7 +504,7 @@ func finish_playable_battle(
 
 	_log(
 		"battle resolved",
-		"第 %d 战按可玩短局节奏结算为%s。金币水龙头为调试首版，非最终平衡。" % [
+		"第 %d 战结算为%s。Gold 已计入本局。" % [
 			battle_number,
 			_display_outcome(final_outcome),
 		],
@@ -591,9 +559,9 @@ func finish_playable_endpoint(
 	var payoff := _endpoint_payoff_for_axis(main_axis, player_wins)
 	var break_reason := "" if player_wins else _break_reason_for_counter(endpoint_counter)
 	if player_wins:
-		battlefield_model.force_battle_result_for_debug("player_win")
+		battlefield_model.resolve_battle_result("player_win")
 	else:
-		battlefield_model.force_battle_result_for_debug("player_loss")
+		battlefield_model.resolve_battle_result("player_loss")
 		player_guardian_hp = 0
 
 	telemetry["endpoint.outcome"] = endpoint_outcome
@@ -640,10 +608,10 @@ func apply_counter(counter_id: String, battle_number: int = 3) -> Dictionary:
 
 	match counter_id:
 		"pool_polluter":
-			machine_model.force_settlement_state("Waste")
+			machine_model.apply_settlement_state("Waste")
 		"echo_breaker":
-			machine_model.force_tuning_result("Echo")
-			machine_model.force_settlement_state("Logic Settlement")
+			machine_model.select_tuning_result("Echo")
+			machine_model.apply_settlement_state("Logic Settlement")
 		"stagger_punisher":
 			battlefield_model.set_public_warning("Right", 2)
 			battlefield_model.spawn_enemy("Right", "Enemy Raider", 22.0)
@@ -659,21 +627,6 @@ func apply_counter(counter_id: String, battle_number: int = 3) -> Dictionary:
 		record
 	)
 	return record.duplicate(true)
-
-
-func run_counter_debug_cases() -> Array:
-	var cases: Array = []
-	for counter_id in ["pool_polluter", "echo_breaker", "stagger_punisher"]:
-		var counter: Resource = COUNTER_RESOURCES[counter_id]
-		var record := _counter_to_record(counter, 0)
-		cases.append({
-			"counter_id": counter_id,
-			"warning": record["warning"],
-			"target_component": record["target_component"],
-			"visible_effect": record["visible_effect"],
-			"log_record": record["log_record"],
-		})
-	return cases
 
 
 func build_result_page() -> Dictionary:
@@ -722,7 +675,7 @@ func build_result_page() -> Dictionary:
 	telemetry["unit.key_queue_entries_by_slot"] = key_queue_entries_by_slot.duplicate(true)
 	telemetry["unit.dominant_slot_share"] = _dominant_slot_share()
 
-	_log("result page", "结算页已由真实 M3 本局数据生成。", result_page)
+	_log("result page", "结算页已由本局数据生成。", result_page)
 	return result_page.duplicate(true)
 
 
@@ -877,9 +830,9 @@ func _generate_machine_queue_entry_for_battle(battle_number: int) -> Dictionary:
 			tuning = "Prime"
 			machine_model.set_battle_time(110.0)
 
-	var entry: Dictionary = machine_model.force_unit_slot_queue(slot_id, tuning)
+	var entry: Dictionary = machine_model.create_unit_slot_queue(slot_id, tuning)
 	if entry.is_empty():
-		entry = machine_model.force_unit_slot_queue(1, "Gate")
+		entry = machine_model.create_unit_slot_queue(1, "Gate")
 	return entry
 
 
@@ -959,7 +912,7 @@ func _spawn_battle_pressure(battle_number: int) -> void:
 			battlefield_model.spawn_enemy("Mid", "Enemy Brute", 24.0)
 
 
-func _apply_debug_battle_pressure(battle_number: int) -> void:
+func _apply_battle_pressure(battle_number: int) -> void:
 	match battle_number:
 		2:
 			player_guardian_hp = max(0, player_guardian_hp - 18)
@@ -978,31 +931,31 @@ func _apply_debug_battle_pressure(battle_number: int) -> void:
 func _apply_gold_faucet(battle_number: int, outcome: String) -> void:
 	if outcome != "player_win":
 		return
-	var awarded := int(GOLD_FAUCET_DEBUG.get(battle_number, 0))
+	var awarded := int(GOLD_FAUCET_FIRST_PASS.get(battle_number, 0))
 	gold += awarded
 	_log(
 		"gold faucet",
-		"第 %d 战获得 %d 金币。调试首版水龙头，非最终平衡。" % [
+			"第 %d 战获得 %d 金币。首版 Gold 来源，数值仍需实测。" % [
 			battle_number,
 			awarded,
 		],
-		{"gold": gold, "debug_first_pass_balance": true}
+		{"gold": gold, "first_pass_balance": true}
 	)
 
 
 func _maybe_rest(window_id: String) -> Dictionary:
 	if player_guardian_hp >= PLAYER_GUARDIAN_MAX_HP:
 		return {}
-	if gold < REST_COST_DEBUG:
+	if gold < REST_COST_FIRST_PASS:
 		return {}
 
 	var before_hp := player_guardian_hp
 	var before_gold := gold
-	gold -= REST_COST_DEBUG
-	player_guardian_hp = min(PLAYER_GUARDIAN_MAX_HP, player_guardian_hp + REST_HEAL_DEBUG)
+	gold -= REST_COST_FIRST_PASS
+	player_guardian_hp = min(PLAYER_GUARDIAN_MAX_HP, player_guardian_hp + REST_HEAL_FIRST_PASS)
 	var record := {
 		"window": window_id,
-		"gold_spent": REST_COST_DEBUG,
+		"gold_spent": REST_COST_FIRST_PASS,
 		"hp_before": before_hp,
 		"hp_after": player_guardian_hp,
 		"hp_restored": player_guardian_hp - before_hp,
@@ -1453,7 +1406,7 @@ func _dominant_slot_share() -> Dictionary:
 	return {
 		"slot_id": best_slot,
 		"share": share,
-		"debug_key_entry_count": total,
+		"key_entry_count": total,
 	}
 
 

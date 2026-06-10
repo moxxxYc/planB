@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="ModifierDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ModifierDefinition" format=3 uid="uid://w8j0nr04nqac"]
 
-[ext_resource type="Script" path="res://scripts/data/modifier_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://cav08rvk43m6s" path="res://scripts/data/modifier_definition.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
@@ -10,6 +10,5 @@ source_pool = "Reward / Shop"
 warehouse = "Tuning"
 target_component = "Tuning.Prime.value_bonus"
 operation = "增加"
-role_tag = "Anchor"
 player_read = "调校仓高价值命中"
-placeholder_note = "M0 调试数据占位。"
+placeholder_note = "首版数据占位。"

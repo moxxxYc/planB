@@ -1,15 +1,13 @@
-[gd_resource type="Resource" script_class="ModifierDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ModifierDefinition" format=3 uid="uid://in8gxbm7gjhu"]
 
-[ext_resource type="Script" path="res://scripts/data/modifier_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://cav08rvk43m6s" path="res://scripts/data/modifier_definition.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 modifier_id = &"pool_pocket"
 display_name = "池袋"
 source_pool = "Reward / Shop"
-warehouse = "Launch"
 target_component = "Launch.Pool.capacity"
 operation = "增加"
-role_tag = "Anchor"
 player_read = "发射仓持续流"
-placeholder_note = "M0 调试数据占位。"
+placeholder_note = "首版数据占位。"

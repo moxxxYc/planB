@@ -94,12 +94,38 @@ func _check_main_scene_instantiates(failures: Array[String]) -> void:
 		failures.append("Main scene could not instantiate")
 		return
 
-	if not instance.has_method("verify_menu_build"):
-		failures.append("Main scene missing verify_menu_build()")
-	elif not instance.verify_menu_build():
-		failures.append("Main menu contract failed")
+	if instance.has_method("get_menu_contract_summary"):
+		instance.call("get_menu_contract_summary")
+	var visible_text := _visible_text_snapshot(instance)
+	if not visible_text.has("开始游戏"):
+		failures.append("Main menu missing start button")
+	if not visible_text.has("退出"):
+		failures.append("Main menu missing quit button")
+	for text in visible_text:
+		var lower_text := str(text).to_lower()
+		if lower_text.contains("debug") or str(text).contains("开发入口") or str(text).contains("调试入口"):
+			failures.append("Main menu exposes non-player entry text: %s" % text)
 
 	instance.free()
+
+
+func _visible_text_snapshot(node: Node) -> Array[String]:
+	var texts: Array[String] = []
+	_collect_visible_text(node, texts)
+	return texts
+
+
+func _collect_visible_text(node: Node, texts: Array[String]) -> void:
+	if node is Label:
+		var label := node as Label
+		if label.visible and not label.text.is_empty():
+			texts.append(label.text)
+	elif node is Button:
+		var button := node as Button
+		if button.visible and not button.text.is_empty():
+			texts.append(button.text)
+	for child in node.get_children():
+		_collect_visible_text(child, texts)
 
 
 func _check_art_assets(failures: Array[String]) -> void:

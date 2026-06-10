@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="ModifierDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ModifierDefinition" format=3 uid="uid://dgee2pxgw3m7v"]
 
-[ext_resource type="Script" path="res://scripts/data/modifier_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://cav08rvk43m6s" path="res://scripts/data/modifier_definition.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
@@ -12,4 +12,4 @@ target_component = "Tuning.Echo.target_lock"
 operation = "替换"
 role_tag = "Deepen"
 player_read = "调校仓重复重击"
-placeholder_note = "M0 调试数据占位。"
+placeholder_note = "首版数据占位。"

@@ -53,7 +53,6 @@ var _current_lane := "Mid"
 var _forwarded_machine_entries := 0
 var _deployed_start_index := 0
 var _selected_shop_purchase_id := ""
-var _endpoint_player_wins := true
 var _last_machine_event_count := 0
 var _last_battlefield_event_count := 0
 var _audio_players: Dictionary = {}
@@ -70,62 +69,6 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _battle_running:
 		_advance_battle(delta)
-
-
-func verify_scene_build() -> bool:
-	_ensure_built()
-	return (
-		_machine_view != null
-		and _battlefield_view != null
-		and _status_label != null
-		and _choice_panel != null
-		and _result_list != null
-	)
-
-
-func run_minimal_player_session_for_verification() -> Dictionary:
-	return _run_player_session_for_verification(true)
-
-
-func run_loss_player_session_for_verification() -> Dictionary:
-	return _run_player_session_for_verification(false)
-
-
-func get_playable_feel_summary() -> Dictionary:
-	_ensure_built()
-	return {
-		"default_viewport_width": DEFAULT_VIEWPORT_SIZE.x,
-		"default_viewport_height": DEFAULT_VIEWPORT_SIZE.y,
-		"uses_scroll_containers": _has_scroll_container(self),
-		"has_visible_debug_framing": _has_visible_debug_framing(),
-		"audio_events": _audio_events.duplicate(),
-		"audio_cue_counts": _audio_cue_counts.duplicate(true),
-		"transition_beats": _transition_beats.duplicate(),
-		"phase_status_mismatches": _phase_status_mismatches.duplicate(),
-		"visible_step": _visible_step,
-		"machine_min_size": _machine_view.custom_minimum_size if _machine_view != null else Vector2.ZERO,
-		"battlefield_min_size": (
-			_battlefield_view.custom_minimum_size if _battlefield_view != null else Vector2.ZERO
-		),
-	}
-
-
-func _run_player_session_for_verification(player_wins: bool) -> Dictionary:
-	_ensure_built()
-	_endpoint_player_wins = player_wins
-	_on_guardian_choice("hive.vein_mother")
-	_run_current_battle_for_verification()
-	_on_first_reward_choice("pool_pocket")
-	_run_current_battle_for_verification()
-	_on_shop_purchase_choice("junk_sieve")
-	_on_rest_choice(true)
-	_run_current_battle_for_verification()
-	_run_current_battle_for_verification()
-	_on_second_reward_choice("front_recycle")
-	_run_current_battle_for_verification()
-	_on_endpoint_rest_choice(true)
-	_run_current_battle_for_verification()
-	return _session.get_run_summary()
 
 
 func _ensure_built() -> void:
@@ -300,10 +243,12 @@ func _advance_battle(delta: float) -> void:
 	_forward_machine_queue_entries()
 	_session.battlefield_model.tick(step)
 	_sync_audio_from_battlefield_events()
-	_refresh()
+	if _is_terminal_battle_state():
+		_complete_current_battle()
+		return
 
-	var duration: float = ENDPOINT_DURATION_SECONDS if _phase == "endpoint" else BATTLE_DURATION_SECONDS
-	if _battle_elapsed >= duration:
+	_refresh()
+	if _battle_elapsed >= _current_battle_duration_seconds():
 		_complete_current_battle()
 
 
@@ -316,19 +261,26 @@ func _forward_machine_queue_entries() -> void:
 	_session.telemetry["playable.queue_entries_forwarded"] = _forwarded_machine_entries
 
 
-func _complete_current_battle() -> void:
-	_battle_running = false
+func _complete_current_battle() -> bool:
 	var deployed := _deployed_units_since_battle_start()
+	var outcome := str(_session.battlefield_model.get_battle_state())
+	if outcome != "player_win" and outcome != "player_loss":
+		return false
+
+	_battle_running = false
 	if _phase == "endpoint":
-		_session.finish_playable_endpoint(_endpoint_player_wins, deployed)
-		_session.telemetry["playable.endpoint_source"] = "scripted_visible_phase"
+		var player_wins := outcome == "player_win"
+		_session.finish_playable_endpoint(player_wins, deployed)
+		_session.telemetry["playable.endpoint_source"] = "battlefield_terminal_state"
 		_session.build_result_page()
 		_record_transition_beat("endpoint_to_result")
 		_show_result_page()
-		return
+		return true
 
-	var outcome := str(_session.battlefield_model.get_battle_state())
-	_session.finish_playable_battle(_battle_number, outcome, deployed)
+	var battle_result: Dictionary = _session.finish_playable_battle(_battle_number, outcome, deployed)
+	if battle_result.is_empty():
+		_battle_running = true
+		return false
 	_play_audio_cue("victory")
 	match _battle_number:
 		1:
@@ -347,6 +299,7 @@ func _complete_current_battle() -> void:
 			_show_endpoint_prep_choices()
 		_:
 			_show_result_page()
+	return true
 
 
 func _deployed_units_since_battle_start() -> Array[Dictionary]:
@@ -479,13 +432,6 @@ func _on_lane_clicked(lane_name: String) -> void:
 	_session.telemetry["playable.deploy_lane_choice_source"] = "player"
 	_play_audio_cue("deploy")
 	_refresh()
-
-
-func _run_current_battle_for_verification() -> void:
-	for _step in range(240):
-		if not _battle_running:
-			return
-		_advance_battle(0.25)
 
 
 func _refresh() -> void:
@@ -680,6 +626,15 @@ func _play_audio_cue(cue_id: String) -> void:
 		player.play()
 
 
+func _current_battle_duration_seconds() -> float:
+	return ENDPOINT_DURATION_SECONDS if _phase == "endpoint" else BATTLE_DURATION_SECONDS
+
+
+func _is_terminal_battle_state() -> bool:
+	var outcome := str(_session.battlefield_model.get_battle_state())
+	return outcome == "player_win" or outcome == "player_loss"
+
+
 func _sync_audio_from_machine_events() -> void:
 	var events: Array = _session.machine_model.event_log
 	while _last_machine_event_count < events.size():
@@ -764,56 +719,10 @@ func _expected_step_for_phase() -> String:
 	return _visible_step
 
 
-func _has_scroll_container(node: Node) -> bool:
-	if node is ScrollContainer:
-		return true
-	for child in node.get_children():
-		if _has_scroll_container(child):
-			return true
-	return false
-
-
-func _has_visible_debug_framing() -> bool:
-	for text in _visible_text_snapshot():
-		var lower_text := str(text).to_lower()
-		if (
-			lower_text.contains("debug")
-			or str(text).contains("调试")
-			or str(text).contains("(DEBUG)")
-			or lower_text.contains("harness")
-			or str(text).contains("M3")
-			or str(text).contains("验证")
-		):
-			return true
-	return false
-
-
-func _visible_text_snapshot() -> Array[String]:
-	var texts: Array[String] = []
-	_collect_visible_text(self, texts)
-	return texts
-
-
-func _collect_visible_text(node: Node, texts: Array[String]) -> void:
-	if node is Label:
-		var label := node as Label
-		if label.visible and not label.text.is_empty():
-			texts.append(label.text)
-	elif node is Button:
-		var button := node as Button
-		if button.visible and not button.text.is_empty():
-			texts.append(button.text)
-	for child in node.get_children():
-		_collect_visible_text(child, texts)
-
-
 func _display_event_description(description: String) -> String:
 	return description \
 		.replace("按可玩短局节奏", "按本局节奏") \
-		.replace("金币水龙头为调试首版，非最终平衡。", "获得的 Gold 已计入本局。") \
-		.replace("调试首版水龙头，非最终平衡。", "Gold 已计入本局。") \
-		.replace("真实 M3 ", "") \
-		.replace("调试", "本局")
+		.replace("首版 Gold 来源，数值仍需实测。", "获得的 Gold 已计入本局。")
 
 
 func _cue_node_suffix(cue_id: String) -> String:
