@@ -1,6 +1,6 @@
 # planB 视觉与资源生产规范
 
-**最后更新：** 2026-06-09
+**最后更新：** 2026-06-10
 **文档状态：** 已确认的 MVP v0 美术风格与资源生产基线；属于当前 MVP v0 实现输入，不是最终资产清单。
 
 本文定义当前实现不能临场发明的视觉风格、资源拆分方式和 AI 资产生产约束。它锁定的是**生产方向**，不是最终资产清单、最终色值、最终字体、最终音频或最终混音。玩法规则仍以 `docs/gdd.md`、`docs/machine-warehouses.md`、`docs/battlefield-rules.md`、`docs/deploy-lane-ui.md`、`docs/guardian-system.md`、`docs/mvp-scope.md`、`docs/mvp-hive-loadout.md`、`docs/rewards-economy.md` 和 `docs/mvp-learning-checkpoints.md` 为准。球机物理表现以 `docs/ball-machine-physical.md` 为 MVP v0 实现假设。
@@ -40,7 +40,7 @@
 - 左侧竖向三板球机：`Launch / Tuning / Unit`。
 - `Forge / Pool / Launcher`、三板底槽、active ball、导轨、回流、Waste、Unit Exposure 挡板。
 - `Queue Bridge` 连接球机和战场。
-- 右侧三路战场、Lane Gate、两个基地圈、Guardian HUD。
+- 右侧三路战场、Lane Gate、两个基地圈、场内 Guardian 和实体附着状态。
 - `Deploy Lane` 当前选路、路线危险 0-3 档、敌人反制预警。
 - `Launch / Tuning / Unit`、`Gate / Prime / Echo / Surge`、`Unit slot`、`Queue`、`Deploy Lane` 等通用标签和基础 UI 语义。
 
@@ -172,16 +172,37 @@ Shape tokens：
 
 HUD 只服务 1 秒扫视，不展示完整未来模拟。
 
+### 5.1 Battle Screen Layout
+
+MVP v0 战斗主画面采用三段结构：
+
+```text
+三仓机器 38% | Queue / Deploy Bridge 14% | 战场 48%
+```
+
+布局规则：
+
+- 左侧三仓机器保持 `Launch / Tuning / Unit` 竖向三板结构。
+- 中间 `Queue / Deploy Bridge` 连接机器输出和战场落点。
+- 右侧战场使用轻弧形三路，而不是三条抽象进度条。
+- 路线视觉可以弯曲，但规则仍按 `docs/battlefield-rules.md` 的三条一维固定路径结算。
+- Player Guardian 和 Enemy Guardian / Endpoint 都是场内基地实体，不是独立 HUD 面板。
+- Guardian 状态信息必须附着在实体或基地圈附近，例如 HP、战术技能触发反馈、短时冷却标记。
+- Player Guardian 与三条路线的出兵口 / Lane Gate 之间必须留有可见基地缓冲区。
+- 单位从三条路线的玩家侧出兵口出生，不从 Guardian 身上出生。
+- `Queue / Deploy Bridge` 的部署指向必须落到当前选中路线的出兵口，而不是指向 Guardian 或战场中心。
+- Debug UI、开发滑条、测试面板和实现状态文本不属于正式 Battle Screen。
+
 | Component | 位置 | MVP v0 必须显示 | Placeholder OK |
 |---|---|---|---|
 | Machine Strip | 左侧竖条 | `Launch / Tuning / Unit` 三板、active ball、刚触发结果槽。 | 钉子和活动块可以是几何占位。 |
 | Forge / Pool / Launcher | 左上到 Launch 顶部 | Forge 进度、Pool `current / capacity`、Launcher 发射节拍。 | Pool 球可用简单圆点。 |
 | Tuning Result | Tuning 板底部 | `Gate / Prime / Echo / Surge` 命中标签和短反馈。 | 具体槽材质可占位。 |
 | Unit Slots | Unit 板底部 | 4 个 slot、progress / required、Exposure Gate、blocked bounce。 | 单位图标可用剪影。 |
-| Queue Bridge | 左右连接处 | 下一个 queue entry、部署节拍、当前路线标记。 | 只预览 3 个条目。 |
-| Deploy Lane Overlay | 战场路线本体 | 当前选中路线、出生口短闪、点击反馈。 | 路线可以是简单路径线。 |
+| Queue Bridge | 三仓机器和战场之间 | 下一个 queue entry、部署节拍、当前路线标记、到当前出兵口的短连线。 | 只预览 3 个条目。 |
+| Deploy Lane Overlay | 战场路线本体和玩家侧出兵口 | 当前选中路线、当前出兵口高亮、出生口短闪、点击反馈。 | 路线可以是简单路径线。 |
 | Lane Danger | 战场路线和 Gate / base | 0-3 档危险，shape + motion 分层。 | 敌人出生预告可用几何标记。 |
-| Guardian HUD | 两端基地圈附近 | Player Guardian HP、Endpoint Guardian HP、战术技能触发反馈。 | Guardian 可用大剪影。 |
+| Guardian Entity Status | 两端 Guardian 实体或基地圈附近 | Player Guardian HP、Endpoint Guardian HP、战术技能触发反馈、短时冷却标记。 | Guardian 可用大剪影。 |
 | Reward Cards | 战后界面 | 机器轴、目标组件、operation、玩家读法。 | 卡面插图可空缺。 |
 | Shop Cards | 商店界面 | Gold、价格、`Patch / Pivot / Deepen / Rest`、购买额度。 | 商品图标可用轴 icon。 |
 | Result Page | 战后结果 | 主轴兑现、关键奖励 / 商店、反制、Deploy Lane 影响、失败观察标签。 | 第一版可以文字较重。 |
@@ -237,7 +258,7 @@ Timing baseline：
 2. 精确色值是否满足最终无障碍对比。
 3. 球物理参数、钉子布局、活动块形态和同屏球数。
 4. 每个 Guardian、中立修正和反制的最终物理表现。
-5. 最终战斗画面布局比例和分辨率适配。
+5. 战斗画面布局比例在不同分辨率下的适配细节。
 6. 每个正式种族的具体 race skin kit。
 7. 每个单位 / Guardian 的最终 sprite sheet、导出尺寸、pivot、碰撞区域和命名规范。
 

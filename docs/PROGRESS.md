@@ -1,6 +1,6 @@
 # 进度与决策日志
 
-**最后更新：** 2026-06-09
+**最后更新：** 2026-06-10
 **仓库状态：** 文档主导，MVP v0 实现已在 `mvp/` 启动；本文记录设计状态和决策日志，不作为代码状态证明。
 
 ## 当前正式文档
@@ -419,7 +419,7 @@
 - 新增 `docs/DESIGN.md` 作为 MVP v0 `/implementation-handoff` 前置设计系统：
   - 包含 art direction：可读的物理战争机器、左侧球机、右侧三路战场、Hive 虫壳 / 酸液 / 巢脉包装、通用标签保持可见。
   - 包含 color / shape tokens：当前选路、路线危险、机器反制、active ball、Tuning 槽、Unit Exposure 和强制导轨均有颜色、形状和运动配对。
-  - 包含 HUD components：Machine Strip、Forge / Pool / Launcher、Tuning Result、Unit Slots、Queue Bridge、Deploy Lane Overlay、Lane Danger、Guardian HUD、Reward Cards、Shop Cards、Result Page。
+  - 包含 HUD components：Machine Strip、Forge / Pool / Launcher、Tuning Result、Unit Slots、Queue Bridge、Deploy Lane Overlay、Lane Danger、Guardian 状态（当时称 Guardian HUD，现已收束为实体附着状态）、Reward Cards、Shop Cards、Result Page。
   - 包含 animation / audio vocabulary：Natural Hit、Forced Redirect、Distribution Shift、Blocked Bounce、Valid Unit Hit、Split Return、Recycle Return、Waste、Logic Settlement、Counter Disruption、Deploy Birth 和 Lane Danger Up。
 - MVP v0 可以进入 `/implementation-handoff`。handoff 应引用当前正式 canon、MVP v0 实现输入、候选草案中已确认可进入 MVP 的部分、`docs/DESIGN.md` 和 `/plan-design-review` artifact；handoff 只写构建目标、体验要求、占位边界和验收标准，不写游戏代码。
 
@@ -445,6 +445,29 @@
   - 将 `docs/mvp-scope.md` 收束为 MVP 范围合同，只保留目标、硬上限、必须包含、明确不做和成功标准。
   - 将 `docs/ball-machine-physical.md` 标题调整为“球机物理表现 MVP v0 输入”，明确它是当前实现输入但不是最终 canon。
 
+## 2026-06-10
+
+- 确认正式玩家 UI flow 第一版方向：
+  - `Main Menu -> Guardian Contract -> Battle Screen -> Battle Result -> Reward Choice / Shop / Rest -> Final Result`。
+  - `Guardian Contract` 发生在 Battle 1 前，使用“守护者契约”口径，不暗示玩家直接控制英雄。
+  - Battle 1 胜利后进入 `Reward Choice`；Battle 2 胜利后按当前经济方向进入第一次 `Shop / Rest`。
+  - `Final Result` 总结整局构筑、主要机器轴、关键奖励 / 商店、最大反制压力和下一局观察目标，不只是最后一场战斗结算。
+- 确认 Battle Screen 正式布局方向：
+  - 战斗主画面采用 `三仓机器 38% | Queue / Deploy Bridge 14% | 战场 48%` 的三段结构。
+  - 右侧战场采用轻弧形三路；视觉可弯曲，但规则仍是 `Left / Mid / Right` 三条固定一维路径。
+  - `Queue / Deploy Bridge` 只显示机器队列到当前选中路线出兵口的连接，不是第四机器仓，也不是推荐路线面板。
+  - Debug UI、开发滑条、测试面板和实现状态文本不属于正式 Battle Screen，除非用户以后明确要求。
+- 确认 Guardian 的主战场表现边界：
+  - `Player Guardian` 和 Enemy Guardian / Endpoint 都是场内攻击型基地实体，不是底部 HUD 面板。
+  - Guardian 状态信息附着在实体或基地圈附近，例如 HP、战术技能触发反馈和短时冷却标记。
+  - `Player Guardian` 位于玩家基地圈内侧，三条玩家侧出兵口 / Lane Gate 位于基地圈连接路径的一侧。
+  - Guardian 与三条出兵口之间必须留有基地缓冲区，用于读出 `破门 -> 入侵 -> Guardian 防守 / 受压`。
+  - 单位从当前选中路线的玩家侧出兵口出生，不从 Guardian 身上出生。
+- 新增并提交 UI flow artifact：
+  - `docs/gstack-artifacts/planb-battle-ui-flow-session-20260610.md`
+  - `docs/gstack-artifacts/planb-battle-ui-flow-1.0-draft-20260610.md`
+  - 这些 artifact 是本次 UI flow 讨论记录和草案来源；正式规则仍以当前正式文档为准。
+
 ## 当前未定
 
 - 中立修正的精确 playtest 后最终平衡。
@@ -452,7 +475,7 @@
 - 两个 Guardian 的 playtest 后最终数值。MVP 实现输入使用已确认的职责带口径和 first-pass 参数。
 - `Unit.Slot.Exposure Gate` 暴露开始到完全暴露之间的插值方式。
 - 球机物理层的层间随机范围、钉子 / 活动块布局、炮台摆动参数、球物理参数与同屏球数、回流与 Exposure 挡板物理形态、各 Guardian / 修正 / 反制的具体物理表现（见 `docs/ball-machine-physical.md`），以及是否提升为正式规则。
-- `docs/DESIGN.md` 已确认生产风格基线；最终字体、图标、具体种族 skin kit、sprite sheet 尺寸、pivot、碰撞区域、音频资产、精确色值、布局比例和无障碍对比仍需实现后验证。
+- `docs/DESIGN.md` 已确认生产风格基线和 Battle Screen 三段布局方向；最终字体、图标、具体种族 skin kit、sprite sheet 尺寸、pivot、碰撞区域、音频资产、精确色值、布局响应式细节和无障碍对比仍需实现后验证。
 
 ## 下一步
 
