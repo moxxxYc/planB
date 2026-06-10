@@ -76,6 +76,11 @@ var key_queue_entries_by_slot: Dictionary = {}
 var visible_contribution_slots: Dictionary = {}
 var deploy_lane_records: Array[Dictionary] = []
 var decision_windows: Array[String] = []
+var battle_readability_records: Dictionary = {}
+var first_reward_commitment: Dictionary = {}
+var next_battle_causality: Dictionary = {}
+var queue_to_lane_bridge: Dictionary = {}
+var result_machine_cause_recap: Dictionary = {}
 
 
 func _init() -> void:
@@ -103,6 +108,11 @@ func reset() -> void:
 	visible_contribution_slots.clear()
 	deploy_lane_records.clear()
 	decision_windows.clear()
+	battle_readability_records.clear()
+	first_reward_commitment.clear()
+	next_battle_causality.clear()
+	queue_to_lane_bridge.clear()
+	result_machine_cause_recap.clear()
 
 
 func start_new_run(guardian_id: String = "hive.vein_mother") -> Dictionary:
@@ -200,9 +210,13 @@ func run_battle(battle_number: int, counter_id: String = "", lane_name_override:
 
 	var outcome := "player_win"
 	battlefield_model.force_battle_result_for_debug(outcome)
+	if battle_number == 1:
+		_record_battle_readability_summary(battle_number, queue_entry, outcome)
 	_apply_debug_battle_pressure(battle_number)
 	_apply_gold_faucet(battle_number, outcome)
 	_record_unit_contribution(queue_entry, lane_name, battle_number)
+	if battle_number == 2:
+		_record_next_battle_causality_summary(outcome)
 
 	if battle_number == 3 and not counter_record.is_empty():
 		telemetry["counter1.family"] = counter_record["display_name"]
@@ -252,10 +266,16 @@ func choose_first_reward(reward_id: String) -> Dictionary:
 		_display_lane(_lane_for_battle(2)),
 		first_reward["player_read"],
 	]
+	first_reward_commitment = _build_first_reward_commitment()
+	telemetry["phase2.first_reward_commitment"] = first_reward_commitment.duplicate(true)
 
 	_log(
 		"first reward selected",
-		"%s 被选择为%s轴锚点。" % [first_reward["display_name"], _display_axis(main_axis)],
+		"%s 被选择为%s轴锚点；下一战观察：%s。" % [
+			first_reward["display_name"],
+			_display_axis(main_axis),
+			first_reward_commitment.get("next_battle_watch", ""),
+		],
 		first_reward
 	)
 	return first_reward.duplicate(true)
@@ -452,6 +472,12 @@ func begin_playable_battle(
 	battlefield_model.select_lane(lane_name)
 	machine_model.set_battle_time(float(_battle_time_anchor_for_battle(battle_number)))
 	machine_model.set_auto_running(true)
+	if battle_number == 1:
+		var opening_queue_entry: Dictionary = machine_model.force_unit_slot_queue(1, "Gate")
+		if not opening_queue_entry.is_empty():
+			battlefield_model.enqueue_machine_queue_entry(opening_queue_entry)
+			_record_battle1_checkpoint(opening_queue_entry)
+			_record_battle_readability_summary(battle_number, opening_queue_entry, "player_win")
 
 	var counter_record := {}
 	if not counter_id.is_empty():
@@ -485,6 +511,7 @@ func finish_playable_battle(
 		var queue_entry := _first_queue_entry_from_deployed_units(deployed_units)
 		if not queue_entry.is_empty():
 			_record_battle1_checkpoint(queue_entry)
+		_record_battle_readability_summary(battle_number, queue_entry, final_outcome)
 
 	_apply_debug_battle_pressure(battle_number)
 	_apply_gold_faucet(battle_number, final_outcome)
@@ -503,6 +530,9 @@ func finish_playable_battle(
 		telemetry["counter1.target_component"] = counter_record["target_component"]
 		telemetry["counter1.visible_effect"] = counter_record["visible_effect"]
 		telemetry["counter1.response_link"] = _counter_response_link(counter_record)
+
+	if battle_number == 2:
+		_record_next_battle_causality_summary(final_outcome)
 
 	_log(
 		"battle resolved",
@@ -660,6 +690,11 @@ func build_result_page() -> Dictionary:
 			_display_axis(chosen_guardian.get("axis_lean", "")),
 		],
 		"main_axis": _display_axis(main_axis),
+		"most_impactful_reward": _most_impactful_reward_read(),
+		"key_battlefield_turn": _key_battlefield_turn_read(),
+		"weakest_link": _weakest_link_read(latest_counter, outcome),
+		"enemy_counter_impact": _enemy_counter_impact_read(latest_counter),
+		"next_run_suggestion": _next_run_suggestion_read(latest_counter, outcome),
 		"key_rewards": "第一奖励：%s；第二奖励：%s" % [
 			first_reward.get("display_name", ""),
 			second_reward.get("display_name", ""),
@@ -673,6 +708,15 @@ func build_result_page() -> Dictionary:
 		"endpoint_payoff_or_break_reason": payoff_or_break,
 		"next_run_watch_tag": str(telemetry.get("endpoint.next_run_watch_tag", "")),
 	}
+	result_machine_cause_recap = {
+		"main_axis": result_page["main_axis"],
+		"most_impactful_reward": result_page["most_impactful_reward"],
+		"key_battlefield_turn": result_page["key_battlefield_turn"],
+		"weakest_link": result_page["weakest_link"],
+		"enemy_counter_impact": result_page["enemy_counter_impact"],
+		"next_run_suggestion": result_page["next_run_suggestion"],
+	}
+	telemetry["phase2.result_machine_cause_recap"] = result_machine_cause_recap.duplicate(true)
 
 	telemetry["unit.visible_contribution_slots"] = _visible_slot_ids()
 	telemetry["unit.key_queue_entries_by_slot"] = key_queue_entries_by_slot.duplicate(true)
@@ -696,6 +740,11 @@ func get_run_summary() -> Dictionary:
 		"rest_records": rest_records.duplicate(true),
 		"counter_records": counter_records.duplicate(true),
 		"deploy_lane_records": deploy_lane_records.duplicate(true),
+		"battle_readability_records": battle_readability_records.duplicate(true),
+		"first_reward_commitment": first_reward_commitment.duplicate(true),
+		"next_battle_causality": next_battle_causality.duplicate(true),
+		"queue_to_lane_bridge": queue_to_lane_bridge.duplicate(true),
+		"result_machine_cause_recap": result_machine_cause_recap.duplicate(true),
 		"telemetry": telemetry.duplicate(true),
 		"result_page": result_page.duplicate(true),
 		"event_log": event_log.duplicate(true),
@@ -782,6 +831,23 @@ func _record_unit_contribution_from_deployed_unit(
 	key_queue_entries_by_slot[slot_id] = entries
 
 
+func _record_next_battle_causality_summary(outcome: String) -> void:
+	if first_reward_commitment.is_empty():
+		return
+	var latest_deploy := deploy_lane_records[deploy_lane_records.size() - 1] if not deploy_lane_records.is_empty() else {}
+	next_battle_causality = {
+		"after_reward": first_reward_commitment.get("reward_name", ""),
+		"committed_axis": first_reward_commitment.get("axis", ""),
+		"machine_component_changed": first_reward_commitment.get("machine_component", ""),
+		"queue_effect_changed": first_reward_commitment.get("queue_effect", ""),
+		"next_watch_target": first_reward_commitment.get("next_battle_watch", ""),
+		"observed_lane": latest_deploy.get("selected_lane", _lane_for_battle(2)),
+		"observed_battlefield_signal": _battlefield_outcome_read(2, outcome),
+		"player_read": "上一场奖励改变机器和队列，这一战观察对应战场结果。",
+	}
+	telemetry["phase2.next_battle_causality"] = next_battle_causality.duplicate(true)
+
+
 func _generate_machine_queue_entry_for_battle(battle_number: int) -> Dictionary:
 	var slot_id := 1
 	var tuning := "Gate"
@@ -835,6 +901,42 @@ func _record_battle1_checkpoint(queue_entry: Dictionary) -> void:
 		"Mid": battlefield_model.get_lane_danger_tier("Mid"),
 		"Right": battlefield_model.get_lane_danger_tier("Right"),
 	}
+	_record_queue_to_lane_bridge(queue_entry, 1)
+
+
+func _record_battle_readability_summary(
+	battle_number: int,
+	queue_entry: Dictionary,
+	outcome: String
+) -> void:
+	if queue_entry.is_empty():
+		return
+	var battle_key := "battle_%d" % battle_number
+	var readable := {
+		"battle_number": battle_number,
+		"machine_axis": main_axis,
+		"machine_component": _component_for_queue_entry(queue_entry),
+		"queue_effect": _queue_effect_for_axis(main_axis, queue_entry),
+		"queue_entry_id": queue_entry.get("queue_entry_id", ""),
+		"queue_head": _queue_head_read(queue_entry),
+		"selected_deploy_lane": battlefield_model.get_selected_lane_name(),
+		"battlefield_outcome": _battlefield_outcome_read(battle_number, outcome),
+		"player_read": "机器输出产生队列头，队列头读取当前 Deploy Lane 后进入战场。",
+	}
+	battle_readability_records[battle_key] = readable
+	telemetry["phase2.%s.readability" % battle_key] = readable.duplicate(true)
+
+
+func _record_queue_to_lane_bridge(queue_entry: Dictionary, battle_number: int) -> void:
+	queue_to_lane_bridge = {
+		"battle_number": battle_number,
+		"queue_head": _queue_head_read(queue_entry),
+		"current_deploy_lane": battlefield_model.get_selected_lane_name(),
+		"predicted_deploy_lane": battlefield_model.get_selected_lane_name(),
+		"already_deployed_rule": "已部署单位保留原路线；Deploy Lane 只影响未来队列条目。",
+		"readability_check": "玩家应能预测下一条队列会落到当前高亮路线。",
+	}
+	telemetry["phase2.queue_to_lane_bridge"] = queue_to_lane_bridge.duplicate(true)
 
 
 func _spawn_battle_pressure(battle_number: int) -> void:
@@ -1128,6 +1230,127 @@ func _counter_response_link(counter_record: Dictionary) -> String:
 	if target.contains("Echo"):
 		return "可用脉冲缓冲 / 预充强化作为调校仓补洞或转轴。"
 	return "可用队列支架 / 槽预涂作为单位仓空窗补洞。"
+
+
+func _build_first_reward_commitment() -> Dictionary:
+	return {
+		"reward_name": first_reward.get("display_name", ""),
+		"axis": first_reward.get("warehouse", ""),
+		"axis_read": _display_axis(first_reward.get("warehouse", "")),
+		"machine_component": _display_component(first_reward.get("target_component", "")),
+		"component_operation": "%s -> %s" % [
+			_display_component(first_reward.get("target_component", "")),
+			first_reward.get("operation", ""),
+		],
+		"queue_effect": _queue_effect_for_reward(first_reward),
+		"next_battle_watch": first_reward.get("player_read", ""),
+		"battlefield_outcome_to_watch": _battlefield_watch_for_axis(first_reward.get("warehouse", "")),
+	}
+
+
+func _queue_head_read(queue_entry: Dictionary) -> String:
+	return "%s / %s / %s" % [
+		queue_entry.get("queue_entry_id", ""),
+		queue_entry.get("source_slot_label", ""),
+		queue_entry.get("tuning_result", ""),
+	]
+
+
+func _component_for_queue_entry(queue_entry: Dictionary) -> String:
+	var tuning := str(queue_entry.get("tuning_result", "Gate"))
+	if tuning != "Gate":
+		return tuning
+	return "Unit Slot %d" % int(queue_entry.get("source_slot_id", 0))
+
+
+func _queue_effect_for_axis(axis: String, queue_entry: Dictionary) -> String:
+	match axis:
+		"Tuning":
+			return "%s 让队列条目质量更容易被读成高价值命中。" % queue_entry.get("tuning_result", "Gate")
+		"Unit":
+			return "Unit Slot %d 的队列贡献更突出。" % int(queue_entry.get("source_slot_id", 0))
+		_:
+			return "Launch 维持队列连续供给，减少战场断档。"
+
+
+func _queue_effect_for_reward(reward: Dictionary) -> String:
+	match str(reward.get("warehouse", "")):
+		"Tuning":
+			return "提高调校命中价值，下一战看高价值条目是否改变战线。"
+		"Unit":
+			return "提高单位槽贡献，下一战看队列是否形成更明确的单位压力。"
+		_:
+			return "提高发射仓供给稳定性，下一战看队列是否更少断档。"
+
+
+func _battlefield_watch_for_axis(axis) -> String:
+	match str(axis):
+		"Tuning":
+			return "观察高价值命中是否造成推线或守门改善。"
+		"Unit":
+			return "观察单位批量或关键槽位是否翻转一路。"
+		_:
+			return "观察持续补兵是否减少断档和漏兵。"
+
+
+func _battlefield_outcome_read(battle_number: int, outcome: String) -> String:
+	var lane := _lane_for_battle(battle_number)
+	var result := "胜利" if outcome == "player_win" else "失败"
+	return "第 %d 战%s：%s，主信号是%s。" % [
+		battle_number,
+		_display_lane(lane),
+		result,
+		_battlefield_watch_for_axis(main_axis),
+	]
+
+
+func _most_impactful_reward_read() -> String:
+	if first_reward.is_empty():
+		return "未记录第一次奖励。"
+	return "%s，%s轴，%s" % [
+		first_reward.get("display_name", ""),
+		_display_axis(first_reward.get("warehouse", "")),
+		_queue_effect_for_reward(first_reward),
+	]
+
+
+func _key_battlefield_turn_read() -> String:
+	if not next_battle_causality.is_empty():
+		return "第二战确认第一次奖励：%s" % next_battle_causality.get("observed_battlefield_signal", "")
+	if battle_readability_records.has("battle_1"):
+		var battle1: Dictionary = battle_readability_records["battle_1"]
+		return "第一战建立链路：%s" % battle1.get("player_read", "")
+	return "未记录关键战场回合。"
+
+
+func _weakest_link_read(counter_record: Dictionary, outcome: String) -> String:
+	if outcome == "loss":
+		return _break_reason_for_counter(counter_record)
+	if main_axis == "Launch":
+		return "继续观察队列是否会被污染或断档。"
+	if main_axis == "Tuning":
+		return "继续观察高价值命中是否被 Echo 反制打断。"
+	return "继续观察单位槽批量前是否出现队列空窗。"
+
+
+func _enemy_counter_impact_read(counter_record: Dictionary) -> String:
+	if counter_record.is_empty():
+		return "本局未记录可结算的敌人反制影响。"
+	return "%s 压力目标：%s；可读影响：%s；回应：%s" % [
+		counter_record.get("display_name", ""),
+		_display_component(counter_record.get("target_component", "")),
+		counter_record.get("visible_effect", ""),
+		_counter_response_link(counter_record),
+	]
+
+
+func _next_run_suggestion_read(counter_record: Dictionary, outcome: String) -> String:
+	if outcome == "loss":
+		return _next_watch_tag(counter_record, false)
+	return "%s；下一局尝试补最弱点：%s" % [
+		_next_watch_tag(counter_record, true),
+		_weakest_link_read(counter_record, outcome),
+	]
 
 
 func _endpoint_payoff_for_axis(axis: String, player_wins: bool) -> String:

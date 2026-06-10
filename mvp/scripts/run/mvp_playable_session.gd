@@ -38,6 +38,7 @@ var _battlefield_view: Control
 var _status_label: Label
 var _phase_label: Label
 var _choice_panel: VBoxContainer
+var _readability_list: VBoxContainer
 var _flow_list: VBoxContainer
 var _log_list: VBoxContainer
 var _result_list: VBoxContainer
@@ -173,6 +174,12 @@ func _build_layout() -> void:
 	_choice_panel = VBoxContainer.new()
 	_choice_panel.add_theme_constant_override("separation", 6)
 	side.add_child(_choice_panel)
+
+	side.add_child(_make_separator())
+	side.add_child(_make_label("可读性", 14))
+	_readability_list = VBoxContainer.new()
+	_readability_list.add_theme_constant_override("separation", 2)
+	side.add_child(_readability_list)
 
 	side.add_child(_make_separator())
 	side.add_child(_make_label("流程", 14))
@@ -510,6 +517,8 @@ func _refresh() -> void:
 			9
 		))
 
+	_refresh_readability_panel(summary)
+
 	_clear_container(_result_list)
 	var result_page: Dictionary = summary.get("result_page", {})
 	if result_page.is_empty():
@@ -518,6 +527,11 @@ func _refresh() -> void:
 		for key in [
 			"chosen_guardian",
 			"main_axis",
+			"most_impactful_reward",
+			"key_battlefield_turn",
+			"weakest_link",
+			"enemy_counter_impact",
+			"next_run_suggestion",
 			"key_rewards",
 			"shop_rest_choice",
 			"counter_target",
@@ -530,6 +544,59 @@ func _refresh() -> void:
 				10
 			))
 	_record_phase_status_check()
+
+
+func _refresh_readability_panel(summary: Dictionary) -> void:
+	_clear_container(_readability_list)
+	var battle_records: Dictionary = summary.get("battle_readability_records", {})
+	var first_commitment: Dictionary = summary.get("first_reward_commitment", {})
+	var next_causality: Dictionary = summary.get("next_battle_causality", {})
+	var queue_bridge: Dictionary = summary.get("queue_to_lane_bridge", {})
+
+	if battle_records.has("battle_1"):
+		var battle1: Dictionary = battle_records["battle_1"]
+		_readability_list.add_child(_make_label(
+			"Battle 1：%s -> %s -> %s" % [
+				battle1.get("machine_component", ""),
+				battle1.get("queue_head", ""),
+				_display_lane(battle1.get("selected_deploy_lane", "")),
+			],
+			9
+		))
+		_readability_list.add_child(_make_label(str(battle1.get("battlefield_outcome", "")), 9))
+	else:
+		_readability_list.add_child(_make_label(
+			"Battle 1 目标：读出机器 -> 队列 -> Deploy Lane -> 战场结果。",
+			9
+		))
+
+	if not first_commitment.is_empty():
+		_readability_list.add_child(_make_label(
+			"First Reward：%s轴，%s" % [
+				_display_axis(first_commitment.get("axis", "")),
+				first_commitment.get("component_operation", ""),
+			],
+			9
+		))
+		_readability_list.add_child(_make_label(
+			"下一战观察：%s" % first_commitment.get("next_battle_watch", ""),
+			9
+		))
+
+	if not next_causality.is_empty():
+		_readability_list.add_child(_make_label(
+			"Reward 后反馈：%s" % next_causality.get("observed_battlefield_signal", ""),
+			9
+		))
+
+	if not queue_bridge.is_empty():
+		_readability_list.add_child(_make_label(
+			"Queue-to-Lane：%s -> %s；已部署不改路。" % [
+				queue_bridge.get("queue_head", ""),
+				_display_lane(queue_bridge.get("current_deploy_lane", "")),
+			],
+			9
+		))
 
 
 func _make_label(text: String, font_size: int) -> Label:
@@ -851,6 +918,16 @@ func _display_result_key(key) -> String:
 			return "选择的守护者"
 		"main_axis":
 			return "主轴"
+		"most_impactful_reward":
+			return "最有影响奖励"
+		"key_battlefield_turn":
+			return "关键战场回合"
+		"weakest_link":
+			return "最弱环节"
+		"enemy_counter_impact":
+			return "敌人反制影响"
+		"next_run_suggestion":
+			return "下一局建议"
 		"key_rewards":
 			return "关键奖励"
 		"shop_rest_choice":

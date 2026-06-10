@@ -182,3 +182,47 @@ func _check_result_reaches_page(
 	var telemetry: Dictionary = result.get("telemetry", {})
 	if str(telemetry.get("endpoint.outcome", "")) != expected_outcome:
 		failures.append("Playable result outcome was not %s" % expected_outcome)
+
+	_check_phase2_playable_readability(expected_outcome, result, failures)
+
+
+func _check_phase2_playable_readability(
+	expected_outcome: String,
+	result: Dictionary,
+	failures: Array[String]
+) -> void:
+	var battle_records: Dictionary = result.get("battle_readability_records", {})
+	if not battle_records.has("battle_1"):
+		failures.append("Playable %s missing Battle 1 readability record" % expected_outcome)
+	else:
+		var battle1: Dictionary = battle_records["battle_1"]
+		for field in ["machine_component", "queue_effect", "queue_head", "selected_deploy_lane", "battlefield_outcome"]:
+			if str(battle1.get(field, "")).is_empty():
+				failures.append("Playable %s Battle 1 readability missing %s" % [expected_outcome, field])
+
+	var first_reward_commitment: Dictionary = result.get("first_reward_commitment", {})
+	for field in ["axis", "machine_component", "queue_effect", "next_battle_watch"]:
+		if str(first_reward_commitment.get(field, "")).is_empty():
+			failures.append("Playable %s first reward commitment missing %s" % [expected_outcome, field])
+
+	var next_battle_causality: Dictionary = result.get("next_battle_causality", {})
+	for field in ["committed_axis", "queue_effect_changed", "next_watch_target", "observed_battlefield_signal"]:
+		if str(next_battle_causality.get(field, "")).is_empty():
+			failures.append("Playable %s next-battle causality missing %s" % [expected_outcome, field])
+
+	var queue_to_lane_bridge: Dictionary = result.get("queue_to_lane_bridge", {})
+	for field in ["queue_head", "current_deploy_lane", "predicted_deploy_lane", "already_deployed_rule"]:
+		if str(queue_to_lane_bridge.get(field, "")).is_empty():
+			failures.append("Playable %s queue-to-lane bridge missing %s" % [expected_outcome, field])
+
+	var result_recap: Dictionary = result.get("result_machine_cause_recap", {})
+	for field in [
+		"main_axis",
+		"most_impactful_reward",
+		"key_battlefield_turn",
+		"weakest_link",
+		"enemy_counter_impact",
+		"next_run_suggestion",
+	]:
+		if str(result_recap.get(field, "")).is_empty():
+			failures.append("Playable %s result recap missing %s" % [expected_outcome, field])

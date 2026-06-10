@@ -22,6 +22,11 @@ const REQUIRED_FLOW := [
 const REQUIRED_RESULT_FIELDS := [
 	"chosen_guardian",
 	"main_axis",
+	"most_impactful_reward",
+	"key_battlefield_turn",
+	"weakest_link",
+	"enemy_counter_impact",
+	"next_run_suggestion",
 	"key_rewards",
 	"shop_rest_choice",
 	"counter_target",
@@ -35,6 +40,11 @@ const REQUIRED_TELEMETRY_FIELDS := [
 	"guardian.outcome",
 	"battle1.machine_chain_sample",
 	"battle1.deploy_lane_selection",
+	"phase2.battle_1.readability",
+	"phase2.queue_to_lane_bridge",
+	"phase2.first_reward_commitment",
+	"phase2.next_battle_causality",
+	"phase2.result_machine_cause_recap",
 	"reward1.choice_id",
 	"reward1.axis",
 	"shop1.gold_before",
@@ -98,6 +108,7 @@ func _check_model_full_run(failures: Array[String]) -> void:
 	_check_flow(result, failures)
 	_check_result_fields(result, failures)
 	_check_telemetry_fields(result, failures)
+	_check_phase2_readability_fields(result, failures)
 	_check_counter_coverage(model, failures)
 
 
@@ -124,6 +135,35 @@ func _check_telemetry_fields(result: Dictionary, failures: Array[String]) -> voi
 			failures.append("M3 telemetry missing checkpoint field: %s" % field)
 		elif str(telemetry[field]).is_empty():
 			failures.append("M3 telemetry checkpoint field is empty: %s" % field)
+
+
+func _check_phase2_readability_fields(result: Dictionary, failures: Array[String]) -> void:
+	var first_reward_commitment: Dictionary = result.get("first_reward_commitment", {})
+	for field in ["axis", "machine_component", "queue_effect", "next_battle_watch"]:
+		if str(first_reward_commitment.get(field, "")).is_empty():
+			failures.append("Phase2 first reward commitment missing field: %s" % field)
+
+	var next_battle_causality: Dictionary = result.get("next_battle_causality", {})
+	for field in ["committed_axis", "queue_effect_changed", "next_watch_target", "observed_battlefield_signal"]:
+		if str(next_battle_causality.get(field, "")).is_empty():
+			failures.append("Phase2 next battle causality missing field: %s" % field)
+
+	var queue_to_lane_bridge: Dictionary = result.get("queue_to_lane_bridge", {})
+	for field in ["queue_head", "current_deploy_lane", "predicted_deploy_lane", "already_deployed_rule"]:
+		if str(queue_to_lane_bridge.get(field, "")).is_empty():
+			failures.append("Phase2 queue-to-lane bridge missing field: %s" % field)
+
+	var result_recap: Dictionary = result.get("result_machine_cause_recap", {})
+	for field in [
+		"main_axis",
+		"most_impactful_reward",
+		"key_battlefield_turn",
+		"weakest_link",
+		"enemy_counter_impact",
+		"next_run_suggestion",
+	]:
+		if str(result_recap.get(field, "")).is_empty():
+			failures.append("Phase2 result recap missing field: %s" % field)
 
 
 func _check_counter_coverage(model, failures: Array[String]) -> void:
