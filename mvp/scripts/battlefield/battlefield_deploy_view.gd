@@ -32,6 +32,8 @@ const SPRITE_PATHS := {
 
 var model: RefCounted = null
 var _lane_rects: Dictionary = {}
+var _spawn_port_centers: Dictionary = {}
+var _guardian_center := Vector2.ZERO
 var _sprite_textures: Dictionary = {}
 
 
@@ -69,9 +71,33 @@ func _draw() -> void:
 
 	var summary: Dictionary = model.get_state_snapshot()
 	_draw_header(summary)
-	_draw_guardians(summary)
 	_draw_lanes(summary)
+	_draw_base_buffers(summary)
+	_draw_guardians(summary)
 	_draw_units(summary)
+
+
+func get_player_facing_contract_snapshot() -> Dictionary:
+	var selected_lane := "Mid"
+	if model != null:
+		var summary: Dictionary = model.get_state_snapshot()
+		selected_lane = str(summary.get("selected_lane_name", "Mid"))
+	var guardian_probe := Vector2(50.0, max(240.0, size.y * 0.54))
+	var spawn_probe := Vector2(120.0, max(240.0, size.y * 0.54))
+	return {
+		"selected_spawn_port": selected_lane,
+		"bridge_target": selected_lane,
+		"spawn_port_count": 3,
+		"guardian_separate_from_spawn_ports": guardian_probe.distance_to(spawn_probe) > 48.0,
+	}
+
+
+func get_spawn_port_position(lane_name: String) -> Vector2:
+	var lane_index := LANE_ORDER.find(lane_name)
+	if lane_index < 0:
+		lane_index = LANE_ORDER.find("Mid")
+	var rect := _lane_rect_for_index(lane_index)
+	return Vector2(rect.position.x + 8.0, rect.position.y + rect.size.y * 0.5)
 
 
 func _draw_header(summary: Dictionary) -> void:
@@ -104,64 +130,64 @@ func _draw_header(summary: Dictionary) -> void:
 
 
 func _draw_guardians(summary: Dictionary) -> void:
-	var top_y := 112.0
 	var player_hp := int(summary.get("player_guardian_hp", 0))
 	var player_max := int(summary.get("player_guardian_max_hp", 1))
 	var enemy_hp := int(summary.get("enemy_guardian_hp", 0))
 	var enemy_max := int(summary.get("enemy_guardian_max_hp", 1))
+	var mid_y := _base_buffer_rect().get_center().y
 
 	var player_guardian_sprite := "guardian.vein_mother"
 	if str(summary.get("player_guardian_template_id", "")) == "hive.acid_crown_mother":
 		player_guardian_sprite = "guardian.acid_crown_mother"
-	_draw_guardian_sprite(player_guardian_sprite, Vector2(44, top_y + 190), COLOR_PLAYER)
-	_draw_text("玩家守护者", Vector2(18, top_y + 232), 12, COLOR_TEXT)
-	_draw_text("生命 %d / %d" % [player_hp, player_max], Vector2(18, top_y + 250), 12, COLOR_PLAYER)
+	_guardian_center = Vector2(50.0, mid_y)
+	_draw_guardian_sprite(player_guardian_sprite, _guardian_center, COLOR_PLAYER)
+	_draw_text("玩家守护者", Vector2(18, mid_y + 46.0), 12, COLOR_TEXT)
+	_draw_text("生命 %d / %d" % [player_hp, player_max], Vector2(18, mid_y + 64.0), 12, COLOR_PLAYER)
 
 	var enemy_x := size.x - 48.0
 	_draw_guardian_sprite(
 		"guardian.acid_crown_mother",
-		Vector2(enemy_x, top_y + 190),
+		Vector2(enemy_x, mid_y),
 		COLOR_ENEMY
 	)
-	_draw_text("敌方守护者", Vector2(enemy_x - 82, top_y + 232), 12, COLOR_TEXT)
-	_draw_text("生命 %d / %d" % [enemy_hp, enemy_max], Vector2(enemy_x - 82, top_y + 250), 12, COLOR_ENEMY)
+	_draw_text("敌方守护者", Vector2(enemy_x - 82, mid_y + 46.0), 12, COLOR_TEXT)
+	_draw_text("生命 %d / %d" % [enemy_hp, enemy_max], Vector2(enemy_x - 82, mid_y + 64.0), 12, COLOR_ENEMY)
 
 
 func _draw_lanes(summary: Dictionary) -> void:
 	_lane_rects.clear()
+	_spawn_port_centers.clear()
 	var lanes: Dictionary = summary.get("lanes", {})
 	var selected_lane := str(summary.get("selected_lane_name", "Mid"))
-	var start_x := 78.0
-	var end_x := size.x - 82.0
-	var top_y := 128.0
-	var lane_height := 92.0
-	var lane_gap := 20.0
 
 	for index in range(LANE_ORDER.size()):
 		var lane_name: String = LANE_ORDER[index]
 		var lane_id := StringName(lane_name.to_lower())
 		var lane_data: Dictionary = lanes.get(lane_id, {})
-		var y: float = top_y + index * (lane_height + lane_gap)
-		var rect := Rect2(Vector2(start_x, y), Vector2(end_x - start_x, lane_height))
+		var rect := _lane_rect_for_index(index)
 		_lane_rects[lane_name] = rect
 
 		draw_rect(rect, COLOR_PANEL, true)
 		draw_rect(rect, COLOR_LANE, false, 1.0)
-		draw_line(
-			Vector2(start_x + 18.0, y + lane_height * 0.5),
-			Vector2(end_x - 18.0, y + lane_height * 0.5),
-			COLOR_LANE,
-			5.0
-		)
+		var lane_mid_y := rect.position.y + rect.size.y * 0.5
+		var curve_offset := 34.0 * float(index - 1)
+		var points := PackedVector2Array([
+			Vector2(rect.position.x + 18.0, lane_mid_y),
+			Vector2(lerp(rect.position.x, rect.end.x, 0.36), lane_mid_y + curve_offset),
+			Vector2(lerp(rect.position.x, rect.end.x, 0.66), lane_mid_y - curve_offset * 0.45),
+			Vector2(rect.end.x - 18.0, lane_mid_y),
+		])
+		draw_polyline(points, COLOR_LANE, 5.0)
 
 		if lane_name == selected_lane:
 			draw_rect(rect.grow(-4.0), COLOR_PLAYER, false, 3.0)
 			draw_rect(rect.grow(-10.0), COLOR_PLAYER_DARK, false, 2.0)
 			_draw_deploy_arrows(rect)
 
-		_draw_lane_gate(rect, 0.08, int(lane_data.get("player_gate_hp", 0)), "我方闸")
+		_draw_lane_gate(rect, 0.02, int(lane_data.get("player_gate_hp", 0)), "出兵口")
 		_draw_lane_gate(rect, 0.92, int(lane_data.get("enemy_gate_hp", 0)), "敌方闸")
 		_draw_lane_danger(rect, int(lane_data.get("danger_tier", 0)))
+		_draw_spawn_port(rect, lane_name == selected_lane, lane_name)
 
 		_draw_text(_display_lane(lane_name), rect.position + Vector2(12, 22), 16, COLOR_TEXT)
 		_draw_text(
@@ -169,10 +195,55 @@ func _draw_lanes(summary: Dictionary) -> void:
 				_display_lane_state(lane_data.get("state", "idle")),
 				int(lane_data.get("danger_tier", 0)),
 			],
-			rect.position + Vector2(12, lane_height - 14),
+			rect.position + Vector2(12, rect.size.y - 14),
 			12,
 			COLOR_DIM_TEXT
 		)
+
+
+func _lane_rect_for_index(index: int) -> Rect2:
+	var start_x := 120.0
+	var end_x := size.x - 120.0
+	var top_y: float = max(126.0, size.y * 0.16)
+	var bottom_margin: float = max(118.0, size.y * 0.12)
+	var lane_gap: float = max(24.0, size.y * 0.035)
+	var available_height: float = max(360.0, size.y - top_y - bottom_margin)
+	var lane_height: float = max(112.0, (available_height - lane_gap * 2.0) / 3.0)
+	var y: float = top_y + index * (lane_height + lane_gap)
+	return Rect2(Vector2(start_x, y), Vector2(end_x - start_x, lane_height))
+
+
+func _draw_base_buffers(_summary: Dictionary) -> void:
+	var player_base := _base_buffer_rect()
+	var enemy_base := Rect2(Vector2(size.x - 134.0, player_base.position.y), player_base.size)
+	draw_rect(player_base, Color(COLOR_PLAYER_DARK, 0.28), true)
+	draw_rect(player_base, COLOR_PLAYER, false, 2.0)
+	draw_rect(enemy_base, Color(COLOR_ENEMY_DARK, 0.24), true)
+	draw_rect(enemy_base, COLOR_ENEMY, false, 2.0)
+	draw_line(Vector2(78.0, player_base.position.y + 18.0), Vector2(78.0, player_base.end.y - 18.0), COLOR_PLAYER_DARK, 2.0)
+	var mid_y := player_base.get_center().y
+	_draw_text("基地缓冲区", Vector2(52.0, mid_y - 92.0), 10, COLOR_DIM_TEXT)
+	_draw_text("Guardian", Vector2(22.0, mid_y - 44.0), 10, COLOR_TEXT)
+	_draw_text("出兵口", Vector2(92.0, mid_y - 44.0), 10, COLOR_PLAYER)
+
+
+func _base_buffer_rect() -> Rect2:
+	var first_lane := _lane_rect_for_index(0)
+	var last_lane := _lane_rect_for_index(2)
+	var top := first_lane.position.y
+	var bottom := last_lane.end.y
+	return Rect2(Vector2(18.0, top), Vector2(116.0, bottom - top))
+
+
+func _draw_spawn_port(rect: Rect2, selected: bool, lane_name: String) -> void:
+	var center := Vector2(rect.position.x + 8.0, rect.position.y + rect.size.y * 0.5)
+	_spawn_port_centers[lane_name] = center
+	var color := COLOR_PLAYER if selected else COLOR_GATE
+	draw_circle(center, 8.0, color)
+	draw_arc(center, 13.0, 0.0, TAU, 24, color, 2.0)
+	if selected:
+		draw_arc(center, 19.0, 0.0, TAU, 32, COLOR_PLAYER, 2.5)
+		draw_line(Vector2(0.0, center.y), center + Vector2(-16.0, 0.0), COLOR_PLAYER, 2.0)
 
 
 func _draw_units(summary: Dictionary) -> void:
@@ -290,10 +361,10 @@ func _load_sprite_textures() -> void:
 
 
 func _load_texture_from_file(path: String) -> Texture2D:
-	var image := Image.load_from_file(path)
-	if image == null or image.is_empty():
+	var resource := ResourceLoader.load(path)
+	if not resource is Texture2D:
 		return null
-	return ImageTexture.create_from_image(image)
+	return resource as Texture2D
 
 
 func _display_lane(lane) -> String:

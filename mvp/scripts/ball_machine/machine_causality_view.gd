@@ -7,6 +7,7 @@ const COLOR_BG := Color("#171a18")
 const COLOR_PANEL := Color("#252923")
 const COLOR_PANEL_DIM := Color("#1c201d")
 const COLOR_TEXT := Color("#e8e1d2")
+const COLOR_MUTED := Color("#a7a093")
 const COLOR_LAUNCH := Color("#7bcb6b")
 const COLOR_TUNING := Color("#e6b450")
 const COLOR_UNIT := Color("#c58be8")
@@ -15,25 +16,24 @@ const COLOR_WARNING := Color("#e84b4b")
 const COLOR_BLOCKER := Color(0.9, 0.9, 0.9, 0.28)
 const COLOR_PEG := Color("#c9c4ad")
 const COLOR_PEG_HOT := Color("#fff2a5")
+const COLOR_EFFECT_BG := Color(0.08, 0.09, 0.08, 0.86)
 const TEXT_SCALE := 1.18
-const DESIGN_SIZE := Vector2(760, 640)
+const DESIGN_SIZE := Vector2(760, 960)
 const DEFAULT_BALL_RADIUS := 6.0
 const DEFAULT_PEG_RADIUS := 7.0
-const SIZE_CONTROL_WIDTH := 176.0
+const SLOT_INSET := 14.0
+const SLOT_GAP := 8.0
+const LAUNCH_SLOT_NAMES := ["Tuning", "Split", "Recycle", "Waste"]
+const LAUNCH_SLOT_WEIGHTS := [65.0, 15.0, 15.0, 5.0]
+const TUNING_SLOT_WEIGHTS := [55.0, 15.0, 15.0, 15.0]
 
 var model: RefCounted = null
 var ball_radius := DEFAULT_BALL_RADIUS
 var peg_radius := DEFAULT_PEG_RADIUS
 
-var _ball_size_label: Label
-var _peg_size_label: Label
-var _ball_size_slider: HSlider
-var _peg_size_slider: HSlider
-
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(560, 500)
-	_build_size_controls()
 
 
 func set_model(next_model: RefCounted) -> void:
@@ -64,23 +64,24 @@ func _draw() -> void:
 	var supply: Dictionary = model.get_supply_summary()
 	var motion: Dictionary = model.get_motion_summary()
 	var active_board := str(motion.get("active_board", "Launch"))
-	_draw_supply(Rect2(24, 18, 236, 54), supply)
+	_draw_supply(Rect2(24, 28, 236, 54), supply)
 	_draw_board(
-		Rect2(24, 108, 690, 128),
+		Rect2(24, 150, 690, 180),
 		"Launch",
 		["Tuning", "Split", "Recycle", "Waste"],
 		COLOR_LAUNCH,
 		active_board == "Launch"
 	)
 	_draw_board(
-		Rect2(24, 254, 690, 128),
+		Rect2(24, 370, 690, 180),
 		"Tuning",
 		model.TUNING_RESULTS,
 		COLOR_TUNING,
 		active_board == "Tuning"
 	)
-	_draw_unit_board(Rect2(24, 400, 690, 178), active_board == "Unit")
-	_draw_queue_bridge(Rect2(438, 590, 276, 38))
+	_draw_unit_board(Rect2(24, 590, 690, 250), active_board == "Unit")
+	_draw_queue_bridge(Rect2(438, 872, 276, 42))
+	_draw_recent_effect_feedback()
 	_draw_active_ball()
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
@@ -93,6 +94,8 @@ func _draw_supply(rect: Rect2, supply: Dictionary) -> void:
 	var pool_origin := rect.position + Vector2(112, 36)
 	var pool_count: int = supply.get("pool_count", 0)
 	var pool_capacity: int = supply.get("pool_capacity", 5)
+	var forge_time := float(supply.get("forge_time_remaining", 0.0))
+	var launcher_time := float(supply.get("launcher_time_remaining", 0.0))
 	for index in range(pool_capacity):
 		var pos: Vector2 = pool_origin + Vector2(index * 16.0, 0.0)
 		var color: Color = COLOR_LAUNCH if index < pool_count else Color(0.45, 0.48, 0.44, 1.0)
@@ -100,6 +103,8 @@ func _draw_supply(rect: Rect2, supply: Dictionary) -> void:
 		draw_arc(pos, 6.4, 0.0, TAU, 18, COLOR_TEXT, 0.8)
 
 	_draw_text("%d / %d" % [pool_count, pool_capacity], rect.position + Vector2(198, 40), 11, COLOR_TEXT)
+	_draw_text("Forge %.1fs" % forge_time, rect.position + Vector2(12, 43), 9, COLOR_MUTED)
+	_draw_text("Launcher %.1fs" % launcher_time, rect.position + Vector2(266, 43), 9, COLOR_MUTED)
 
 
 func _draw_board(rect: Rect2, title: String, slots: Array, accent: Color, is_active: bool) -> void:
@@ -109,26 +114,27 @@ func _draw_board(rect: Rect2, title: String, slots: Array, accent: Color, is_act
 	draw_rect(rect, accent, false, border_width)
 	_draw_text(_display_board(title), rect.position + Vector2(14, 24), 18, accent)
 	if is_active:
-		_draw_text("ACTIVE BALL", rect.position + Vector2(rect.size.x - 128, 24), 11, COLOR_ACTIVE)
+		_draw_text("活跃球", rect.position + Vector2(rect.size.x - 86, 24), 11, COLOR_ACTIVE)
 
 	if title == "Launch":
 		_draw_launcher(rect, is_active)
 
-	_draw_pegs(rect, is_active, 3, 7, peg_radius)
+	_draw_pegs(rect, is_active, 4, 7, peg_radius)
 
-	var slot_width: float = (rect.size.x - 28.0) / float(slots.size())
-	for index in range(slots.size()):
-		var slot_rect := Rect2(
-			rect.position + Vector2(14 + index * slot_width, rect.size.y - 42),
-			Vector2(slot_width - 8, 28)
-		)
-		var slot_name: String = slots[index]
+	for segment in _slot_segments(title, slots, rect):
+		var slot_rect: Rect2 = segment["rect"]
+		var slot_name: String = segment["name"]
 		var fill: Color = accent.darkened(0.32)
 		if title == "Tuning" and slot_name == model.selected_tuning_result:
 			fill = accent
 		draw_rect(slot_rect, fill, true)
 		draw_rect(slot_rect, accent, false, 1.0)
-		_draw_text(_display_slot(slot_name), slot_rect.position + Vector2(6, 20), 12, COLOR_TEXT)
+		var font_size := 12
+		var label := _display_slot(slot_name)
+		if slot_rect.size.x < 38.0:
+			label = _display_slot_short(slot_name)
+			font_size = 10
+		_draw_text(label, slot_rect.position + Vector2(5, 20), font_size, COLOR_TEXT)
 
 
 func _draw_unit_board(rect: Rect2, is_active: bool) -> void:
@@ -138,9 +144,9 @@ func _draw_unit_board(rect: Rect2, is_active: bool) -> void:
 	draw_rect(rect, COLOR_UNIT, false, border_width)
 	_draw_text("单位仓", rect.position + Vector2(14, 24), 18, COLOR_UNIT)
 	if is_active:
-		_draw_text("ACTIVE BALL", rect.position + Vector2(rect.size.x - 128, 24), 11, COLOR_ACTIVE)
+		_draw_text("活跃球", rect.position + Vector2(rect.size.x - 86, 24), 11, COLOR_ACTIVE)
 
-	_draw_pegs(rect, is_active, 4, 7, max(3.0, peg_radius * 0.92))
+	_draw_pegs(rect, is_active, 5, 7, max(3.0, peg_radius * 0.92))
 
 	var slots: Array = model.get_unit_slots()
 	var slot_width: float = (rect.size.x - 28.0) / 4.0
@@ -209,99 +215,50 @@ func _draw_queue_bridge(rect: Rect2) -> void:
 	_draw_text(text, rect.position + Vector2(10, 25), 13, COLOR_TEXT)
 
 
-func _build_size_controls() -> void:
-	var panel := PanelContainer.new()
-	panel.name = "SizeControls"
-	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	panel.anchor_left = 1.0
-	panel.anchor_top = 0.0
-	panel.anchor_right = 1.0
-	panel.anchor_bottom = 0.0
-	panel.offset_left = -SIZE_CONTROL_WIDTH - 8.0
-	panel.offset_top = 8.0
-	panel.offset_right = -8.0
-	panel.offset_bottom = 134.0
-	add_child(panel)
+func _slot_segments(title: String, slots: Array, rect: Rect2) -> Array[Dictionary]:
+	var weights: Array = []
+	if title == "Launch":
+		weights = LAUNCH_SLOT_WEIGHTS
+	elif title == "Tuning":
+		weights = TUNING_SLOT_WEIGHTS
+	else:
+		for _slot in slots:
+			weights.append(1.0)
 
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 3)
-	panel.add_child(box)
+	var total_weight := 0.0
+	for weight in weights:
+		total_weight += float(weight)
 
-	_ball_size_label = _make_control_label("")
-	box.add_child(_ball_size_label)
-	_ball_size_slider = _make_size_slider(DEFAULT_BALL_RADIUS)
-	_ball_size_slider.value_changed.connect(_on_ball_radius_changed)
-	box.add_child(_ball_size_slider)
-
-	_peg_size_label = _make_control_label("")
-	box.add_child(_peg_size_label)
-	_peg_size_slider = _make_size_slider(DEFAULT_PEG_RADIUS)
-	_peg_size_slider.value_changed.connect(_on_peg_radius_changed)
-	box.add_child(_peg_size_slider)
-
-	var reset_button := Button.new()
-	reset_button.text = "重置尺寸"
-	reset_button.custom_minimum_size = Vector2(0, 26)
-	reset_button.add_theme_font_size_override("font_size", 10)
-	reset_button.pressed.connect(_on_reset_size_pressed)
-	box.add_child(reset_button)
-
-	_update_size_control_labels()
+	var segments: Array[Dictionary] = []
+	var cursor := rect.position.x + SLOT_INSET
+	var available_width := rect.size.x - SLOT_INSET * 2.0
+	for index in range(slots.size()):
+		var segment_width := available_width * float(weights[index]) / total_weight
+		var visible_width: float = max(0.0, segment_width - SLOT_GAP)
+		segments.append({
+			"name": str(slots[index]),
+			"rect": Rect2(
+				Vector2(cursor, rect.position.y + rect.size.y - 42.0),
+				Vector2(visible_width, 28.0)
+			),
+		})
+		cursor += segment_width
+	return segments
 
 
-func _make_control_label(text: String) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.add_theme_font_size_override("font_size", 10)
-	return label
-
-
-func _make_size_slider(value: float) -> HSlider:
-	var slider := HSlider.new()
-	slider.min_value = 3.0
-	slider.max_value = 14.0
-	slider.step = 0.5
-	slider.value = value
-	slider.custom_minimum_size = Vector2(0, 18)
-	return slider
-
-
-func _on_ball_radius_changed(value: float) -> void:
-	ball_radius = value
-	_update_size_control_labels()
-	queue_redraw()
-
-
-func _on_peg_radius_changed(value: float) -> void:
-	peg_radius = value
-	_update_size_control_labels()
-	queue_redraw()
-
-
-func _on_reset_size_pressed() -> void:
-	ball_radius = DEFAULT_BALL_RADIUS
-	peg_radius = DEFAULT_PEG_RADIUS
-	if _ball_size_slider != null:
-		_ball_size_slider.set_value_no_signal(ball_radius)
-	if _peg_size_slider != null:
-		_peg_size_slider.set_value_no_signal(peg_radius)
-	_update_size_control_labels()
-	queue_redraw()
-
-
-func _update_size_control_labels() -> void:
-	if _ball_size_label != null:
-		_ball_size_label.text = "球半径 %.1f" % ball_radius
-	if _peg_size_label != null:
-		_peg_size_label.text = "钉子半径 %.1f" % peg_radius
+func _slot_center(title: String, slot_name: String, rect: Rect2) -> Vector2:
+	var slots: Array = LAUNCH_SLOT_NAMES if title == "Launch" else model.TUNING_RESULTS
+	for segment in _slot_segments(title, slots, rect):
+		if str(segment["name"]) == slot_name:
+			var slot_rect: Rect2 = segment["rect"]
+			return slot_rect.position + slot_rect.size * 0.5
+	return Vector2(rect.position.x + SLOT_INSET, rect.position.y + rect.size.y - 28.0)
 
 
 func _draw_launcher(rect: Rect2, is_active: bool) -> void:
 	var motion: Dictionary = model.get_motion_summary()
-	var pivot := rect.position + Vector2(68, 26)
-	var sway := sin(float(motion.get("cannon_angle", 0.0))) * 0.13
-	var angle := PI * 0.5 + sway
-	var barrel_end := pivot + Vector2(cos(angle), sin(angle)) * 48.0
+	var pivot: Vector2 = motion.get("launcher_pivot", rect.position + Vector2(68, 26))
+	var barrel_end: Vector2 = motion.get("launcher_muzzle", pivot + Vector2(0, 48))
 	var color := COLOR_ACTIVE if is_active else COLOR_LAUNCH
 	draw_arc(pivot, 19.0, 0.0, TAU, 24, COLOR_LAUNCH.darkened(0.12), 2.0)
 	draw_line(pivot, barrel_end, color, 5.0)
@@ -354,6 +311,14 @@ func _draw_active_ball() -> void:
 	var color := COLOR_ACTIVE
 	if state == "Blocked Bounce":
 		color = COLOR_WARNING
+	elif state == "Split Return" or state == "Recycle Return":
+		color = COLOR_LAUNCH
+	elif state == "Waste":
+		color = Color(0.42, 0.43, 0.40, 1.0)
+	elif state == "Valid Unit Hit":
+		color = COLOR_UNIT
+	elif state == "Logic Settlement":
+		color = COLOR_TUNING
 	draw_circle(center, ball_radius, color)
 	draw_arc(center, ball_radius + 3.0, 0.0, TAU, 24, COLOR_TEXT, 1.6)
 	if bool(motion.get("in_flight", false)):
@@ -378,6 +343,131 @@ func _draw_active_ball() -> void:
 		)
 
 
+func _draw_recent_effect_feedback() -> void:
+	var event := _latest_effect_event()
+	if event.is_empty():
+		return
+
+	var component := str(event.get("component", ""))
+	var state := str(event.get("state", ""))
+	var data: Dictionary = event.get("data", {})
+	var label := ""
+	var anchor := Vector2.ZERO
+	var accent := COLOR_ACTIVE
+
+	match state:
+		"Split Return":
+			label = "分裂 +2"
+			anchor = _launch_effect_position("Split")
+			accent = COLOR_LAUNCH
+		"Recycle Return":
+			label = "回收 +1"
+			anchor = _launch_effect_position("Recycle")
+			accent = COLOR_LAUNCH
+		"Waste":
+			label = "废弃"
+			anchor = _launch_effect_position("Waste")
+			accent = COLOR_WARNING
+		"Valid Unit Hit":
+			var slot_id := int(data.get("slot_id", 1))
+			var progress_added := int(data.get("progress_added", 1))
+			label = "Unit +%d" % progress_added
+			anchor = _unit_effect_position(slot_id)
+			accent = COLOR_UNIT
+		"Logic Settlement":
+			if component != "Tuning":
+				return
+			var tuning_result := str(data.get("tuning_result", model.selected_tuning_result))
+			label = _tuning_effect_label(tuning_result, data)
+			if label.is_empty():
+				return
+			anchor = _tuning_effect_position(tuning_result)
+			accent = COLOR_TUNING
+		"Blocked Bounce":
+			var slot_id := int(data.get("slot_id", 1))
+			label = "挡板"
+			anchor = _unit_effect_position(slot_id)
+			accent = COLOR_WARNING
+		_:
+			return
+
+	_draw_effect_badge(anchor, label, accent)
+
+
+func _latest_effect_event() -> Dictionary:
+	var event_log: Array = model.event_log
+	for index in range(event_log.size() - 1, -1, -1):
+		var event: Dictionary = event_log[index]
+		var state := str(event.get("state", ""))
+		if [
+			"Split Return",
+			"Recycle Return",
+			"Waste",
+			"Valid Unit Hit",
+			"Logic Settlement",
+			"Blocked Bounce",
+		].has(state):
+			return event
+	return {}
+
+
+func _draw_effect_badge(anchor: Vector2, label: String, accent: Color) -> void:
+	var rect := Rect2(anchor + Vector2(-42, -34), Vector2(84, 24))
+	draw_rect(rect, COLOR_EFFECT_BG, true)
+	draw_rect(rect, accent, false, 1.5)
+	draw_line(anchor + Vector2(0, -10), anchor + Vector2(0, 5), accent, 2.0)
+	draw_circle(anchor, 6.0, accent)
+	_draw_text(label, rect.position + Vector2(8, 17), 11, COLOR_TEXT)
+
+
+func _launch_effect_position(slot_name: String) -> Vector2:
+	match slot_name:
+		"Tuning", "Tuning Path":
+			return _slot_center(
+				"Launch",
+				"Tuning",
+				Rect2(24, 150, 690, 180)
+			)
+		"Split":
+			return _slot_center(
+				"Launch",
+				"Split",
+				Rect2(24, 150, 690, 180)
+			)
+		"Recycle", "Miss + Recycle":
+			return _slot_center(
+				"Launch",
+				"Recycle",
+				Rect2(24, 150, 690, 180)
+			)
+		"Waste":
+			return _slot_center(
+				"Launch",
+				"Waste",
+				Rect2(24, 150, 690, 180)
+			)
+	return _slot_center("Launch", "Tuning", Rect2(24, 150, 690, 180))
+
+
+func _tuning_effect_position(tuning_result: String) -> Vector2:
+	return _slot_center("Tuning", tuning_result, Rect2(24, 370, 690, 180))
+
+
+func _unit_effect_position(slot_id: int) -> Vector2:
+	return Vector2(106 + (slot_id - 1) * 166, 750)
+
+
+func _tuning_effect_label(tuning_result: String, data: Dictionary) -> String:
+	match tuning_result:
+		"Prime":
+			return "预充 +%d" % int(data.get("progress_value", 2))
+		"Echo":
+			return "复写 x2"
+		"Surge":
+			return "脉冲 0.25s"
+	return ""
+
+
 func _active_ball_position(ball: Dictionary) -> Vector2:
 	var board: String = ball.get("board", "Launch")
 	var target: String = ball.get("target", "")
@@ -387,15 +477,15 @@ func _active_ball_position(ball: Dictionary) -> Vector2:
 		"Pool":
 			return Vector2(128, 54)
 		"Launcher":
-			return Vector2(92, 132)
+			var motion: Dictionary = model.get_motion_summary()
+			return motion.get("launcher_muzzle", Vector2(92, 224))
 		"Tuning":
-			var tuning_index: int = max(0, int(model.TUNING_RESULTS.find(target)))
-			return Vector2(124 + tuning_index * 166, 352)
+			return _tuning_effect_position(target)
 		"Unit":
 			var slot_id: int = _slot_id_from_target(target)
-			return Vector2(106 + (slot_id - 1) * 166, 512)
+			return Vector2(106 + (slot_id - 1) * 166, 750)
 		_:
-			return Vector2(576, 208)
+			return Vector2(576, 250)
 
 
 func _slot_id_from_target(target: String) -> int:
@@ -447,6 +537,27 @@ func _display_slot(slot_name: String) -> String:
 		"Waste":
 			return "废弃"
 	return slot_name
+
+
+func _display_slot_short(slot_name: String) -> String:
+	match slot_name:
+		"Tuning":
+			return "调"
+		"Split":
+			return "分"
+		"Recycle":
+			return "回"
+		"Waste":
+			return "废"
+		"Gate":
+			return "闸"
+		"Prime":
+			return "预"
+		"Echo":
+			return "复"
+		"Surge":
+			return "脉"
+	return slot_name.left(1)
 
 
 func _scaled_font(font_size: int) -> int:

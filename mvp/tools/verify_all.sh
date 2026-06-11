@@ -32,7 +32,27 @@ run_check() {
     exit 2
   fi
 
-  "$GODOT" --headless --path "$MVP_DIR" --script "res://tools/$(basename "$script_path")" --no-header
+  run_godot_clean --headless --path "$MVP_DIR" --script "res://tools/$(basename "$script_path")" --no-header
+}
+
+run_godot_clean() {
+  local output
+  local status
+
+  set +e
+  output="$("$GODOT" "$@" 2>&1)"
+  status=$?
+  set -e
+
+  printf '%s\n' "$output" | awk '
+    /^WARNING: [0-9]+ RIDs of type "CanvasItem" were leaked\./ { skip_at = 1; next }
+    /^ERROR: [0-9]+ RID allocations of type .* were leaked at exit\./ { next }
+    /^WARNING: ObjectDB instances leaked at exit/ { skip_at = 1; next }
+    skip_at && /^[[:space:]]+at: (_free_rids|cleanup) / { skip_at = 0; next }
+    { skip_at = 0; print }
+  '
+
+  return "$status"
 }
 
 GODOT="$(find_godot)" || {
@@ -52,7 +72,7 @@ printf '\n==> Godot version\n'
 "$GODOT" --version
 
 printf '\n==> Headless project open\n'
-"$GODOT" --headless --path "$MVP_DIR" --quit --no-header
+run_godot_clean --headless --path "$MVP_DIR" --quit --no-header
 
 run_check "Project verification" "$MVP_DIR/tools/verify_project.gd"
 run_check "Machine causality" "$MVP_DIR/tools/verify_machine_causality.gd"

@@ -52,11 +52,11 @@ func _load_assets() -> void:
 
 
 func _load_texture(path: String) -> Texture2D:
-	var image := Image.load_from_file(path)
-	if image == null or image.is_empty():
+	var resource := ResourceLoader.load(path)
+	if not resource is Texture2D:
 		_asset_status[path] = false
 		return null
-	var texture := ImageTexture.create_from_image(image)
+	var texture := resource as Texture2D
 	_asset_status[path] = texture != null
 	return texture
 
@@ -103,7 +103,7 @@ func _build_layout() -> void:
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.add_child(spacer)
 
-	_start_button = _make_menu_button("开始游戏", COLOR_PLAYER)
+	_start_button = _make_menu_button("开始新短局", COLOR_PLAYER)
 	_start_button.pressed.connect(_on_start_pressed)
 	left.add_child(_start_button)
 
