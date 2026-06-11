@@ -9,6 +9,7 @@ const UI_SCALE := 1.08
 const BATTLE_DURATION_SECONDS := 9.0
 const ENDPOINT_DURATION_SECONDS := 7.0
 const SIMULATION_SPEED := 2.6
+const SIMULATION_SPEED_OPTIONS := [0.5, 1.0, 2.0, 4.0]
 const DEFAULT_VIEWPORT_SIZE := Vector2i(1600, 900)
 const AUDIO_MIX_RATE := 22050
 const AUDIO_CUE_FREQUENCIES := {
@@ -32,15 +33,167 @@ const AUDIO_CUE_DURATIONS := {
 	"result": 0.18,
 }
 
+class QueueBridgeVisual:
+	extends Control
+
+	const COLOR_BG := Color("#171a18")
+	const COLOR_LINE := Color("#62c9cf")
+	const COLOR_DIM := Color("#4e5a5f")
+	const COLOR_TEXT := Color("#ece6d8")
+	const LANE_ORDER := ["Left", "Mid", "Right"]
+
+	var selected_lane := "Mid"
+	var queue_label := "等待 Unit"
+
+	func _ready() -> void:
+		custom_minimum_size = Vector2(0, 150)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func set_bridge_state(next_lane: String, next_queue_label: String) -> void:
+		selected_lane = next_lane
+		queue_label = next_queue_label
+		queue_redraw()
+
+	func _draw() -> void:
+		draw_rect(Rect2(Vector2.ZERO, size), COLOR_BG, true)
+		var source := Vector2(22.0, size.y * 0.5)
+		draw_circle(source, 8.0, COLOR_LINE)
+		draw_arc(source, 13.0, 0.0, TAU, 24, COLOR_LINE, 2.0)
+		draw_string(get_theme_default_font(), source + Vector2(-4.0, -18.0), "Q", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, COLOR_TEXT)
+		for index in range(LANE_ORDER.size()):
+			var lane_name: String = LANE_ORDER[index]
+			var target := Vector2(size.x - 20.0, 30.0 + index * 42.0)
+			var color := COLOR_LINE if lane_name == selected_lane else COLOR_DIM
+			draw_line(source, target, color, 3.0 if lane_name == selected_lane else 1.0)
+			draw_circle(target, 7.0, color)
+			draw_string(
+				get_theme_default_font(),
+				target + Vector2(-48.0, 4.0),
+				_display_lane(lane_name),
+				HORIZONTAL_ALIGNMENT_LEFT,
+				-1.0,
+				11,
+				COLOR_TEXT if lane_name == selected_lane else COLOR_DIM
+			)
+		draw_string(get_theme_default_font(), Vector2(8.0, size.y - 12.0), queue_label, HORIZONTAL_ALIGNMENT_LEFT, size.x - 16.0, 10, COLOR_TEXT)
+
+	func _display_lane(lane_name: String) -> String:
+		match lane_name:
+			"Left":
+				return "左"
+			"Mid":
+				return "中"
+			"Right":
+				return "右"
+		return lane_name
+
+
+class BridgeConnectorOverlay:
+	extends Node2D
+
+	const COLOR_LINE := Color("#62c9cf")
+	const COLOR_GLOW := Color("#b7f7ff")
+
+	var bridge_panel: Control
+	var battlefield_view: Control
+	var selected_lane := "Mid"
+
+	func set_connector_targets(
+		next_bridge_panel: Control,
+		next_battlefield_view: Control,
+		next_selected_lane: String
+	) -> void:
+		bridge_panel = next_bridge_panel
+		battlefield_view = next_battlefield_view
+		selected_lane = next_selected_lane
+		queue_redraw()
+
+	func _process(_delta: float) -> void:
+		if bridge_panel != null and battlefield_view != null:
+			queue_redraw()
+
+	func _draw() -> void:
+		if bridge_panel == null or battlefield_view == null:
+			return
+		if not bridge_panel.visible or not battlefield_view.visible:
+			return
+		if not battlefield_view.has_method("get_spawn_port_position"):
+			return
+
+		var bridge_source := _to_local_canvas(
+			bridge_panel.get_global_transform_with_canvas() * Vector2(
+				bridge_panel.size.x,
+				bridge_panel.size.y * 0.5
+			)
+		)
+		var spawn_local: Vector2 = battlefield_view.call("get_spawn_port_position", selected_lane)
+		var spawn_target := _to_local_canvas(
+			battlefield_view.get_global_transform_with_canvas() * spawn_local
+		)
+		var control_a := Vector2(lerp(bridge_source.x, spawn_target.x, 0.35), bridge_source.y)
+		var control_b := Vector2(lerp(bridge_source.x, spawn_target.x, 0.72), spawn_target.y)
+		var points := PackedVector2Array([
+			bridge_source,
+			control_a,
+			control_b,
+			spawn_target,
+		])
+		draw_polyline(points, Color(COLOR_LINE, 0.24), 9.0)
+		draw_polyline(points, COLOR_LINE, 3.5)
+		draw_circle(spawn_target, 7.0, COLOR_GLOW)
+		draw_arc(spawn_target, 13.0, 0.0, TAU, 24, COLOR_LINE, 2.0)
+
+	func get_contract_snapshot() -> Dictionary:
+		if bridge_panel == null or battlefield_view == null:
+			return {}
+		if not battlefield_view.has_method("get_spawn_port_position"):
+			return {}
+		var bridge_source := _to_local_canvas(
+			bridge_panel.get_global_transform_with_canvas() * Vector2(
+				bridge_panel.size.x,
+				bridge_panel.size.y * 0.5
+			)
+		)
+		var spawn_local: Vector2 = battlefield_view.call("get_spawn_port_position", selected_lane)
+		var spawn_target := _to_local_canvas(
+			battlefield_view.get_global_transform_with_canvas() * spawn_local
+		)
+		return {
+			"selected_lane": selected_lane,
+			"source_is_bridge_panel": bridge_panel != null,
+			"target_is_battlefield_spawn_port": battlefield_view != null,
+			"source_x": bridge_source.x,
+			"target_x": spawn_target.x,
+			"target_y": spawn_target.y,
+			"crosses_from_bridge_to_battlefield": spawn_target.x > bridge_source.x,
+		}
+
+	func _to_local_canvas(canvas_position: Vector2) -> Vector2:
+		return get_global_transform_with_canvas().affine_inverse() * canvas_position
+
 var _session: RefCounted = SessionModelScript.new()
 var _machine_view: Control
+var _bridge_panel: PanelContainer
+var _bridge_list: VBoxContainer
+var _bridge_visual: QueueBridgeVisual
+var _bridge_connector_overlay: BridgeConnectorOverlay
 var _battlefield_view: Control
+var _contract_page: PanelContainer
+var _contract_choice_panel: VBoxContainer
+var _run_page: HBoxContainer
+var _action_panel: PanelContainer
+var _battle_page: VBoxContainer
+var _simulation_speed_bar: HBoxContainer
+var _simulation_speed_buttons: Dictionary = {}
+var _post_battle_page: PanelContainer
+var _post_battle_list: VBoxContainer
 var _status_label: Label
 var _phase_label: Label
 var _choice_panel: VBoxContainer
 var _readability_list: VBoxContainer
 var _flow_list: VBoxContainer
 var _log_list: VBoxContainer
+var _result_panel: PanelContainer
 var _result_list: VBoxContainer
 var _built := false
 
@@ -49,6 +202,7 @@ var _visible_step := "Guardian Select"
 var _battle_running := false
 var _battle_number := 0
 var _battle_elapsed := 0.0
+var _simulation_speed_multiplier := 1.0
 var _current_lane := "Mid"
 var _forwarded_machine_entries := 0
 var _deployed_start_index := 0
@@ -100,89 +254,132 @@ func _build_layout() -> void:
 	_status_label = _make_label("", 12)
 	root.add_child(_status_label)
 
-	var body := HBoxContainer.new()
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 10)
-	root.add_child(body)
+	_contract_page = PanelContainer.new()
+	_contract_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(_contract_page)
 
-	var side_panel := PanelContainer.new()
-	side_panel.custom_minimum_size = Vector2(320, 0)
-	body.add_child(side_panel)
+	var contract_margin := MarginContainer.new()
+	contract_margin.add_theme_constant_override("margin_left", 64)
+	contract_margin.add_theme_constant_override("margin_top", 44)
+	contract_margin.add_theme_constant_override("margin_right", 64)
+	contract_margin.add_theme_constant_override("margin_bottom", 44)
+	_contract_page.add_child(contract_margin)
 
-	var side := VBoxContainer.new()
-	side.add_theme_constant_override("separation", 8)
-	side_panel.add_child(side)
+	_contract_choice_panel = VBoxContainer.new()
+	_contract_choice_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_contract_choice_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_contract_choice_panel.add_theme_constant_override("separation", 14)
+	contract_margin.add_child(_contract_choice_panel)
 
-	side.add_child(_make_label("玩家操作", 15))
+	_run_page = HBoxContainer.new()
+	_run_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_run_page.add_theme_constant_override("separation", 8)
+	root.add_child(_run_page)
+
+	_action_panel = PanelContainer.new()
+	_action_panel.custom_minimum_size = Vector2(300, 0)
+	_run_page.add_child(_action_panel)
+
 	_choice_panel = VBoxContainer.new()
 	_choice_panel.add_theme_constant_override("separation", 6)
-	side.add_child(_choice_panel)
+	_action_panel.add_child(_choice_panel)
 
-	side.add_child(_make_separator())
-	side.add_child(_make_label("可读性", 14))
 	_readability_list = VBoxContainer.new()
 	_readability_list.add_theme_constant_override("separation", 2)
-	side.add_child(_readability_list)
-
-	side.add_child(_make_separator())
-	side.add_child(_make_label("流程", 14))
 	_flow_list = VBoxContainer.new()
 	_flow_list.add_theme_constant_override("separation", 2)
-	side.add_child(_flow_list)
-
-	side.add_child(_make_separator())
-	side.add_child(_make_label("事件", 14))
 	_log_list = VBoxContainer.new()
 	_log_list.add_theme_constant_override("separation", 2)
-	side.add_child(_log_list)
 
-	var play_area := VBoxContainer.new()
-	play_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	play_area.add_theme_constant_override("separation", 8)
-	body.add_child(play_area)
+	_battle_page = VBoxContainer.new()
+	_battle_page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_battle_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_battle_page.add_theme_constant_override("separation", 8)
+	_run_page.add_child(_battle_page)
+
+	_simulation_speed_bar = HBoxContainer.new()
+	_simulation_speed_bar.add_theme_constant_override("separation", 6)
+	_battle_page.add_child(_simulation_speed_bar)
+	_build_simulation_speed_bar()
 
 	var views := HBoxContainer.new()
 	views.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	views.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	views.add_theme_constant_override("separation", 8)
-	play_area.add_child(views)
+	_battle_page.add_child(views)
 
 	_machine_view = MachineViewScript.new()
-	_machine_view.custom_minimum_size = Vector2(560, 500)
+	_machine_view.custom_minimum_size = Vector2(480, 500)
 	_machine_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_machine_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_machine_view.size_flags_stretch_ratio = 38.0
 	views.add_child(_machine_view)
 
+	_bridge_panel = PanelContainer.new()
+	_bridge_panel.custom_minimum_size = Vector2(178, 500)
+	_bridge_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_bridge_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_bridge_panel.size_flags_stretch_ratio = 14.0
+	views.add_child(_bridge_panel)
+
+	_bridge_list = VBoxContainer.new()
+	_bridge_list.add_theme_constant_override("separation", 8)
+	_bridge_panel.add_child(_bridge_list)
+
 	_battlefield_view = BattlefieldViewScript.new()
-	_battlefield_view.custom_minimum_size = Vector2(660, 500)
+	_battlefield_view.custom_minimum_size = Vector2(600, 500)
 	_battlefield_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_battlefield_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_battlefield_view.size_flags_stretch_ratio = 48.0
 	_battlefield_view.lane_clicked.connect(_on_lane_clicked)
 	views.add_child(_battlefield_view)
 
-	var result_panel := PanelContainer.new()
-	result_panel.custom_minimum_size = Vector2(0, 118)
-	play_area.add_child(result_panel)
+	_bridge_connector_overlay = BridgeConnectorOverlay.new()
+	_bridge_connector_overlay.z_index = 20
+	views.add_child(_bridge_connector_overlay)
+
+	_result_panel = PanelContainer.new()
+	_result_panel.custom_minimum_size = Vector2(0, 118)
+	_battle_page.add_child(_result_panel)
 
 	_result_list = VBoxContainer.new()
 	_result_list.add_theme_constant_override("separation", 3)
-	result_panel.add_child(_result_list)
+	_result_panel.add_child(_result_list)
+
+	_post_battle_page = PanelContainer.new()
+	_post_battle_page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_post_battle_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_run_page.add_child(_post_battle_page)
+
+	var post_margin := MarginContainer.new()
+	post_margin.add_theme_constant_override("margin_left", 56)
+	post_margin.add_theme_constant_override("margin_top", 40)
+	post_margin.add_theme_constant_override("margin_right", 56)
+	post_margin.add_theme_constant_override("margin_bottom", 40)
+	_post_battle_page.add_child(post_margin)
+
+	_post_battle_list = VBoxContainer.new()
+	_post_battle_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_post_battle_list.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_post_battle_list.add_theme_constant_override("separation", 12)
+	post_margin.add_child(_post_battle_list)
 
 
 func _show_guardian_choices() -> void:
 	_set_visible_phase("guardian", "Guardian Select")
+	_show_contract_page()
 	_battle_running = false
-	_clear_container(_choice_panel)
-	_choice_panel.add_child(_make_label("选择 Player Guardian", 14))
+	_clear_container(_contract_choice_panel)
+	_contract_choice_panel.add_child(_make_label("选择守护者契约", 20))
+	_contract_choice_panel.add_child(_make_label("选择本局机器偏向与基地兜底方式", 13))
 	for guardian in _session.get_available_guardians():
 		var guardian_id := str(guardian.get("guardian_id", ""))
-		var label := "%s | %s轴 | %s" % [
+		var label := "签订契约，开始 Battle 1：%s | %s轴 | %s" % [
 			guardian.get("display_name", ""),
 			_display_axis(guardian.get("axis_lean", "")),
 			guardian.get("tactical_skill", ""),
 		]
-		_add_button(_choice_panel, label, Callable(self, "_on_guardian_choice").bind(guardian_id))
+		_add_button(_contract_choice_panel, label, Callable(self, "_on_guardian_choice").bind(guardian_id))
 
 
 func _on_guardian_choice(guardian_id: String) -> void:
@@ -198,6 +395,7 @@ func _on_guardian_choice(guardian_id: String) -> void:
 
 func _start_battle(battle_number: int) -> void:
 	_set_visible_phase("battle", _battle_step_label(battle_number))
+	_show_run_page()
 	_battle_number = battle_number
 	_battle_elapsed = 0.0
 	_battle_running = true
@@ -214,6 +412,7 @@ func _start_battle(battle_number: int) -> void:
 
 func _start_endpoint() -> void:
 	_set_visible_phase("endpoint", "Endpoint")
+	_show_run_page()
 	_battle_number = 6
 	_battle_elapsed = 0.0
 	_battle_running = true
@@ -225,18 +424,14 @@ func _start_endpoint() -> void:
 	_show_battle_status("Endpoint")
 
 
-func _show_battle_status(title: String) -> void:
+func _show_battle_status(_title: String) -> void:
+	_show_battle_screen_page()
 	_clear_container(_choice_panel)
-	_choice_panel.add_child(_make_label(_display_step(title), 15))
-	_choice_panel.add_child(_make_label(
-		"球机自动运行；点击右侧战场路线直接切换 Deploy Lane。当前队列部署读取点击后的路线。",
-		11
-	))
 	_refresh()
 
 
 func _advance_battle(delta: float) -> void:
-	var step: float = max(0.0, delta) * SIMULATION_SPEED
+	var step: float = max(0.0, delta) * SIMULATION_SPEED * _simulation_speed_multiplier
 	_battle_elapsed += step
 	_session.machine_model.step_simulation(step)
 	_sync_audio_from_machine_events()
@@ -312,17 +507,15 @@ func _deployed_units_since_battle_start() -> Array[Dictionary]:
 
 func _show_first_reward_choices() -> void:
 	_set_visible_phase("first_reward", "First Reward")
-	_clear_container(_choice_panel)
-	_choice_panel.add_child(_make_label("战斗胜利 -> 奖励选择", 12))
-	_choice_panel.add_child(_make_label("第一次奖励：选择机器轴锚点", 14))
+	_begin_post_battle_page("第一次奖励", "战斗胜利。选择一个机器轴锚点，下一战会看这个选择是否读得出来。")
 	for reward in _session.get_first_reward_choices():
 		var reward_id := str(reward.get("modifier_id", ""))
-		_add_button(
-			_choice_panel,
-			"%s | %s轴 | %s" % [
-				reward.get("display_name", ""),
+		_add_post_choice(
+			_post_battle_list,
+			str(reward.get("display_name", "")),
+			"%s轴 | %s" % [
 				_display_axis(reward.get("warehouse", "")),
-				reward.get("operation", ""),
+				reward.get("operation", "")
 			],
 			Callable(self, "_on_first_reward_choice").bind(reward_id)
 		)
@@ -338,16 +531,16 @@ func _on_first_reward_choice(reward_id: String) -> void:
 
 func _show_shop_choices() -> void:
 	_set_visible_phase("shop", "Shop / Gold / Rest")
-	_clear_container(_choice_panel)
-	_choice_panel.add_child(_make_label("战斗胜利 -> 商店 / 休整", 12))
-	_choice_panel.add_child(_make_label("第一次商店：选择 1 个中立机器修正", 14))
-	_choice_panel.add_child(_make_label("Gold：%d。购买后会进入休整选择。" % _session.gold, 11))
+	_begin_post_battle_page(
+		"商店 / 休整",
+		"Gold %d。先选择一个中立机器修正，之后决定是否花费 Gold 休整。" % _session.gold
+	)
 	for item in _session.get_shop_choices():
 		var modifier_id := str(item.get("modifier_id", ""))
-		_add_button(
-			_choice_panel,
-			"购买 %s | %s | %d Gold" % [
-				item.get("display_name", ""),
+		_add_post_choice(
+			_post_battle_list,
+			"购买 %s" % item.get("display_name", ""),
+			"%s | %d Gold" % [
 				_display_role(item.get("role_tag", "")),
 				int(item.get("price", 0)),
 			],
@@ -358,11 +551,9 @@ func _show_shop_choices() -> void:
 
 func _on_shop_purchase_choice(modifier_id: String) -> void:
 	_selected_shop_purchase_id = modifier_id
-	_clear_container(_choice_panel)
-	_choice_panel.add_child(_make_label("休整窗口", 14))
-	_choice_panel.add_child(_make_label("休整花费 3 Gold，恢复 20 Player Guardian HP。", 11))
-	_add_button(_choice_panel, "休整", Callable(self, "_on_rest_choice").bind(true))
-	_add_button(_choice_panel, "不休整", Callable(self, "_on_rest_choice").bind(false))
+	_begin_post_battle_page("休整", "休整花费 3 Gold，恢复 20 Player Guardian HP。")
+	_add_post_choice(_post_battle_list, "休整", "花费 3 Gold，恢复 20 HP", Callable(self, "_on_rest_choice").bind(true))
+	_add_post_choice(_post_battle_list, "不休整", "保留 Gold，直接进入下一战", Callable(self, "_on_rest_choice").bind(false))
 
 
 func _on_rest_choice(buy_rest: bool) -> void:
@@ -375,15 +566,13 @@ func _on_rest_choice(buy_rest: bool) -> void:
 
 func _show_second_reward_choices() -> void:
 	_set_visible_phase("second_reward", "Second Reward")
-	_clear_container(_choice_panel)
-	_choice_panel.add_child(_make_label("战斗胜利 -> 第二奖励", 12))
-	_choice_panel.add_child(_make_label("第二次奖励：深化主轴或补洞", 14))
+	_begin_post_battle_page("第二次奖励", "深化主轴，或者补上前几战暴露出来的机器短板。")
 	for reward in _session.get_second_reward_choices():
 		var modifier_id := str(reward.get("modifier_id", ""))
-		_add_button(
-			_choice_panel,
-			"%s | %s | %s" % [
-				reward.get("display_name", ""),
+		_add_post_choice(
+			_post_battle_list,
+			str(reward.get("display_name", "")),
+			"%s | %s" % [
 				reward.get("offer_role", ""),
 				reward.get("reason", ""),
 			],
@@ -401,12 +590,9 @@ func _on_second_reward_choice(modifier_id: String) -> void:
 
 func _show_endpoint_prep_choices() -> void:
 	_set_visible_phase("endpoint_prep", "Endpoint Prep")
-	_clear_container(_choice_panel)
-	_choice_panel.add_child(_make_label("战斗胜利 -> 终点前整备", 12))
-	_choice_panel.add_child(_make_label("终点前整备", 14))
-	_choice_panel.add_child(_make_label("此处不卖第二次商店，只允许休整或直接进入终点。", 11))
-	_add_button(_choice_panel, "终点前休整", Callable(self, "_on_endpoint_rest_choice").bind(true))
-	_add_button(_choice_panel, "直接进入终点", Callable(self, "_on_endpoint_rest_choice").bind(false))
+	_begin_post_battle_page("终点前整备", "此处不卖第二次商店，只允许休整或直接进入终点。")
+	_add_post_choice(_post_battle_list, "终点前休整", "花费 Gold，换取进入终点前的容错", Callable(self, "_on_endpoint_rest_choice").bind(true))
+	_add_post_choice(_post_battle_list, "直接进入终点", "保留 Gold，马上进入 Endpoint", Callable(self, "_on_endpoint_rest_choice").bind(false))
 	_refresh()
 
 
@@ -418,11 +604,12 @@ func _on_endpoint_rest_choice(buy_rest: bool) -> void:
 
 func _show_result_page() -> void:
 	_set_visible_phase("result", "Result Page")
+	_show_post_battle_page()
 	_play_audio_cue("result")
-	_clear_container(_choice_panel)
-	_choice_panel.add_child(_make_label("终点完成 -> 结算页", 12))
-	_choice_panel.add_child(_make_label("结算页", 15))
-	_choice_panel.add_child(_make_label("本局已结束；结果页字段来自本局选择、部署、反制和终点记录。", 11))
+	_clear_container(_post_battle_list)
+	_post_battle_list.add_child(_make_label("本局结算", 22))
+	_post_battle_list.add_child(_make_label("查看本局主轴、关键选择、路线压力和下一局观察。", 12))
+	_populate_result_summary(_post_battle_list)
 	_refresh()
 
 
@@ -464,11 +651,12 @@ func _refresh() -> void:
 		))
 
 	_refresh_readability_panel(summary)
+	_refresh_bridge_panel(summary)
 
 	_clear_container(_result_list)
 	var result_page: Dictionary = summary.get("result_page", {})
 	if result_page.is_empty():
-		_result_list.add_child(_make_label("结算页会在 Endpoint 后显示。", 11))
+		_result_list.add_child(_make_label("", 1))
 	else:
 		for key in [
 			"chosen_guardian",
@@ -490,6 +678,93 @@ func _refresh() -> void:
 				10
 			))
 	_record_phase_status_check()
+
+
+func _refresh_bridge_panel(summary: Dictionary) -> void:
+	if _bridge_list == null:
+		return
+	_clear_container(_bridge_list)
+	_bridge_list.add_child(_make_label("Queue Bridge", 14))
+	var queue_bridge: Dictionary = summary.get("queue_to_lane_bridge", {})
+	var queue_label := "队首：等待 Unit"
+	if not queue_bridge.is_empty():
+		queue_label = "队首：%s" % queue_bridge.get("queue_head", "空")
+	_bridge_visual = QueueBridgeVisual.new()
+	_bridge_visual.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_bridge_visual.set_bridge_state(_current_lane, queue_label)
+	_bridge_list.add_child(_bridge_visual)
+	_bridge_list.add_child(_make_label("当前出兵口：%s" % _display_lane(_current_lane), 11))
+	_bridge_list.add_child(_make_label("已部署单位不随切路改变。", 9))
+	if _bridge_connector_overlay != null:
+		_bridge_connector_overlay.set_connector_targets(_bridge_panel, _battlefield_view, _current_lane)
+
+
+func _show_contract_page() -> void:
+	if _contract_page != null:
+		_contract_page.visible = true
+	if _run_page != null:
+		_run_page.visible = false
+
+
+func _show_run_page() -> void:
+	if _contract_page != null:
+		_contract_page.visible = false
+	if _run_page != null:
+		_run_page.visible = true
+
+
+func _show_battle_screen_page() -> void:
+	_show_run_page()
+	if _action_panel != null:
+		_action_panel.visible = false
+	if _battle_page != null:
+		_battle_page.visible = true
+	if _post_battle_page != null:
+		_post_battle_page.visible = false
+	if _result_panel != null:
+		_result_panel.visible = false
+	_refresh_simulation_speed_buttons()
+
+
+func _show_post_battle_page() -> void:
+	_show_run_page()
+	if _action_panel != null:
+		_action_panel.visible = false
+	if _battle_page != null:
+		_battle_page.visible = false
+	if _post_battle_page != null:
+		_post_battle_page.visible = true
+	if _result_panel != null:
+		_result_panel.visible = false
+
+
+func _begin_post_battle_page(title: String, description: String) -> void:
+	_show_post_battle_page()
+	_clear_container(_post_battle_list)
+	_post_battle_list.add_child(_make_label(title, 22))
+	_post_battle_list.add_child(_make_label(description, 12))
+
+
+func _populate_result_summary(parent: Node) -> void:
+	var summary: Dictionary = _session.get_run_summary()
+	var result_page: Dictionary = summary.get("result_page", {})
+	if result_page.is_empty():
+		parent.add_child(_make_label("结算数据尚未生成。", 11))
+		return
+	for key in [
+		"chosen_guardian",
+		"main_axis",
+		"key_rewards",
+		"shop_rest_choice",
+		"counter_target",
+		"deploy_lane_impact",
+		"endpoint_payoff_or_break_reason",
+		"next_run_watch_tag",
+	]:
+		parent.add_child(_make_label(
+			"%s：%s" % [_display_result_key(key), result_page.get(key, "")],
+			11
+		))
 
 
 func _refresh_readability_panel(summary: Dictionary) -> void:
@@ -563,6 +838,55 @@ func _add_button(parent: Node, text: String, callback: Callable) -> void:
 	parent.add_child(button)
 
 
+func _add_post_choice(parent: Node, title: String, detail: String, callback: Callable) -> void:
+	var button := Button.new()
+	button.text = "%s\n%s" % [title, detail]
+	button.custom_minimum_size = Vector2(0, 74)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.add_theme_font_size_override("font_size", _scaled_font(12))
+	button.pressed.connect(callback)
+	parent.add_child(button)
+
+
+func _build_simulation_speed_bar() -> void:
+	_simulation_speed_bar.add_child(_make_label("全局倍速", 11))
+	for speed_value in SIMULATION_SPEED_OPTIONS:
+		var button := Button.new()
+		button.text = _format_simulation_speed(speed_value)
+		button.toggle_mode = true
+		button.custom_minimum_size = Vector2(58, 30)
+		button.add_theme_font_size_override("font_size", _scaled_font(10))
+		button.pressed.connect(Callable(self, "_on_simulation_speed_pressed").bind(float(speed_value)))
+		_simulation_speed_bar.add_child(button)
+		_simulation_speed_buttons[float(speed_value)] = button
+	_refresh_simulation_speed_buttons()
+
+
+func _on_simulation_speed_pressed(speed_value: float) -> void:
+	_set_simulation_speed_multiplier(speed_value)
+
+
+func _set_simulation_speed_multiplier(speed_value: float) -> void:
+	if not SIMULATION_SPEED_OPTIONS.has(speed_value):
+		return
+	_simulation_speed_multiplier = speed_value
+	_refresh_simulation_speed_buttons()
+
+
+func _refresh_simulation_speed_buttons() -> void:
+	for speed_value in _simulation_speed_buttons.keys():
+		var button := _simulation_speed_buttons[speed_value] as Button
+		if button != null:
+			button.button_pressed = abs(float(speed_value) - _simulation_speed_multiplier) < 0.001
+
+
+func _format_simulation_speed(speed_value: float) -> String:
+	if abs(speed_value - round(speed_value)) < 0.001:
+		return "%dx" % int(round(speed_value))
+	return "%.1fx" % speed_value
+
+
 func _make_separator() -> HSeparator:
 	var separator := HSeparator.new()
 	separator.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -571,8 +895,7 @@ func _make_separator() -> HSeparator:
 
 func _clear_container(container: Node) -> void:
 	for child in container.get_children():
-		container.remove_child(child)
-		child.queue_free()
+		child.free()
 
 
 func _build_audio_bank() -> void:

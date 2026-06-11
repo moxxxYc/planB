@@ -97,7 +97,7 @@ func _check_main_scene_instantiates(failures: Array[String]) -> void:
 	if instance.has_method("get_menu_contract_summary"):
 		instance.call("get_menu_contract_summary")
 	var visible_text := _visible_text_snapshot(instance)
-	if not visible_text.has("开始游戏"):
+	if not visible_text.has("开始新短局"):
 		failures.append("Main menu missing start button")
 	if not visible_text.has("退出"):
 		failures.append("Main menu missing quit button")
@@ -133,9 +133,9 @@ func _check_art_assets(failures: Array[String]) -> void:
 		if not FileAccess.file_exists(path):
 			failures.append("Missing art asset file: %s" % path)
 			continue
-		var image := Image.load_from_file(path)
-		if image == null or image.is_empty():
-			failures.append("Art asset did not decode as image: %s" % path)
+		var resource := ResourceLoader.load(path)
+		if not resource is Texture2D:
+			failures.append("Art asset did not load as imported texture: %s" % path)
 
 
 func _check_resource_category_counts(failures: Array[String]) -> void:

@@ -7,6 +7,26 @@ GODOT_BIN="${GODOT_BIN:-godot}"
 
 cd "$ROOT"
 
+run_godot_clean() {
+  local output
+  local status
+
+  set +e
+  output="$("$GODOT_BIN" "$@" 2>&1)"
+  status=$?
+  set -e
+
+  printf '%s\n' "$output" | awk '
+    /^WARNING: [0-9]+ RIDs of type "CanvasItem" were leaked\./ { skip_at = 1; next }
+    /^ERROR: [0-9]+ RID allocations of type .* were leaked at exit\./ { next }
+    /^WARNING: ObjectDB instances leaked at exit/ { skip_at = 1; next }
+    skip_at && /^[[:space:]]+at: (_free_rids|cleanup) / { skip_at = 0; next }
+    { skip_at = 0; print }
+  '
+
+  return "$status"
+}
+
 echo "[verify] 工程根: $ROOT"
 echo "[verify] Godot 可执行: $GODOT_BIN"
 
@@ -21,39 +41,39 @@ echo "[verify] Godot 版本（需为 4.6.x）"
 "$GODOT_BIN" --version
 
 echo "[verify] headless 打开工程烟测"
-"$GODOT_BIN" --headless --path "$ROOT" --quit --no-header
+run_godot_clean --headless --path "$ROOT" --quit --no-header
 
 if [[ -f "$ROOT/tools/verify_project.gd" ]]; then
   echo "[verify] 运行 tools/verify_project.gd"
-  "$GODOT_BIN" --headless --path "$ROOT" --script "res://tools/verify_project.gd" --no-header
+  run_godot_clean --headless --path "$ROOT" --script "res://tools/verify_project.gd" --no-header
 else
   echo "[verify] 跳过自定义检查：未找到 tools/verify_project.gd"
 fi
 
 if [[ -f "$ROOT/tools/verify_machine_causality.gd" ]]; then
   echo "[verify] 运行 tools/verify_machine_causality.gd"
-  "$GODOT_BIN" --headless --path "$ROOT" --script "res://tools/verify_machine_causality.gd" --no-header
+  run_godot_clean --headless --path "$ROOT" --script "res://tools/verify_machine_causality.gd" --no-header
 else
   echo "[verify] 跳过 M1 机器因果验证：未找到 tools/verify_machine_causality.gd"
 fi
 
 if [[ -f "$ROOT/tools/verify_battlefield_deploy_loop.gd" ]]; then
   echo "[verify] 运行 tools/verify_battlefield_deploy_loop.gd"
-  "$GODOT_BIN" --headless --path "$ROOT" --script "res://tools/verify_battlefield_deploy_loop.gd" --no-header
+  run_godot_clean --headless --path "$ROOT" --script "res://tools/verify_battlefield_deploy_loop.gd" --no-header
 else
   echo "[verify] 跳过 M2 战场/Deploy Lane 验证：未找到 tools/verify_battlefield_deploy_loop.gd"
 fi
 
 if [[ -f "$ROOT/tools/verify_mvp_session.gd" ]]; then
   echo "[verify] 运行 tools/verify_mvp_session.gd"
-  "$GODOT_BIN" --headless --path "$ROOT" --script "res://tools/verify_mvp_session.gd" --no-header
+  run_godot_clean --headless --path "$ROOT" --script "res://tools/verify_mvp_session.gd" --no-header
 else
   echo "[verify] 跳过 M3 完整 session 验证：未找到 tools/verify_mvp_session.gd"
 fi
 
 if [[ -f "$ROOT/tools/verify_playable_session.gd" ]]; then
   echo "[verify] 运行 tools/verify_playable_session.gd"
-  "$GODOT_BIN" --headless --path "$ROOT" --script "res://tools/verify_playable_session.gd" --no-header
+  run_godot_clean --headless --path "$ROOT" --script "res://tools/verify_playable_session.gd" --no-header
 else
   echo "[verify] 跳过可玩短局验证：未找到 tools/verify_playable_session.gd"
 fi

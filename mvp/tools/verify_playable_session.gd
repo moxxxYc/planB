@@ -45,29 +45,45 @@ const FORBIDDEN_PLAYER_TEXT := [
 	"调试",
 	"harness",
 	"验证",
+	"可读性",
+	"流程",
+	"事件",
+	"结算页会在 Endpoint 后显示",
+	"选择 Player Guardian",
+	"点击右侧战场路线",
+	"球半径",
+	"钉子半径",
+	"重置尺寸",
+	"ACTIVE BALL",
 ]
 
 
 func _init() -> void:
+	_run_checks.call_deferred()
+
+
+func _run_checks() -> void:
 	var failures: Array[String] = []
 
-	_check_scene_loads(failures)
+	await _check_scene_loads(failures)
 	if failures.is_empty():
 		_check_running_battle_is_not_forced_to_win(failures)
-		_check_playable_path_reaches_result(failures)
+		await _check_playable_path_reaches_result(failures)
 
 	if not failures.is_empty():
 		for failure in failures:
 			push_error(failure)
+		await process_frame
 		quit(1)
 		return
 
 	print("verify_playable_session.gd passed: formal playable Win/Loss paths verified")
+	await process_frame
 	quit(0)
 
 
 func _check_scene_loads(failures: Array[String]) -> void:
-	var instance := _instantiate_playable(failures)
+	var instance := await _instantiate_playable(failures)
 	if instance == null:
 		return
 
@@ -77,7 +93,11 @@ func _check_scene_loads(failures: Array[String]) -> void:
 	if _contains_scroll_container(instance):
 		failures.append("Playable layout still uses scroll containers in the default window")
 	_check_no_forbidden_player_text(instance, "initial playable screen", failures)
-	instance.free()
+	_check_player_facing_contract_text(instance, failures)
+	_check_guardian_contract_is_standalone(instance, failures)
+	await _check_battle_screen_contract(instance, failures)
+	_check_post_battle_pages_are_primary(instance, failures)
+	await _free_test_instance(instance)
 
 
 func _check_running_battle_is_not_forced_to_win(failures: Array[String]) -> void:
@@ -100,14 +120,14 @@ func _check_running_battle_is_not_forced_to_win(failures: Array[String]) -> void
 
 
 func _check_playable_path_reaches_result(failures: Array[String]) -> void:
-	var win_instance := _instantiate_playable(failures)
+	var win_instance := await _instantiate_playable(failures)
 	if win_instance == null:
 		return
 
 	_check_terminal_battle_completes_immediately(win_instance, failures)
-	win_instance.free()
+	await _free_test_instance(win_instance)
 
-	win_instance = _instantiate_playable(failures)
+	win_instance = await _instantiate_playable(failures)
 	if win_instance == null:
 		return
 	var result: Dictionary = _run_player_session(win_instance, true, failures)
@@ -115,16 +135,16 @@ func _check_playable_path_reaches_result(failures: Array[String]) -> void:
 	_check_player_choice_telemetry(result, failures)
 	_check_completed_playable_contract(win_instance, failures)
 	_check_no_forbidden_player_text(win_instance, "completed win screen", failures)
-	win_instance.free()
+	await _free_test_instance(win_instance)
 
-	var loss_instance := _instantiate_playable(failures)
+	var loss_instance := await _instantiate_playable(failures)
 	if loss_instance == null:
 		return
 	var loss_result: Dictionary = _run_player_session(loss_instance, false, failures)
 	_check_result_reaches_page("loss", loss_result, failures)
 	_check_completed_playable_contract(loss_instance, failures)
 	_check_no_forbidden_player_text(loss_instance, "completed loss screen", failures)
-	loss_instance.free()
+	await _free_test_instance(loss_instance)
 
 
 func _check_terminal_battle_completes_immediately(instance: Node, failures: Array[String]) -> void:
@@ -312,49 +332,290 @@ func _instantiate_playable(failures: Array[String]) -> Node:
 	var instance := (packed as PackedScene).instantiate()
 	if instance == null:
 		failures.append("Playable session scene could not instantiate")
+	else:
+		root.add_child(instance)
+		await process_frame
 	return instance
 
 
-func _has_required_runtime_children(root: Node) -> bool:
+func _free_test_instance(instance: Node) -> void:
+	if instance == null or not is_instance_valid(instance):
+		return
+	var parent := instance.get_parent()
+	if parent != null:
+		parent.remove_child(instance)
+	instance.free()
+	await process_frame
+
+
+func _has_required_runtime_children(node: Node) -> bool:
 	for property_name in [
 		"_phase_label",
 		"_status_label",
 		"_choice_panel",
+		"_battle_page",
+		"_simulation_speed_bar",
+		"_post_battle_page",
+		"_post_battle_list",
 		"_machine_view",
+		"_bridge_panel",
 		"_battlefield_view",
 		"_result_list",
 	]:
-		if root.get(property_name) == null:
+		if node.get(property_name) == null:
 			return false
 	return true
 
 
-func _contains_scroll_container(root: Node) -> bool:
-	if root is ScrollContainer:
+func _check_player_facing_contract_text(node: Node, failures: Array[String]) -> void:
+	var texts: Array[String] = []
+	_collect_visible_text(node, texts)
+	var joined := "\n".join(texts)
+	for required_text in [
+		"选择守护者契约",
+		"选择本局机器偏向与基地兜底方式",
+		"签订契约，开始 Battle 1",
+	]:
+		if not joined.contains(required_text):
+			failures.append("Guardian Contract missing player-facing text: %s" % required_text)
+
+
+func _check_guardian_contract_is_standalone(instance: Node, failures: Array[String]) -> void:
+	var contract_page = instance.get("_contract_page")
+	var run_page = instance.get("_run_page")
+	if contract_page == null:
+		failures.append("Guardian Contract page container is missing")
+	elif contract_page is CanvasItem and not (contract_page as CanvasItem).visible:
+		failures.append("Guardian Contract page is not visible before contract choice")
+	if run_page == null:
+		failures.append("Battle run page container is missing")
+	elif run_page is CanvasItem and (run_page as CanvasItem).visible:
+		failures.append("Battle run page is visible before Guardian Contract is signed")
+
+	var texts: Array[String] = []
+	_collect_visible_text(instance, texts)
+	var joined := "\n".join(texts)
+	for battle_text in [
+		"Queue / Deploy Bridge",
+		"当前出兵口",
+		"部署路线",
+		"战斗结果会在战斗结束后显示",
+	]:
+		if joined.contains(battle_text):
+			failures.append("Guardian Contract screen leaks Battle Screen text: %s" % battle_text)
+
+
+func _check_battle_screen_contract(instance: Node, failures: Array[String]) -> void:
+	instance.call("_on_guardian_choice", "hive.vein_mother")
+	await process_frame
+	var contract_page = instance.get("_contract_page")
+	var run_page = instance.get("_run_page")
+	if contract_page is CanvasItem and (contract_page as CanvasItem).visible:
+		failures.append("Guardian Contract page remains visible after contract choice")
+	if run_page is CanvasItem and not (run_page as CanvasItem).visible:
+		failures.append("Battle run page is not visible after Guardian Contract is signed")
+	var bridge_panel = instance.get("_bridge_panel")
+	if bridge_panel == null:
+		failures.append("Battle Screen missing Queue / Deploy Bridge panel")
+	var bridge_connector = instance.get("_bridge_connector_overlay")
+	if bridge_connector == null:
+		failures.append("Battle Screen missing Bridge-to-spawn connector overlay")
+	var action_panel = instance.get("_action_panel")
+	if action_panel is CanvasItem and (action_panel as CanvasItem).visible:
+		failures.append("Battle Screen still exposes a fourth action/instruction panel")
+	var result_panel = instance.get("_result_panel")
+	if result_panel is CanvasItem and (result_panel as CanvasItem).visible:
+		failures.append("Battle Screen still exposes the result strip before battle result")
+	if _contains_slider(instance):
+		failures.append("Player-facing flow exposes development sliders")
+	_check_simulation_speed_control(instance, failures)
+	var battlefield_view = instance.get("_battlefield_view")
+	if battlefield_view == null:
+		failures.append("Battle Screen missing battlefield view")
+		return
+
+	var snapshot: Dictionary = battlefield_view.call("get_player_facing_contract_snapshot")
+	if str(snapshot.get("selected_spawn_port", "")) != "Mid":
+		failures.append("Battle Screen does not expose Mid as selected spawn port")
+	if str(snapshot.get("bridge_target", "")) != "Mid":
+		failures.append("Queue Bridge does not target selected Mid spawn port")
+	if not bool(snapshot.get("guardian_separate_from_spawn_ports", false)):
+		failures.append("Guardian is not separated from spawn ports by a base buffer")
+	if int(snapshot.get("spawn_port_count", 0)) != 3:
+		failures.append("Battle Screen must expose exactly 3 player-side spawn ports")
+
+	if bridge_connector != null and bridge_connector.has_method("get_contract_snapshot"):
+		var connector_snapshot: Dictionary = bridge_connector.call("get_contract_snapshot")
+		if str(connector_snapshot.get("selected_lane", "")) != "Mid":
+			failures.append("Bridge connector does not start on selected Mid lane")
+		if not bool(connector_snapshot.get("source_is_bridge_panel", false)):
+			failures.append("Bridge connector source is not the Bridge panel")
+		if not bool(connector_snapshot.get("target_is_battlefield_spawn_port", false)):
+			failures.append("Bridge connector target is not a battlefield spawn port")
+		if not bool(connector_snapshot.get("crosses_from_bridge_to_battlefield", false)):
+			failures.append("Bridge connector does not cross from Bridge panel to battlefield")
+
+	instance.call("_on_lane_clicked", "Right")
+	await process_frame
+	if bridge_connector != null and bridge_connector.has_method("get_contract_snapshot"):
+		var right_connector_snapshot: Dictionary = bridge_connector.call("get_contract_snapshot")
+		if str(right_connector_snapshot.get("selected_lane", "")) != "Right":
+			failures.append("Bridge connector target does not update after lane click")
+
+
+func _check_simulation_speed_control(instance: Node, failures: Array[String]) -> void:
+	var speed_bar = instance.get("_simulation_speed_bar")
+	if speed_bar == null:
+		failures.append("Battle Screen missing global simulation speed control")
+	var speed_buttons: Dictionary = instance.get("_simulation_speed_buttons")
+	for speed_text in ["0.5x", "1x", "2x", "4x"]:
+		var texts: Array[String] = []
+		_collect_visible_text(instance, texts)
+		if not "\n".join(texts).contains(speed_text):
+			failures.append("Global simulation speed control missing option: %s" % speed_text)
+	if abs(float(instance.get("_simulation_speed_multiplier")) - 1.0) > 0.001:
+		failures.append("Global simulation speed should default to 1x")
+
+	var button_1x := speed_buttons.get(1.0) as Button
+	if button_1x == null or not button_1x.button_pressed:
+		failures.append("Global simulation speed 1x button is not selected by default")
+
+	var before_elapsed := float(instance.get("_battle_elapsed"))
+	var session: RefCounted = instance.get("_session")
+	var before_machine_time := float(session.machine_model.battle_time_seconds)
+	instance.call("_set_simulation_speed_multiplier", 0.5)
+	instance.call("_advance_battle", 0.1)
+	var half_speed_delta := float(instance.get("_battle_elapsed")) - before_elapsed
+	var half_machine_delta := float(session.machine_model.battle_time_seconds) - before_machine_time
+	if abs(half_speed_delta - 0.13) > 0.03:
+		failures.append("0.5x speed did not halve battle timeline step")
+	if abs(half_machine_delta - half_speed_delta) > 0.03:
+		failures.append("0.5x speed did not apply to ball machine simulation")
+
+	before_elapsed = float(instance.get("_battle_elapsed"))
+	before_machine_time = float(session.machine_model.battle_time_seconds)
+	instance.call("_set_simulation_speed_multiplier", 4.0)
+	instance.call("_advance_battle", 0.1)
+	var four_speed_delta := float(instance.get("_battle_elapsed")) - before_elapsed
+	var four_machine_delta := float(session.machine_model.battle_time_seconds) - before_machine_time
+	if abs(four_speed_delta - 1.04) > 0.05:
+		failures.append("4x speed did not quadruple battle timeline step")
+	if abs(four_machine_delta - four_speed_delta) > 0.05:
+		failures.append("4x speed did not apply to ball machine simulation")
+
+	var button_4x := speed_buttons.get(4.0) as Button
+	if button_4x == null or not button_4x.button_pressed:
+		failures.append("Global simulation speed 4x button does not reflect selected speed")
+
+
+func _check_post_battle_pages_are_primary(instance: Node, failures: Array[String]) -> void:
+	instance.call("_show_first_reward_choices")
+	_check_primary_post_battle_page(
+		instance,
+		"First Reward",
+		["第一次奖励", "战斗胜利"],
+		failures
+	)
+
+	instance.call("_show_shop_choices")
+	_check_primary_post_battle_page(
+		instance,
+		"Shop / Gold / Rest",
+		["商店 / 休整", "Gold"],
+		failures
+	)
+
+	var session: RefCounted = instance.get("_session")
+	var shop_id := _first_id(session.get_shop_choices(), "modifier_id")
+	instance.call("_on_shop_purchase_choice", shop_id)
+	_check_primary_post_battle_page(
+		instance,
+		"Rest",
+		["休整", "恢复 20"],
+		failures
+	)
+
+	session.build_result_page()
+	instance.call("_show_result_page")
+	_check_primary_post_battle_page(
+		instance,
+		"Result Page",
+		["本局结算", "下一局观察"],
+		failures
+	)
+
+
+func _check_primary_post_battle_page(
+	instance: Node,
+	page_label: String,
+	required_texts: Array[String],
+	failures: Array[String]
+) -> void:
+	var post_battle_page = instance.get("_post_battle_page")
+	if post_battle_page == null:
+		failures.append("%s missing post-battle page container" % page_label)
+	elif post_battle_page is CanvasItem and not (post_battle_page as CanvasItem).visible:
+		failures.append("%s is not shown as the primary post-battle page" % page_label)
+
+	var battle_page = instance.get("_battle_page")
+	if battle_page is CanvasItem and (battle_page as CanvasItem).visible:
+		failures.append("%s still shows the Battle Screen beside the post-battle decision" % page_label)
+
+	var action_panel = instance.get("_action_panel")
+	if action_panel is CanvasItem and (action_panel as CanvasItem).visible:
+		failures.append("%s still uses the obsolete left action panel" % page_label)
+
+	var texts: Array[String] = []
+	_collect_visible_text(instance, texts)
+	var joined := "\n".join(texts)
+	for required in required_texts:
+		if not joined.contains(required):
+			failures.append("%s missing primary page text: %s" % [page_label, required])
+	for battle_text in ["Queue Bridge", "当前出兵口"]:
+		if joined.contains(battle_text):
+			failures.append("%s leaks Battle Screen text while post-battle page is active: %s" % [
+				page_label,
+				battle_text,
+			])
+
+
+func _contains_scroll_container(node: Node) -> bool:
+	if node is ScrollContainer:
 		return true
-	for child in root.get_children():
+	for child in node.get_children():
 		if child is Node and _contains_scroll_container(child):
 			return true
 	return false
 
 
-func _check_no_forbidden_player_text(root: Node, label: String, failures: Array[String]) -> void:
+func _contains_slider(node: Node) -> bool:
+	if node is Slider:
+		return true
+	if node.name == "SizeControls":
+		return true
+	for child in node.get_children():
+		if child is Node and _contains_slider(child):
+			return true
+	return false
+
+
+func _check_no_forbidden_player_text(node: Node, label: String, failures: Array[String]) -> void:
 	var texts: Array[String] = []
-	_collect_visible_text(root, texts)
+	_collect_visible_text(node, texts)
 	var joined := "\n".join(texts)
 	for forbidden in FORBIDDEN_PLAYER_TEXT:
 		if joined.contains(forbidden):
 			failures.append("%s exposes forbidden text: %s" % [label, forbidden])
 
 
-func _collect_visible_text(root: Node, texts: Array[String]) -> void:
-	if root is CanvasItem and not (root as CanvasItem).visible:
+func _collect_visible_text(node: Node, texts: Array[String]) -> void:
+	if node is CanvasItem and not (node as CanvasItem).visible:
 		return
-	if root is Label:
-		texts.append(str((root as Label).text))
-	elif root is Button:
-		texts.append(str((root as Button).text))
-	for child in root.get_children():
+	if node is Label:
+		texts.append(str((node as Label).text))
+	elif node is Button:
+		texts.append(str((node as Button).text))
+	for child in node.get_children():
 		if child is Node:
 			_collect_visible_text(child, texts)
 

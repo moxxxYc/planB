@@ -54,9 +54,21 @@ const BOARD_NAMES := [
 
 const POOL_CAPACITY := 5
 const BASE_DEPLOY_DELAY_SECONDS := 0.5
-const AUTO_LAUNCH_INTERVAL_SECONDS := 1.2
-const AUTO_PHASE_SECONDS := 0.65
+const FORGE_INTERVAL_SECONDS := 2.2
+const AUTO_LAUNCH_INTERVAL_SECONDS := 1.3
+const AUTO_PHASE_SECONDS := 1.3
+const MAX_SIMULATION_STEP_SECONDS := 0.2
 const MOTION_TRAIL_LIMIT := 28
+
+const AUTO_LAUNCH_SEQUENCE := [
+	"Tuning",
+	"Split",
+	"Tuning",
+	"Recycle",
+	"Tuning",
+	"Waste",
+	"Tuning",
+]
 
 const AUTO_TUNING_SEQUENCE := [
 	"Gate",
@@ -74,6 +86,19 @@ const AUTO_SLOT_SEQUENCE := [
 	1,
 ]
 
+const BOARD_SLOT_X := 38.0
+const BOARD_SLOT_WIDTH := 662.0
+const BOARD_SLOT_GAP := 8.0
+const LAUNCH_SLOT_NAMES := ["Tuning", "Split", "Recycle", "Waste"]
+const LAUNCH_SLOT_WEIGHTS := [65.0, 15.0, 15.0, 5.0]
+const TUNING_SLOT_WEIGHTS := [55.0, 15.0, 15.0, 15.0]
+const LAUNCH_SLOT_CENTER_Y := 302.0
+const TUNING_SLOT_CENTER_Y := 522.0
+const UNIT_SLOT_CENTER_Y := 750.0
+const LAUNCHER_PIVOT := Vector2(92.0, 176.0)
+const LAUNCHER_BARREL_LENGTH := 48.0
+const LAUNCHER_SWAY_RADIANS := 0.13
+
 var battle_time_seconds: float = 0.0
 var selected_tuning_result: String = "Gate"
 var pool_count: int = 3
@@ -87,6 +112,7 @@ var motion_trail: Array[Vector2] = []
 
 var _chain_index := 0
 var _auto_sequence_index := 0
+var _forge_timer_seconds: float = 0.0
 var _launch_timer_seconds: float = 0.0
 var _flight: Dictionary = {}
 
@@ -115,6 +141,7 @@ func reset() -> void:
 	motion_trail.clear()
 	_chain_index = 0
 	_auto_sequence_index = 0
+	_forge_timer_seconds = FORGE_INTERVAL_SECONDS
 	_launch_timer_seconds = 0.0
 	_flight = {
 		"in_flight": false,
@@ -137,19 +164,28 @@ func set_auto_running(enabled: bool) -> void:
 
 
 func step_simulation(delta: float) -> void:
-	var step: float = clamp(delta, 0.0, 0.2)
+	var remaining: float = max(0.0, delta)
+	while remaining > 0.0:
+		var step: float = min(remaining, MAX_SIMULATION_STEP_SECONDS)
+		_step_simulation_chunk(step)
+		remaining -= step
+
+
+func _step_simulation_chunk(step: float) -> void:
 	if step <= 0.0:
 		return
 
 	battle_time_seconds += step
 	cannon_phase = fmod(cannon_phase + step * 1.35, TAU)
+	_advance_forge(step)
 
+	var started_chain := false
 	if auto_running:
 		_launch_timer_seconds = max(0.0, _launch_timer_seconds - step)
 		if _launch_timer_seconds <= 0.0 and not bool(_flight.get("in_flight", false)):
-			_start_dynamic_chain()
+			started_chain = _start_dynamic_chain()
 
-	if bool(_flight.get("in_flight", false)):
+	if bool(_flight.get("in_flight", false)) and not started_chain:
 		_advance_dynamic_chain(step)
 
 	_record_motion_sample(_motion_position())
@@ -164,7 +200,9 @@ func get_motion_summary() -> Dictionary:
 		"phase_progress": _phase_progress(),
 		"ball_position": _motion_position(),
 		"trail": motion_trail.duplicate(),
-		"cannon_angle": sin(cannon_phase) * 0.38,
+		"cannon_angle": _launcher_angle_offset(),
+		"launcher_pivot": LAUNCHER_PIVOT,
+		"launcher_muzzle": _launcher_muzzle_position(),
 		"chain_id": str(_flight.get("chain_id", "")),
 		"tuning_result": str(_flight.get("tuning_result", selected_tuning_result)),
 		"slot_id": int(_flight.get("slot_id", 1)),
@@ -271,9 +309,13 @@ func apply_settlement_state(state: String) -> Dictionary:
 			description = "发射仓分裂回流向球池返回了两颗干净球。"
 			data = {"pool_count": pool_count}
 		"Recycle Return":
-			pool_count = min(POOL_CAPACITY, pool_count + 1)
-			description = "发射仓回收在落空后向球池返回了一颗干净球。"
-			data = {"pool_count": pool_count}
+			if pool_count >= POOL_CAPACITY:
+				description = "发射仓回收槽命中，但 Pool 已满，本次回流失败。"
+				data = {"pool_count": pool_count, "return_failed": true}
+			else:
+				pool_count += 1
+				description = "发射仓回收在落空后向球池返回了一颗干净球。"
+				data = {"pool_count": pool_count, "return_failed": false}
 		"Waste":
 			description = "发射仓废弃口吞掉了当前球，没有产生有效结算。"
 			data = {"pool_count": pool_count}
@@ -347,7 +389,7 @@ func run_machine_chain(tuning_result: String, slot_id: int) -> Dictionary:
 
 	var entry := _apply_unit_hit(slot_id, tuning_result, chain_id)
 	return {
-		"event": event_log[event_log.size() - 1],
+		"event": _find_chain_event(chain_id, "Unit", "Valid Unit Hit"),
 		"queue_entry": entry,
 	}
 
@@ -389,10 +431,12 @@ func get_unit_slots() -> Array[Dictionary]:
 
 func get_supply_summary() -> Dictionary:
 	return {
-		"forge": "clean ball cadence placeholder",
+		"forge": "clean ball every %.1fs" % FORGE_INTERVAL_SECONDS,
+		"forge_time_remaining": _forge_timer_seconds,
 		"pool_count": pool_count,
 		"pool_capacity": POOL_CAPACITY,
-		"launcher": "active",
+		"launcher": "active every %.1fs" % AUTO_LAUNCH_INTERVAL_SECONDS,
+		"launcher_time_remaining": _launch_timer_seconds,
 	}
 
 
@@ -407,27 +451,35 @@ func get_state_snapshot() -> Dictionary:
 	}
 
 
-func _start_dynamic_chain() -> void:
+func _start_dynamic_chain() -> bool:
+	var chain_id := _new_chain_id()
+	if not _record_chain_intro(chain_id):
+		_launch_timer_seconds = AUTO_LAUNCH_INTERVAL_SECONDS
+		return false
+
+	var launch_result: String = AUTO_LAUNCH_SEQUENCE[
+		_auto_sequence_index % AUTO_LAUNCH_SEQUENCE.size()
+	]
 	var tuning_result: String = AUTO_TUNING_SEQUENCE[
 		_auto_sequence_index % AUTO_TUNING_SEQUENCE.size()
 	]
 	var slot_id: int = AUTO_SLOT_SEQUENCE[_auto_sequence_index % AUTO_SLOT_SEQUENCE.size()]
 	_auto_sequence_index += 1
 
-	var chain_id := _new_chain_id()
 	selected_tuning_result = tuning_result
-	_record_chain_intro(chain_id)
 	_flight = {
 		"in_flight": true,
 		"phase": "Launch",
 		"phase_elapsed": 0.0,
 		"chain_id": chain_id,
+		"launch_result": launch_result,
 		"tuning_result": tuning_result,
 		"slot_id": slot_id,
 	}
-	active_ball = _make_active_ball("Launch", "Tuning Path", "Natural Hit", chain_id)
+	active_ball = _make_active_ball("Launch", _launch_target_label(launch_result), "Natural Hit", chain_id)
 	motion_trail.clear()
 	_record_motion_sample(_motion_position())
+	return true
 
 
 func _advance_dynamic_chain(delta: float) -> void:
@@ -454,20 +506,65 @@ func _advance_dynamic_chain(delta: float) -> void:
 
 func _finish_dynamic_launch_phase() -> void:
 	var chain_id := str(_flight.get("chain_id", ""))
-	_record_event(
-		"Launch",
-		"Natural Hit",
-		"发射仓动态球路自然落入调校入口。",
-		{"launch_result": "Tuning Path"},
-		chain_id
-	)
-	_flight["phase"] = "Tuning"
-	active_ball = _make_active_ball(
-		"Tuning",
-		str(_flight.get("tuning_result", "Gate")),
-		"Natural Hit",
-		chain_id
-	)
+	var launch_result := str(_flight.get("launch_result", "Tuning"))
+	match launch_result:
+		"Tuning":
+			_record_event(
+				"Launch",
+				"Natural Hit",
+				"发射仓动态球路自然落入调校入口。",
+				{"launch_result": "Tuning Path"},
+				chain_id
+			)
+			_flight["phase"] = "Tuning"
+			active_ball = _make_active_ball(
+				"Tuning",
+				str(_flight.get("tuning_result", "Gate")),
+				"Natural Hit",
+				chain_id
+			)
+		"Split":
+			pool_count = min(POOL_CAPACITY, pool_count + 2)
+			_record_event(
+				"Launch",
+				"Split Return",
+				"发射仓动态球路落入分裂回流槽，向球池返回两颗干净球。",
+				{"launch_result": "Split", "pool_count": pool_count},
+				chain_id
+			)
+			active_ball = _make_active_ball("Launch", "Split", "Split Return", chain_id)
+			_finish_dynamic_launch_terminal()
+		"Recycle":
+			var return_failed := pool_count >= POOL_CAPACITY
+			if not return_failed:
+				pool_count += 1
+			_record_event(
+				"Launch",
+				"Recycle Return",
+				"发射仓动态球路落入回收槽，Pool 已满，回流失败。"
+				if return_failed
+				else "发射仓动态球路落入回收槽，向球池返回一颗干净球。",
+				{
+					"launch_result": "Recycle",
+					"pool_count": pool_count,
+					"return_failed": return_failed,
+				},
+				chain_id
+			)
+			active_ball = _make_active_ball("Launch", "Recycle", "Recycle Return", chain_id)
+			_finish_dynamic_launch_terminal()
+		"Waste":
+			_record_event(
+				"Launch",
+				"Waste",
+				"发射仓动态球路落入废弃口，本球没有进入后续球机。",
+				{"launch_result": "Waste", "pool_count": pool_count},
+				chain_id
+			)
+			active_ball = _make_active_ball("Launch", "Waste", "Waste", chain_id)
+			_finish_dynamic_launch_terminal()
+		_:
+			_stop_dynamic_chain()
 
 
 func _finish_dynamic_tuning_phase() -> void:
@@ -530,6 +627,13 @@ func _finish_dynamic_unit_phase() -> void:
 	_launch_timer_seconds = AUTO_LAUNCH_INTERVAL_SECONDS
 
 
+func _finish_dynamic_launch_terminal() -> void:
+	_flight["in_flight"] = false
+	_flight["phase"] = "Idle"
+	_flight["phase_elapsed"] = 0.0
+	_launch_timer_seconds = AUTO_LAUNCH_INTERVAL_SECONDS
+
+
 func _stop_dynamic_chain() -> void:
 	_flight["in_flight"] = false
 	_flight["phase"] = "Idle"
@@ -555,35 +659,33 @@ func _motion_position() -> Vector2:
 	var progress := _phase_progress()
 	match str(_flight.get("phase", "Launch")):
 		"Launch":
+			var launch_result := str(_flight.get("launch_result", "Tuning"))
 			return _polyline_position([
-				Vector2(92, 132),
+				_launcher_muzzle_position(),
 				Vector2(150, 176),
 				Vector2(226, 146),
 				Vector2(316, 194),
-				Vector2(438, 212),
+				_launch_slot_position(launch_result),
 			], progress)
 		"Tuning":
-			var tuning_index: int = max(
-				0,
-				int(TUNING_RESULTS.find(str(_flight.get("tuning_result", "Gate"))))
-			)
-			var end_x := 108.0 + float(tuning_index) * 172.0
+			var tuning_result := str(_flight.get("tuning_result", "Gate"))
+			var end := _tuning_slot_position(tuning_result)
 			return _polyline_position([
-				Vector2(438, 270),
-				Vector2(344, 322),
-				Vector2(252, 288),
-				Vector2(end_x, 354),
+				Vector2(438, 350),
+				Vector2(344, 430),
+				Vector2(252, 455),
+				end,
 			], progress)
 		"Unit":
 			var slot_id := int(_flight.get("slot_id", 1))
-			var end := Vector2(106 + (slot_id - 1) * 166, 512)
+			var end := _unit_slot_position(slot_id)
 			var final_point := end
 			if not is_slot_accepting_hit(slot_id):
 				final_point += Vector2(34, -42)
 			return _polyline_position([
-				Vector2(370, 430),
-				Vector2(292, 468),
-				Vector2(204 + float(slot_id) * 24.0, 444),
+				Vector2(370, 570),
+				Vector2(292, 640),
+				Vector2(204 + float(slot_id) * 44.0, 700),
 				final_point,
 			], progress)
 
@@ -615,13 +717,14 @@ func _resting_ball_position() -> Vector2:
 		"Pool":
 			return Vector2(128, 54)
 		"Launcher":
-			return Vector2(92, 132)
+			return _launcher_muzzle_position()
+		"Launch":
+			return _launch_slot_position(target)
 		"Tuning":
-			var tuning_index: int = max(0, int(TUNING_RESULTS.find(target)))
-			return Vector2(124 + tuning_index * 166, 352)
+			return _tuning_slot_position(target)
 		"Unit":
 			var slot_id: int = _slot_id_from_target(target)
-			return Vector2(106 + (slot_id - 1) * 166, 512)
+			return _unit_slot_position(slot_id)
 		_:
 			return Vector2(576, 208)
 
@@ -640,24 +743,41 @@ func _record_motion_sample(position: Vector2) -> void:
 		motion_trail.pop_front()
 
 
-func _record_chain_intro(chain_id: String) -> void:
+func _advance_forge(delta: float) -> void:
+	if pool_count >= POOL_CAPACITY:
+		_forge_timer_seconds = FORGE_INTERVAL_SECONDS
+		return
+
+	_forge_timer_seconds = max(0.0, _forge_timer_seconds - delta)
+	while _forge_timer_seconds <= 0.0 and pool_count < POOL_CAPACITY:
+		pool_count += 1
+		_record_event(
+			"Forge",
+			"Logic Settlement",
+			"造球器按 2.2 秒节奏补入了一颗干净球。",
+			{
+				"pool_count": pool_count,
+				"forge_interval_seconds": FORGE_INTERVAL_SECONDS,
+			},
+			_new_chain_id()
+		)
+		_forge_timer_seconds += FORGE_INTERVAL_SECONDS
+
+
+func _record_chain_intro(chain_id: String) -> bool:
 	if pool_count <= 0:
-		pool_count = 1
 		_record_event(
-			"Forge",
+			"Launcher",
 			"Logic Settlement",
-		"造球器因球池为空补入了一颗干净球。",
-			{"pool_count": pool_count},
+			"发射器空转：Pool 暂无可发射的干净球。",
+			{
+				"pool_count": pool_count,
+				"launcher_interval_seconds": AUTO_LAUNCH_INTERVAL_SECONDS,
+			},
 			chain_id
 		)
-	else:
-		_record_event(
-			"Forge",
-			"Logic Settlement",
-		"造球器维持球池供给，等待下一次发射。",
-			{"pool_count": pool_count},
-			chain_id
-		)
+		active_ball = _make_active_ball("Launcher", "Dry Fire", "Logic Settlement", chain_id)
+		return false
 
 	pool_count = max(0, pool_count - 1)
 	_record_event(
@@ -675,6 +795,7 @@ func _record_chain_intro(chain_id: String) -> void:
 		chain_id
 	)
 	active_ball = _make_active_ball("Launch", "Tuning Path", "Natural Hit", chain_id)
+	return true
 
 
 func _apply_unit_hit(slot_id: int, tuning_result: String, chain_id: String) -> Dictionary:
@@ -761,6 +882,88 @@ func _progress_for_tuning(tuning_result: String) -> int:
 			return 1
 
 
+func _launch_slot_position(launch_result: String) -> Vector2:
+	match launch_result:
+		"Tuning", "Tuning Path":
+			return _weighted_slot_position(
+				"Tuning",
+				LAUNCH_SLOT_NAMES,
+				LAUNCH_SLOT_WEIGHTS,
+				LAUNCH_SLOT_CENTER_Y
+			)
+		"Split":
+			return _weighted_slot_position(
+				"Split",
+				LAUNCH_SLOT_NAMES,
+				LAUNCH_SLOT_WEIGHTS,
+				LAUNCH_SLOT_CENTER_Y
+			)
+		"Recycle", "Miss + Recycle":
+			return _weighted_slot_position(
+				"Recycle",
+				LAUNCH_SLOT_NAMES,
+				LAUNCH_SLOT_WEIGHTS,
+				LAUNCH_SLOT_CENTER_Y
+			)
+		"Waste":
+			return _weighted_slot_position(
+				"Waste",
+				LAUNCH_SLOT_NAMES,
+				LAUNCH_SLOT_WEIGHTS,
+				LAUNCH_SLOT_CENTER_Y
+			)
+	return _weighted_slot_position("Tuning", LAUNCH_SLOT_NAMES, LAUNCH_SLOT_WEIGHTS, LAUNCH_SLOT_CENTER_Y)
+
+
+func _tuning_slot_position(tuning_result: String) -> Vector2:
+	return _weighted_slot_position(
+		tuning_result,
+		TUNING_RESULTS,
+		TUNING_SLOT_WEIGHTS,
+		TUNING_SLOT_CENTER_Y
+	)
+
+
+func _unit_slot_position(slot_id: int) -> Vector2:
+	return Vector2(106 + (slot_id - 1) * 166, UNIT_SLOT_CENTER_Y)
+
+
+func _launcher_angle_offset() -> float:
+	return sin(cannon_phase) * LAUNCHER_SWAY_RADIANS
+
+
+func _launcher_muzzle_position() -> Vector2:
+	var angle := PI * 0.5 + _launcher_angle_offset()
+	return LAUNCHER_PIVOT + Vector2(cos(angle), sin(angle)) * LAUNCHER_BARREL_LENGTH
+
+
+func _weighted_slot_position(
+	slot_name: String,
+	slot_names: Array,
+	slot_weights: Array,
+	center_y: float
+) -> Vector2:
+	var total_weight := 0.0
+	for weight in slot_weights:
+		total_weight += float(weight)
+
+	var cursor := BOARD_SLOT_X
+	for index in range(slot_names.size()):
+		var segment_width := BOARD_SLOT_WIDTH * float(slot_weights[index]) / total_weight
+		if str(slot_names[index]) == slot_name:
+			var visible_width: float = max(0.0, segment_width - BOARD_SLOT_GAP)
+			return Vector2(cursor + visible_width * 0.5, center_y)
+		cursor += segment_width
+
+	return Vector2(BOARD_SLOT_X, center_y)
+
+
+func _launch_target_label(launch_result: String) -> String:
+	if launch_result == "Tuning":
+		return "Tuning Path"
+	return launch_result
+
+
 func _tuning_logic_description(tuning_result: String) -> String:
 	match tuning_result:
 		"Prime":
@@ -791,6 +994,18 @@ func _record_event(
 	if event_log.size() > 32:
 		event_log.pop_front()
 	return event
+
+
+func _find_chain_event(chain_id: String, component: String, state: String) -> Dictionary:
+	for index in range(event_log.size() - 1, -1, -1):
+		var event: Dictionary = event_log[index]
+		if str(event.get("chain_id", "")) != chain_id:
+			continue
+		if str(event.get("component", "")) != component:
+			continue
+		if str(event.get("state", "")) == state:
+			return event
+	return {}
 
 
 func _make_active_ball(board: String, target: String, state: String, chain_id: String) -> Dictionary:
