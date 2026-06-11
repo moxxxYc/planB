@@ -1,17 +1,15 @@
 # planB
 
-planB 当前是文档主导的 Godot MVP 项目。正式设计来源仍在根目录和 `docs/` 下；`mvp/` 是当前 Godot MVP v0 实现目录，但不替代设计文档的权威性。
+planB 当前是文档主导、Godot 实现已重新启动的 MVP 项目。正式设计来源仍在根目录和 `docs/` 下；原 `mvp/` Godot MVP v0 实现已在 2026-06-11 归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`。
 
-当前阶段：Phase 1 Toolchain Alignment，目标是在进入 MVP Readability Sprint 前收束 AI 开发入口、验证命令和工具职责；本阶段不扩玩法、不改核心 canon、不替换工具链。
+当前阶段：MVP v0 M0-M1 活动实现。当前活动 Godot 工程位于 `godot/`，当前验证命令是 `bash tools/verify_godot.sh`。M0-M1 之外的新里程碑、范围扩展或玩法 canon 变更，必须先从正式文档重新写有范围约束的实现计划，并等待用户明确确认。
 
-## MVP 开发目录
+## MVP 实现状态
 
-- `mvp/`：MVP v0 的当前实现目录。MVP 阶段的工程代码、场景、配置和验证入口都应放在这个目录下（Godot 工程根 = `mvp/`，Godot 4.6）。
-- `mvp/AGENTS.md`：`mvp/` 实现目录的工程规则（vibe coding 规范），只管怎么改代码，不是设计权威。
-- `mvp/docs/agent/`：分层工程文档（项目结构、场景架构、GDScript、Signal/Autoload、玩法实现模式、平台导出性能、资产、测试验证、AI 执行协议）。
-- `mvp/tools/verify_all.sh`：从仓库根目录运行当前 Godot MVP 核心验证的统一入口。
-- `mvp/tools/verify_godot.sh`：Godot headless 烟测兼容入口，可用于快速回归现有 harness。
-- `mvp/.gitkeep`：空目录占位文件，便于在尚未创建工程文件前提交目录。
+- `godot/`：当前活动 Godot MVP 工程。M0 建立 fresh project、Main Menu 和验证入口；M1 建立 Battle 1 vertical，证明机器结果到 Queue 再到选中路线出兵口的基础因果链。
+- `tools/verify_godot.sh`：当前主验证入口。
+- `mvp/`：旧实现路径已归档，不再作为活动实现或当前 build artifact。
+- `docs/archive/implementations/godot-mvp-v0-20260611/`：已归档的旧 Godot MVP v0 实现。它不是当前 build artifact，不是验证命令来源，也不能作为新实现的默认结构依据。
 - `docs/archive/prototypes/` 不是当前实现来源，不要从旧 prototype 恢复代码或验证假设。
 
 ## 当前文档
@@ -38,6 +36,7 @@ planB 当前是文档主导的 Godot MVP 项目。正式设计来源仍在根目
 ## 归档内容
 
 - `docs/archive/`：旧方向、过时计划、历史 skill 产物和旧实现假设的归档目录。
+- `docs/archive/implementations/godot-mvp-v0-20260611/`：2026-06-11 归档的旧 Godot MVP v0 实现。
 
 归档内容不是当前正式设计，除非被上述正式文档明确重新提升。
 `docs/archive/prototypes/three_axis_readability_battle_lab/` 已完全过期，不再作为构建、验证、评审或路由依据。
@@ -52,9 +51,9 @@ planB 当前是文档主导的 Godot MVP 项目。正式设计来源仍在根目
 
 ## 当前状态
 
-- 仓库已有 `mvp/` Godot MVP v0 实现目录；实现目录不是设计 canon，本 README 和 `docs/` 仍是设计来源。
+- 原 `mvp/` Godot MVP v0 实现目录已归档；当前活动实现目录是 `godot/`。
 - 当前 MVP 工程目标是 Godot 4.6、GDScript、Compatibility / `gl_compatibility` 渲染路径。
-- 当前主验证命令是从仓库根目录运行 `bash mvp/tools/verify_all.sh`，可用 `GODOT_BIN=/path/to/godot` 覆盖 Godot 可执行文件。
+- 当前可运行的 Godot MVP 主验证命令是 `bash tools/verify_godot.sh`。归档目录里的旧验证脚本只作历史背景，不作为当前验收入口。
 - 旧 Web MVP 和旧 Godot Battle Lab 假设都不能直接恢复为当前设计。
 - 旧 Godot prototype 已归档，不需要也不应该参与未来上下文扫描。
 - 正式机器术语是 `Launch / Tuning / Unit`。

@@ -1,0 +1,242 @@
+[gd_scene load_steps=6 format=3 uid="uid://planb_m1_battle_one_vertical"]
+
+[ext_resource type="Script" path="res://scripts/run/battle_one_vertical.gd" id="1_battle_script"]
+[ext_resource type="Script" path="res://scripts/ui/machine_strip_view.gd" id="2_machine_view"]
+[ext_resource type="Script" path="res://scripts/ui/queue_bridge_view.gd" id="3_bridge_view"]
+[ext_resource type="Script" path="res://scripts/ui/battlefield_view.gd" id="4_battlefield_view"]
+[ext_resource type="Script" path="res://scripts/ui/machine_board_view.gd" id="5_machine_board_view"]
+
+[node name="BattleOneVertical" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_battle_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0901961, 0.101961, 0.0941176, 1)
+
+[node name="SafeArea" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 18
+
+[node name="RootRows" type="VBoxContainer" parent="SafeArea"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="StatusBar" type="HBoxContainer" parent="SafeArea/RootRows"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="StatusLabel" type="Label" parent="SafeArea/RootRows/StatusBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "战斗 1"
+
+[node name="InputHintLabel" type="Label" parent="SafeArea/RootRows/StatusBar"]
+layout_mode = 2
+text = "点击路线，或按 A / S / D 切换部署路线"
+horizontal_alignment = 2
+
+[node name="MainColumns" type="HBoxContainer" parent="SafeArea/RootRows"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="MachinePanel" type="PanelContainer" parent="SafeArea/RootRows/MainColumns"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 38.0
+custom_minimum_size = Vector2(380, 0)
+
+[node name="MachineStripView" type="VBoxContainer" parent="SafeArea/RootRows/MainColumns/MachinePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+script = ExtResource("2_machine_view")
+
+[node name="MachineTitle" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+layout_mode = 2
+text = "三仓球机 | Launch / Tuning / Unit"
+
+[node name="MachineBoardView" type="Control" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 600)
+script = ExtResource("5_machine_board_view")
+
+[node name="ForgeLabel" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Forge 造球 0% -> Pool"
+
+[node name="ForgeProgressBar" type="ProgressBar" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+unique_name_in_owner = true
+layout_mode = 2
+max_value = 100.0
+show_percentage = false
+
+[node name="LauncherLabel" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Launcher 发射 0% -> Tuning"
+
+[node name="LauncherProgressBar" type="ProgressBar" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+unique_name_in_owner = true
+layout_mode = 2
+max_value = 100.0
+show_percentage = false
+
+[node name="PoolLabel" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Pool 球池 0 / 5 颗净球"
+
+[node name="TuningLabel" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Tuning 槽：Gate / Prime / Echo / Surge"
+
+[node name="UnitLabel" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Unit 槽：S1 0/3 | S2 0/5 | S3 0/8 | S4 0/12"
+
+[node name="QueueHintLabel" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Queue 待部署条目：0"
+
+[node name="MachineLogTitle" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+layout_mode = 2
+text = "机器读法"
+
+[node name="MachineLogLabel" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 1
+custom_minimum_size = Vector2(0, 64)
+text = ""
+
+[node name="BridgePanel" type="PanelContainer" parent="SafeArea/RootRows/MainColumns"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 14.0
+custom_minimum_size = Vector2(260, 0)
+
+[node name="QueueBridgeView" type="VBoxContainer" parent="SafeArea/RootRows/MainColumns/BridgePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+script = ExtResource("3_bridge_view")
+
+[node name="BridgeTitle" type="Label" parent="SafeArea/RootRows/MainColumns/BridgePanel/QueueBridgeView"]
+layout_mode = 2
+text = "Queue Bridge 队列桥"
+
+[node name="LaneLabel" type="Label" parent="SafeArea/RootRows/MainColumns/BridgePanel/QueueBridgeView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "部署路线：中路"
+
+[node name="QueueLabel" type="Label" parent="SafeArea/RootRows/MainColumns/BridgePanel/QueueBridgeView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Queue 条目：0"
+
+[node name="QueuePreviewLabel" type="Label" parent="SafeArea/RootRows/MainColumns/BridgePanel/QueueBridgeView"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+text = "预览：等待 Unit 槽满后生成 Queue 条目。"
+
+[node name="BridgeLabel" type="Label" parent="SafeArea/RootRows/MainColumns/BridgePanel/QueueBridgeView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Queue Bridge -> 中路出兵口"
+
+[node name="SpawnPortLabel" type="Label" parent="SafeArea/RootRows/MainColumns/BridgePanel/QueueBridgeView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "连线：Queue 队首 ===> 中路玩家侧出兵口"
+
+[node name="BattlefieldPanel" type="PanelContainer" parent="SafeArea/RootRows/MainColumns"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 48.0
+custom_minimum_size = Vector2(480, 0)
+
+[node name="BattlefieldView" type="VBoxContainer" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+script = ExtResource("4_battlefield_view")
+
+[node name="BattlefieldTitle" type="Label" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
+layout_mode = 2
+text = "三路战场"
+
+[node name="LaneHelpLabel" type="Label" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
+layout_mode = 2
+text = "直接点击左路 / 中路 / 右路。点击只改变后续部署路线。"
+
+[node name="LeftLane" type="Button" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 126)
+text = "[ 左路出兵口 ] ---- [ 路线门 ]\n点击后续 Queue 将走这一路\n单位：0"
+
+[node name="MidLane" type="Button" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 126)
+text = "[[ 中路出兵口 ]] ==> [[ 路线门 ]]\n选中路线 | 双轨生效\n单位：0"
+
+[node name="RightLane" type="Button" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 126)
+text = "[ 右路出兵口 ] ---- [ 路线门 ]\n点击后续 Queue 将走这一路\n单位：0"
+
+[node name="BattleSummaryLabel" type="Label" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "己方单位 | 左路 0 | 中路 0 | 右路 0"
+
+[node name="LastDeployLabel" type="Label" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "最近部署：暂无"

@@ -1,8 +1,12 @@
 ## 项目状态
 
-当前仓库是文档主导的 Godot MVP 项目。`mvp/` 是当前 Godot MVP v0 实现目录；正式设计来源仍在根目录和 `docs/` 下。旧 Web MVP、旧 Battle Lab、归档 prototype、归档生成资源、旧包脚本、旧验证探针和项目内旧本地技能在 2026-06-02 后不再作为当前方向的依据。
+当前仓库是文档主导的 Godot MVP 项目。原 `mvp/` Godot MVP v0 实现已在 2026-06-11 归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`；当前活动 Godot 实现目录是 `godot/`，用于经确认的 MVP v0 M0-M1 重新实现。正式设计来源仍在根目录和 `docs/` 下。旧 Web MVP、旧 Battle Lab、归档 prototype、归档实现、归档生成资源、旧包脚本、旧验证探针和项目内旧本地技能不再作为当前方向的依据。
 
-当前阶段是 Phase 1 Toolchain Alignment：只收束 AI 开发入口、验证命令和工具职责；后续才进入 MVP Readability Sprint。当前 Godot 工程目标为 Godot 4.6、GDScript、Compatibility / `gl_compatibility`。
+当前阶段是 MVP v0 M0-M1 活动实现：`godot/` 承载新工程、Battle 1 vertical 和当前验证入口。M0-M1 之后的新里程碑、范围扩展、玩法 canon 变更或新系统开发，必须先从当前正式文档写有范围约束的实现计划，并等待用户明确确认。Godot 工程目标为 Godot 4.6、GDScript、Compatibility / `gl_compatibility`，除非正式文档另行确认。
+
+当前验证命令：
+
+- `bash tools/verify_godot.sh`
 
 当前正式文档：
 
@@ -28,6 +32,8 @@
 
 `docs/archive/` 是旧方向、过时计划、历史 skill 产物、旧 prototype 和旧实现假设的归档目录。除非被正式文档明确引用为当前规则，否则只当作背景材料。
 
+`docs/archive/implementations/godot-mvp-v0-20260611/` 是已归档的旧 Godot MVP v0 实现。不要把它当作当前 build artifact、验证命令来源或新实现结构依据；只有用户明确要求考古时才读取。
+
 `docs/archive/prototypes/three_axis_readability_battle_lab/` 已完全过期。不要把它当作当前 build artifact，不要用它触发 `BUILDING` / `SHIPPING` 路由，也不要为了判断当前设计主动读取它。
 
 ## 协作要求
@@ -35,11 +41,12 @@
 要求保持客观公正，不要献媚，不要敷衍。
 
 - 不要发明缺失玩法、实现状态、内容表或生产进度。
+- 除非用户明确指定其他语言，游戏内玩家可见文字默认使用中文；代码标识、资源路径、Godot class 名、验证脚本错误和内部日志可以保留英文。
 - 未定事项必须标记为未定，不要用合理猜测补齐。
 - 不要恢复旧 Web MVP 或旧 Battle Lab 的实现假设。
 - 不要把归档 prototype 当作实现证明、验证命令来源或当前计划输入。
-- 如果未来进入实现，必须从当前正式文档重新写有范围约束的实现计划。
-- 任何真正开发前必须先获得用户明确确认。未经确认，不得创建、修改或恢复代码、资源、构建脚本、验证脚本、Godot/Web prototype 或其他实现文件；只能读取上下文、分析问题、提出候选方案、写用户明确要求的文档约束。
+- 如果进入新的实现里程碑或扩展 M0-M1 之外的范围，必须从当前正式文档重新写有范围约束的实现计划。
+- 任何新里程碑、玩法 canon 变更或范围扩展开发前必须先获得用户明确确认。未经确认，不得创建、修改或恢复 M0-M1 范围之外的代码、资源、构建脚本、验证脚本、Godot/Web prototype 或其他实现文件；只能读取上下文、分析问题、提出候选方案、写用户明确要求的文档约束。
 - 优先长期清晰的项目结构，不为了表面连续性保留错误旧术语。
 
 ## 游戏设计技能和原型流程要求
@@ -76,7 +83,7 @@
 - `docs/DESIGN.md`：MVP v0 美术风格、资源生产约束和视觉反馈规范；不改写玩法规则。
 - `docs/PROGRESS.md`：近期决策日志，不是实现证明。
 
-候选草案不参与文档权威顺序，除非用户确认后再提升为正式规则。MVP v0 实现输入可以指导当前 `mvp/` 构建，但不自动提升为长期 canon。
+候选草案不参与文档权威顺序，除非用户确认后再提升为正式规则。MVP v0 实现输入可以指导未来重新实现计划，但不自动提升为长期 canon。
 
 如果文档冲突，先以更具体的规则文档为准，再更新 GDD 和 PROGRESS 消除冲突。
 
@@ -106,6 +113,6 @@
 - 奖励、商店、Gold、休整或中立修正候选变更：更新 `docs/rewards-economy.md` 和 `docs/PROGRESS.md`，精确 playtest 后最终平衡仍需标明未定。
 - MVP 范围变更：更新 `docs/mvp-scope.md` 和 `docs/PROGRESS.md`。
 - 美术风格、资源生产或视觉反馈规范变更：更新 `docs/DESIGN.md` 和 `docs/PROGRESS.md`。
-- 实现工作开始前：先创建新的实现计划，不引用已删除实现；计划必须等待用户明确确认后才能执行。
+- 实现工作开始前：先创建新的实现计划，不引用已归档实现；计划必须等待用户明确确认后才能执行。
 - 如果发现归档 prototype 或归档实现文件，默认忽略；只有用户明确要求考古时才读取。
-- 当前仓库没有 npm 命令或通用构建命令；Godot MVP 核心验证从仓库根目录运行 `bash mvp/tools/verify_all.sh`，可用 `GODOT_BIN=/path/to/godot` 指定 Godot 4.6 可执行文件。
+- 当前活动 Godot MVP 工程位于 `godot/`，当前主验证命令是 `bash tools/verify_godot.sh`。归档目录里的旧验证脚本只作历史背景，不作为当前验收入口。

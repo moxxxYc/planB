@@ -1,5 +1,26 @@
 .DS_Store
 
-# Godot 本地/导入缓存（按 Godot 4 惯例：忽略 .godot/，但提交各资源旁的 *.import）
+# Godot editor/import cache. Commit resource-side *.import files when real assets exist.
 .godot/
+godot/.godot/
 *.translation
+
+# Godot export/build artifacts
+export/
+builds/
+*.apk
+*.aab
+*.ipa
+*.exe
+*.x86_64
+*.x86_32
+*.arm32
+*.arm64
+*.pck
+*.zip
+
+# IDE and OS noise
+.vscode/settings.json
+.idea/
+*.swp
+Thumbs.db

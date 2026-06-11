@@ -172,6 +172,12 @@ Shape tokens：
 
 HUD 只服务 1 秒扫视，不展示完整未来模拟。
 
+语言约束：
+
+- 除非用户明确指定其他语言，游戏内玩家可见文字默认使用中文。
+- `Launch / Tuning / Unit`、`Gate / Prime / Echo / Surge`、`Queue`、`Deploy Lane` 等正式机器术语可以保留英文标签，但解释性 UI、按钮、提示、状态、结果页和教程文案默认中文。
+- 代码标识、资源路径、Godot class 名、验证脚本错误和内部日志不属于玩家可见文字，不强制中文化。
+
 ### 5.1 Battle Screen Layout
 
 MVP v0 战斗主画面采用三段结构：

@@ -1,7 +1,7 @@
 # 进度与决策日志
 
-**最后更新：** 2026-06-10
-**仓库状态：** 文档主导，MVP v0 实现已在 `mvp/` 启动；本文记录设计状态和决策日志，不作为代码状态证明。
+**最后更新：** 2026-06-11
+**仓库状态：** 文档主导；原 `mvp/` Godot MVP v0 实现已归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`，当前活动 Godot 实现目录为 `godot/`，M0-M1 已进入活动实现。本文记录设计状态和决策日志，不作为代码状态证明。
 
 ## 当前正式文档
 
@@ -33,7 +33,9 @@
 
 ## 当前总状态
 
-- 仓库已经从纯文档态进入“文档主导 + Godot MVP v0 已启动”阶段；`mvp/` 是当前 Godot MVP v0 实现目录，但不替代 `docs/` 的设计权威。
+- 仓库当前处于“文档主导 + MVP v0 M0-M1 活动实现”阶段；原 `mvp/` Godot MVP v0 实现已归档，当前活动实现目录为 `godot/`。
+- M0-M1 之外的新里程碑、范围扩展或玩法 canon 变更，必须从当前正式文档重新写有范围约束的实现计划，并等待用户明确确认后再开始。
+- 当前可运行的 Godot MVP 主验证命令是 `bash tools/verify_godot.sh`；归档目录里的旧验证脚本只作历史背景，不作为当前验收入口。
 - 旧 Web MVP、旧脚本、旧验证命令和旧实现假设都不再作为当前设计依据。
 - 旧 Godot prototype 已归档到 `docs/archive/prototypes/`，完全过期，不再作为 build、验证、评审或路由信号。
 - 当前正在从基础机制整理转入 Hive 第一种族设计；`Caste Hive` 方向已确认，单位工作名、占位剪影、轻行为和第一版攻击几何已定，两个 Guardian 的身份、轴倾向、技能结构、技能方向、战术技能目标优先级和第一版战术技能范围已定，最终美术资源和最终数值仍未定。
@@ -178,7 +180,17 @@
   - 路线危险分 0-3 四档：安全、压力、破门风险、漏兵/入侵。
   - 危险提示只来自可见战场状态和已公开波次/反制预警，不读隐藏压力值，不自动切路。
 - 将根目录 `prototype/three_axis_readability_battle_lab/` 移入 `docs/archive/prototypes/`。
+
+## 2026-06-11
+
+- 将原 `mvp/` Godot MVP v0 实现整体归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`。
+- 归档当时确认没有活动 Godot 实现目录；归档实现不再作为当前 build artifact、验证命令来源或新实现结构依据。
+- 重新实现必须从当前正式文档重新创建有范围约束的实现计划，并等待用户明确确认；M0-M1 已按该流程确认后改走新的 `godot/` 活动工程。
 - 确认该旧 prototype 完全过期，后续不再读取它来判断当前状态、设计方向或实现计划。
+- 确认游戏内玩家可见文字默认中文，除非用户明确指定其他语言；正式机器术语可以保留英文标签，解释性 UI、按钮、提示、状态、结果页和教程文案默认中文。
+- 经用户确认后，MVP v0 M0-M1 重新实现从新的 `godot/` 活动工程开始，不从归档 `mvp/` 恢复。
+- M0 当前验证入口为 `bash tools/verify_godot.sh`，工程目标为 Godot 4.6、GDScript、Compatibility / `gl_compatibility`。
+- M1 当前范围为 Battle 1 vertical：三板机器显示、Ball result -> Unit progress -> Queue、Queue Bridge -> selected spawn port、直接点击路线、Battle 1 胜 / 败路径。
 
 ## 2026-06-05
 
