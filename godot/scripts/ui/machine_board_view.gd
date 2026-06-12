@@ -100,6 +100,7 @@ func render(machine, p_counter_target_component: String = "") -> void:
 func get_visual_contract_summary() -> Dictionary:
 	_ensure_physics_board()
 	var board_contract: Dictionary = physics_board.get_runtime_contract()
+	_apply_exposure_contract(board_contract)
 	var physics_landing_count_value: int = int(board_contract.get("physics_landing_count", physics_landing_count))
 	var last_result_variant: Variant = board_contract.get("last_physics_result", last_physics_result)
 	var last_result_source: String = ""
@@ -126,10 +127,10 @@ func get_visual_contract_summary() -> Dictionary:
 		"physics_queue_chain_count": physics_queue_chain_count,
 		"last_physics_queue_chain": last_physics_queue_chain.duplicate(true),
 		"machine_chain_sample": last_machine_chain_sample.duplicate(true),
-		"exposure_gate_snapshot": exposure_gate_snapshot.duplicate(true),
-		"blocked_bounce_count": blocked_bounce_count,
-		"last_blocked_bounce": last_blocked_bounce.duplicate(true),
-		"has_unit_gate_blockers": has_unit_gate_blockers,
+		"exposure_gate_snapshot": (board_contract.get("exposure_gate_snapshot", {}) as Dictionary).duplicate(true),
+		"blocked_bounce_count": int(board_contract.get("blocked_bounce_count", 0)),
+		"last_blocked_bounce": (board_contract.get("last_blocked_bounce", {}) as Dictionary).duplicate(true),
+		"has_unit_gate_blockers": bool(board_contract.get("has_unit_gate_blockers", false)),
 		"pool_count": pool_count,
 		"queue_count": queue_count,
 		"active_board_index": active_board_index,
@@ -271,6 +272,9 @@ func _update_exposure_contract_from_physics_board() -> void:
 	if physics_board == null or not is_instance_valid(physics_board):
 		return
 	var board_contract: Dictionary = physics_board.get_runtime_contract()
+	_apply_exposure_contract(board_contract)
+
+func _apply_exposure_contract(board_contract: Dictionary) -> void:
 	exposure_gate_snapshot = (board_contract.get("exposure_gate_snapshot", {}) as Dictionary).duplicate(true)
 	blocked_bounce_count = int(board_contract.get("blocked_bounce_count", 0))
 	var bounce_variant: Variant = board_contract.get("last_blocked_bounce", {})

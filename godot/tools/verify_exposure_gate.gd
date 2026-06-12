@@ -1,12 +1,17 @@
 extends SceneTree
 
 const EXPOSURE_STATE_PATH: String = "res://scripts/model/machine/machine_slot_exposure_state.gd"
+const MACHINE_SIMULATOR_PATH: String = "res://scripts/model/machine/machine_simulator.gd"
+const PHYSICS_BOARD_PATH: String = "res://scripts/ui/machine_physics_board_view.gd"
 const RUN_SCENE_PATH: String = "res://scenes/run/mvp_run_session.tscn"
 
 var failures: Array[String] = []
 
 func _initialize() -> void:
 	_verify_exposure_state_model()
+	_verify_exposure_state_assignment_contract()
+	_verify_blocked_bounce_escape_contract()
+	_verify_simulator_blocked_guard_terminates_chain()
 	_verify_battle_one_learning_record()
 	_finish()
 
@@ -38,6 +43,93 @@ func _verify_exposure_state_model() -> void:
 		failures.append("Slot 2 must be fully exposed by 24s.")
 	if bool(exposure.call("is_slot_open_for_progress", 4, 71.9)):
 		failures.append("Slot 4 must not accept progress before 72s exposure start.")
+
+func _verify_exposure_state_assignment_contract() -> void:
+	var machine_script: Script = load(MACHINE_SIMULATOR_PATH) as Script
+	if machine_script == null:
+		failures.append("MachineSimulator script failed to load.")
+		return
+	var machine: Object = machine_script.new() as Object
+	if machine == null:
+		failures.append("MachineSimulator failed to instantiate.")
+		return
+	if not _require_object_methods(machine, [
+		"get_exposure_state",
+		"set_exposure_state",
+	]):
+		return
+	var original_state: Variant = machine.call("get_exposure_state")
+	machine.call("set_exposure_state", RefCounted.new())
+	if machine.call("get_exposure_state") != original_state:
+		failures.append("MachineSimulator.set_exposure_state() must reject objects without the exposure-state contract.")
+
+	var board_script: Script = load(PHYSICS_BOARD_PATH) as Script
+	if board_script == null:
+		failures.append("MachinePhysicsBoardView script failed to load.")
+		return
+	var board: Node = board_script.new() as Node
+	if board == null:
+		failures.append("MachinePhysicsBoardView failed to instantiate.")
+		return
+	if not _require_node_methods(board, ["set_exposure_state"]):
+		board.free()
+		return
+	if not board.has_method("_has_exposure_state_contract"):
+		failures.append("MachinePhysicsBoardView must expose an internal exposure-state contract validator.")
+	else:
+		if bool(board.call("_has_exposure_state_contract", RefCounted.new())):
+			failures.append("MachinePhysicsBoardView must reject exposure states without required methods.")
+	board.free()
+
+func _verify_blocked_bounce_escape_contract() -> void:
+	var board_script: Script = load(PHYSICS_BOARD_PATH) as Script
+	if board_script == null:
+		failures.append("MachinePhysicsBoardView script failed to load.")
+		return
+	var board: Node = board_script.new() as Node
+	if board == null:
+		failures.append("MachinePhysicsBoardView failed to instantiate.")
+		return
+	root.add_child(board)
+	board.call("set_battle_elapsed", 13.0)
+	if not board.has_method("_open_unit_slot_for_bounce"):
+		failures.append("MachinePhysicsBoardView missing blocked-bounce retarget helper.")
+	else:
+		var target_slot_id: int = int(board.call("_open_unit_slot_for_bounce", 2, 13.0))
+		if target_slot_id == 2:
+			failures.append("Narrowly exposed S2 must not retarget a blocked bounce back into S2.")
+	if not board.has_method("_max_blocked_bounce_count"):
+		failures.append("MachinePhysicsBoardView must expose a per-ball blocked-bounce cap.")
+	else:
+		if int(board.call("_max_blocked_bounce_count")) <= 0:
+			failures.append("MachinePhysicsBoardView blocked-bounce cap must be positive.")
+	root.remove_child(board)
+	board.free()
+
+func _verify_simulator_blocked_guard_terminates_chain() -> void:
+	var machine_script: Script = load(MACHINE_SIMULATOR_PATH) as Script
+	if machine_script == null:
+		failures.append("MachineSimulator script failed to load.")
+		return
+	var machine: Object = machine_script.new() as Object
+	if machine == null:
+		failures.append("MachineSimulator failed to instantiate.")
+		return
+	if not _require_object_methods(machine, [
+		"apply_physics_result",
+		"get_machine_chain_sample",
+	]):
+		return
+	machine.call("set_battle_elapsed", 0.0)
+	machine.call("apply_physics_result", MachinePhysicsResult.make("Tuning", "Gate", 0, 1, "clean", "physics", "blocked_guard_chain", 0.0))
+	machine.call("apply_physics_result", MachinePhysicsResult.make("Unit", "UnitHit", 2, 0, "clean", "physics", "blocked_guard_chain", 0.0))
+	var chain_sample: Dictionary = machine.call("get_machine_chain_sample") as Dictionary
+	var chain_text: String = JSON.stringify(chain_sample)
+	if not chain_text.contains("ExposureBlocked"):
+		failures.append("Simulator blocked Unit guard must record terminal ExposureBlocked telemetry.")
+	var pending_variant: Variant = machine.get("_pending_physics_chains")
+	if pending_variant is Dictionary and (pending_variant as Dictionary).has("blocked_guard_chain"):
+		failures.append("Simulator blocked Unit guard must erase the pending physics chain.")
 
 func _verify_battle_one_learning_record() -> void:
 	var scene: PackedScene = load(RUN_SCENE_PATH)

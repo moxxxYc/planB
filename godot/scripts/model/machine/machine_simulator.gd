@@ -47,7 +47,7 @@ var _last_machine_chain_sample: Dictionary = {}
 var _physics_queue_chains: Array[Dictionary] = []
 
 func set_exposure_state(p_exposure_state: RefCounted) -> void:
-	if p_exposure_state == null:
+	if not _has_exposure_state_contract(p_exposure_state):
 		return
 	exposure_state = p_exposure_state
 
@@ -154,11 +154,28 @@ func advance_step(delta: float) -> Array[Dictionary]:
 func apply_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
 	if result == null:
 		return []
+	if result.component == "Unit" and result.result_id == "ExposureBlocked":
+		_register_physics_result(result)
+		event_log.append("Unit：S%d 暴露闸门挡开，球未产生 Unit 进度" % clampi(result.slot_id, 1, 4))
+		_commit_queue_chain_if_needed(result, [])
+		return []
 	if result.component == "Unit" and exposure_state != null:
 		var guarded_slot_id: int = clampi(result.slot_id, 1, 4)
 		var guard_elapsed: float = maxf(battle_elapsed, result.battle_elapsed)
 		if not bool(exposure_state.call("is_slot_open_for_progress", guarded_slot_id, guard_elapsed)):
+			var blocked_result := MachinePhysicsResult.make(
+				"Unit",
+				"ExposureBlocked",
+				guarded_slot_id,
+				0,
+				result.ball_kind,
+				result.source,
+				result.chain_id,
+				guard_elapsed
+			)
+			_register_physics_result(blocked_result)
 			event_log.append("Unit：S%d 暴露闸门未开启，球被挡开" % guarded_slot_id)
+			_commit_queue_chain_if_needed(blocked_result, [])
 			return []
 	_register_physics_result(result)
 	var produced_entries: Array[Dictionary] = []
@@ -623,6 +640,20 @@ func _erase_pending_chain(chain_id: String) -> void:
 
 func _is_staged_physics_source(source: String) -> bool:
 	return source == "physics" or source == "verifier_seed"
+
+func _has_exposure_state_contract(candidate: Object) -> bool:
+	if candidate == null:
+		return false
+	for method_name: String in [
+		"get_exposure_ratio",
+		"is_slot_open_for_progress",
+		"is_slot_fully_exposed",
+		"snapshot",
+		"lowest_progress_legal_slot",
+	]:
+		if not candidate.has_method(method_name):
+			return false
+	return true
 
 func _value_for_tuning_result(result: MachinePhysicsResult) -> int:
 	var value: int = maxi(1, result.value)

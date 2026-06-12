@@ -18,6 +18,8 @@ const RETIRED_BALL_DWELL_SECONDS: float = 0.5
 const MAX_RETIRED_BALLS: int = 4
 const UNIT_GATE_PLATE_EXTRA_HEIGHT: float = 18.0
 const UNIT_GATE_MIN_COLLISION_WIDTH: float = 1.0
+const UNIT_GATE_BOUNCE_MARGIN: float = 4.0
+const MAX_BLOCKED_BOUNCES_PER_BALL: int = 3
 
 var active_ball: RigidBody2D = null
 var physics_landing_count: int = 0
@@ -52,7 +54,7 @@ func launch_ball(ball: Dictionary, battle_elapsed: float) -> void:
 	_place_body_for_stage(body, "Launch", battle_elapsed)
 
 func set_exposure_state(exposure_state: RefCounted) -> void:
-	if exposure_state == null:
+	if not _has_exposure_state_contract(exposure_state):
 		return
 	_exposure_state = exposure_state
 	_update_unit_gate_blockers()
@@ -414,8 +416,11 @@ func _on_bin_body_entered(body: Node2D, bin: Area2D) -> void:
 	rigid_body.set_meta("battle_elapsed", _battle_elapsed)
 	rigid_body.set_meta("resolving_stage", true)
 	if bin_stage == "Unit" and _is_unit_gate_blocking_contact(rigid_body, bin):
-		_record_blocked_unit_bounce(rigid_body, bin)
-		call_deferred("_bounce_body_from_blocked_unit_gate", rigid_body, bin)
+		var bounce_record: Dictionary = _record_blocked_unit_bounce(rigid_body, bin)
+		if bool(bounce_record.get("terminal", false)):
+			call_deferred("_retire_body_after_blocked_unit_gate", rigid_body)
+		else:
+			call_deferred("_bounce_body_from_blocked_unit_gate", rigid_body, bin)
 		return
 	var result: MachinePhysicsResult = _result_from_bin(rigid_body, bin)
 	_record_landing(result)
@@ -438,12 +443,14 @@ func _is_unit_gate_blocking_contact(body: RigidBody2D, bin: Area2D) -> bool:
 	var exposed_right: float = slot_left + bin_size.x * ratio
 	return body.global_position.x > exposed_right
 
-func _record_blocked_unit_bounce(body: RigidBody2D, bin: Area2D) -> void:
+func _record_blocked_unit_bounce(body: RigidBody2D, bin: Area2D) -> Dictionary:
 	var slot_id: int = int(bin.get_meta("slot_id"))
 	var battle_elapsed: float = float(body.get_meta("battle_elapsed", _battle_elapsed))
 	var target_slot_id: int = _open_unit_slot_for_bounce(slot_id, battle_elapsed)
 	var ratio: float = _slot_exposure_ratio(slot_id, battle_elapsed)
-	var message: String = "Unit：S%d 暴露闸门挡开，球转向 S%d" % [slot_id, target_slot_id]
+	var per_ball_bounce_count: int = int(body.get_meta("blocked_bounce_count", 0)) + 1
+	var terminal: bool = per_ball_bounce_count >= MAX_BLOCKED_BOUNCES_PER_BALL
+	var message: String = "Unit：S%d 暴露闸门挡开，球终止" % slot_id if terminal else "Unit：S%d 暴露闸门挡开，球转向 S%d" % [slot_id, target_slot_id]
 	blocked_bounce_count += 1
 	last_blocked_bounce = {
 		"component": "Unit",
@@ -452,12 +459,18 @@ func _record_blocked_unit_bounce(body: RigidBody2D, bin: Area2D) -> void:
 		"target_slot_id": target_slot_id,
 		"battle_elapsed": battle_elapsed,
 		"exposure_ratio": ratio,
+		"per_ball_bounce_count": per_ball_bounce_count,
+		"max_blocked_bounces": MAX_BLOCKED_BOUNCES_PER_BALL,
+		"terminal": terminal,
 		"source": "physics",
 		"chain_id": String(body.get_meta("chain_id", "")),
 		"message": message,
 	}
+	body.set_meta("blocked_bounce_count", per_ball_bounce_count)
+	body.set_meta("last_blocked_slot_id", slot_id)
 	body.set_meta("blocked_bounce_target_slot_id", target_slot_id)
 	body.set_meta("last_blocked_bounce_message", message)
+	return last_blocked_bounce.duplicate(true)
 
 func _bounce_body_from_blocked_unit_gate(body: RigidBody2D, _bin: Area2D) -> void:
 	if not is_instance_valid(body):
@@ -474,6 +487,26 @@ func _bounce_body_from_blocked_unit_gate(body: RigidBody2D, _bin: Area2D) -> voi
 	body.freeze = false
 	body.sleeping = false
 	body.reset_physics_interpolation()
+
+func _retire_body_after_blocked_unit_gate(body: RigidBody2D) -> void:
+	if not is_instance_valid(body):
+		return
+	var slot_id: int = int(body.get_meta("last_blocked_slot_id", 0))
+	if slot_id <= 0:
+		slot_id = int(body.get_meta("blocked_bounce_target_slot_id", 1))
+	var result := MachinePhysicsResult.make(
+		"Unit",
+		"ExposureBlocked",
+		clampi(slot_id, 1, 4),
+		0,
+		String(body.get_meta("ball_kind", "clean")),
+		"physics",
+		String(body.get_meta("chain_id", "")),
+		float(body.get_meta("battle_elapsed", _battle_elapsed))
+	)
+	_record_landing(result)
+	landing_resolved.emit(result)
+	_retire_body(body)
 
 func _result_from_bin(body: RigidBody2D, bin: Area2D) -> MachinePhysicsResult:
 	var stage: String = String(bin.get_meta("stage"))
@@ -640,6 +673,23 @@ func _has_unit_gate_blockers() -> bool:
 			return false
 	return true
 
+func _max_blocked_bounce_count() -> int:
+	return MAX_BLOCKED_BOUNCES_PER_BALL
+
+func _has_exposure_state_contract(candidate: Object) -> bool:
+	if candidate == null:
+		return false
+	for method_name: String in [
+		"get_exposure_ratio",
+		"is_slot_open_for_progress",
+		"is_slot_fully_exposed",
+		"snapshot",
+		"lowest_progress_legal_slot",
+	]:
+		if not candidate.has_method(method_name):
+			return false
+	return true
+
 func _exposure_snapshot(battle_elapsed: float) -> Dictionary:
 	if _exposure_state == null:
 		return {}
@@ -651,12 +701,13 @@ func _slot_exposure_ratio(slot_id: int, battle_elapsed: float) -> float:
 	return float(_exposure_state.call("get_exposure_ratio", slot_id, battle_elapsed))
 
 func _open_unit_slot_for_bounce(blocked_slot_id: int, battle_elapsed: float) -> int:
-	if _exposure_state != null and bool(_exposure_state.call("is_slot_open_for_progress", blocked_slot_id, battle_elapsed)) and _slot_exposure_ratio(blocked_slot_id, battle_elapsed) > 0.0:
+	_rebuild_board()
+	if _is_slot_safe_bounce_target(blocked_slot_id, battle_elapsed):
 		return blocked_slot_id
 	var best_slot_id: int = 0
 	var best_distance: int = 999
 	for slot_id: int in range(1, 5):
-		if _exposure_state != null and not bool(_exposure_state.call("is_slot_open_for_progress", slot_id, battle_elapsed)):
+		if not _is_slot_safe_bounce_target(slot_id, battle_elapsed):
 			continue
 		var distance: int = absi(slot_id - blocked_slot_id)
 		if best_slot_id == 0 or distance < best_distance or (distance == best_distance and slot_id < best_slot_id):
@@ -665,6 +716,21 @@ func _open_unit_slot_for_bounce(blocked_slot_id: int, battle_elapsed: float) -> 
 	if best_slot_id == 0:
 		return 1
 	return best_slot_id
+
+func _is_slot_safe_bounce_target(slot_id: int, battle_elapsed: float) -> bool:
+	if _exposure_state != null and not bool(_exposure_state.call("is_slot_open_for_progress", slot_id, battle_elapsed)):
+		return false
+	return _slot_exposed_width(slot_id, battle_elapsed) >= _minimum_safe_exposed_width()
+
+func _slot_exposed_width(slot_id: int, battle_elapsed: float) -> float:
+	var bin: Area2D = _unit_bin(slot_id)
+	if bin == null:
+		return 0.0
+	var bin_size: Vector2 = _bin_size(bin)
+	return bin_size.x * _slot_exposure_ratio(slot_id, battle_elapsed)
+
+func _minimum_safe_exposed_width() -> float:
+	return BALL_RADIUS * 2.0 + UNIT_GATE_BOUNCE_MARGIN
 
 func _unit_slot_target_x(slot_id: int, battle_elapsed: float) -> float:
 	var bin: Area2D = _unit_bin(slot_id)
@@ -675,6 +741,8 @@ func _unit_slot_target_x(slot_id: int, battle_elapsed: float) -> float:
 	if ratio > 0.0 and ratio < 1.0:
 		var slot_left: float = bin.position.x - bin_size.x * 0.5
 		var open_width: float = bin_size.x * ratio
+		if open_width < _minimum_safe_exposed_width():
+			return bin.position.x
 		var local_target: float = clampf(open_width * 0.5, BALL_RADIUS + 2.0, maxf(BALL_RADIUS + 2.0, open_width - BALL_RADIUS - 2.0))
 		return slot_left + local_target
 	return bin.position.x
