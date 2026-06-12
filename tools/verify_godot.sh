@@ -98,4 +98,33 @@ fi
 
 run_godot_verifier "res://tools/verify_machine_physics_contract.gd"
 
+red_gate_failures=0
+
+run_red_godot_verifier() {
+  local script_path="$1"
+  local local_path="${script_path#res://}"
+
+  if [[ ! -f "$PROJECT_DIR/$local_path" ]]; then
+    echo "Missing required red gate verifier at $PROJECT_DIR/$local_path" >&2
+    red_gate_failures=1
+    return
+  fi
+
+  if ! run_godot_verifier "$script_path"; then
+    red_gate_failures=1
+  fi
+}
+
+run_red_godot_verifier "res://tools/verify_physics_machine_integration.gd"
+run_red_godot_verifier "res://tools/verify_exposure_gate.gd"
+run_red_godot_verifier "res://tools/verify_guardian_contract_behaviors.gd"
+run_red_godot_verifier "res://tools/verify_hive_unit_and_battle_profile.gd"
+run_red_godot_verifier "res://tools/verify_modifier_semantics.gd"
+run_red_godot_verifier "res://tools/verify_complete_learning_record.gd"
+
+if [[ "$red_gate_failures" -ne 0 ]]; then
+  echo "verify_godot: FAIL (red verification gates failed)" >&2
+  exit 1
+fi
+
 echo "verify_godot: PASS"
