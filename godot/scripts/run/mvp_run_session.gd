@@ -350,9 +350,15 @@ func _add_screen_child(child: Control) -> void:
 	_ensure_shell_ready()
 	if screen_slot == null:
 		return
+	var wrapper := Control.new()
+	wrapper.name = "%sWrapper" % child.name
+	wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wrapper.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	screen_slot.add_child(wrapper)
 	child.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	child.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	screen_slot.add_child(child)
+	wrapper.add_child(child)
+	child.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 func _clear_screen() -> void:
 	_ensure_shell_ready()
@@ -567,7 +573,7 @@ func _make_guardian(
 func _make_modifier(
 	id: String,
 	display_name: String,
-	source_type: int,
+	source_type: ModifierDefinition.SourceType,
 	warehouse: String,
 	target_component: String,
 	operation: String,

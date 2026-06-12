@@ -173,10 +173,11 @@ func _render() -> void:
 	battlefield_view.render(deploy, lanes)
 	if lanes.get_battle_result() == BattleLaneState.RESULT_RUNNING:
 		var counter_text: String = " | %s" % get_active_counter_banner_text() if battle_number == 3 else ""
-		status_label.text = "%s | %.1fs | Queue 从当前出兵口部署，不从 Guardian 出兵。 | %s%s" % [
+		status_label.text = "%s | %.1fs | 部署：%s | 修正：%s%s" % [
 			_battle_label(),
 			elapsed,
-			get_battle_modifier_marker_text(),
+			_lane_name(deploy.current_lane),
+			_active_modifier_names(),
 			counter_text,
 		]
 	else:
@@ -278,6 +279,50 @@ func _counter_definition_id() -> String:
 
 func _battle_label() -> String:
 	return "战斗 %d" % battle_number
+
+func _active_modifier_names() -> String:
+	if run_session == null:
+		return "无"
+	var names := PackedStringArray()
+	if battle_number >= 2 and not run_session.reward_one_id.is_empty():
+		names.append(_modifier_display_name(run_session.reward_one_id))
+	if battle_number >= 3 and not run_session.shop_purchase_id.is_empty():
+		names.append(_modifier_display_name(run_session.shop_purchase_id))
+	if names.is_empty():
+		return "无"
+	return " + ".join(names)
+
+func _modifier_display_name(modifier_id: String) -> String:
+	match modifier_id:
+		"pool_pocket":
+			return "Pool Pocket"
+		"prime_charge":
+			return "Prime Charge"
+		"slot_primer":
+			return "Slot Primer"
+		"front_recycle":
+			return "Front Recycle"
+		"surge_buffer":
+			return "Surge Buffer"
+		"queue_brace":
+			return "Queue Brace"
+		"junk_sieve":
+			return "Junk Sieve"
+		"muster_pair":
+			return "Muster Pair"
+		_:
+			return modifier_id
+
+func _lane_name(lane: String) -> String:
+	match lane:
+		"Left":
+			return "左路"
+		"Mid":
+			return "中路"
+		"Right":
+			return "右路"
+		_:
+			return lane
 
 func _battle_result_text() -> String:
 	return lanes.get_result_text().replace("战斗 1", _battle_label())

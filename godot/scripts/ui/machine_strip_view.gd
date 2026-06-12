@@ -44,7 +44,12 @@ func render(machine) -> void:
 		int(machine.slot_progress.get(4, 0)),
 	]
 	queue_hint_label.text = "Queue 待部署条目：%d" % machine.queue.size()
-	log_label.text = _recent_log_text(machine.event_log)
+	var counter_log: Array[String] = []
+	var counter_log_value: Variant = machine.get("counter_log")
+	if counter_log_value is Array:
+		for line_variant: Variant in counter_log_value:
+			counter_log.append(String(line_variant))
+	log_label.text = _recent_log_text(machine.event_log, counter_log)
 
 func get_visual_contract_summary() -> Dictionary:
 	_ensure_nodes()
@@ -63,14 +68,21 @@ func _machine_pool_capacity(machine) -> int:
 		return maxi(1, int(capacity_value))
 	return 5
 
-func _recent_log_text(event_log: Array[String]) -> String:
+func _recent_log_text(event_log: Array[String], counter_log: Array[String] = []) -> String:
 	if event_log.is_empty():
 		return "机器预热中：Forge 造球进入 Pool，Launcher 将球送入 Tuning，Unit 槽满后进入 Queue。"
 
 	var lines := PackedStringArray()
+	var counter_start: int = maxi(0, counter_log.size() - 2)
+	for index: int in range(counter_start, counter_log.size()):
+		lines.append(_localized_log_line(counter_log[index]))
 	var start_index: int = maxi(0, event_log.size() - LOG_LINE_COUNT)
 	for index: int in range(start_index, event_log.size()):
-		lines.append(_localized_log_line(event_log[index]))
+		var localized_line: String = _localized_log_line(event_log[index])
+		if not lines.has(localized_line):
+			lines.append(localized_line)
+		if lines.size() >= LOG_LINE_COUNT:
+			break
 	return "\n".join(lines)
 
 func _localized_log_line(log_line: String) -> String:

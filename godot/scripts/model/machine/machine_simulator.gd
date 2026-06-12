@@ -86,6 +86,8 @@ func apply_modifier(modifier_id: String, payload: Dictionary = {}) -> void:
 		modifier_id,
 		effect_marker,
 	])
+	if modifier_id == "junk_sieve" or modifier_id == "muster_pair":
+		counter_log.append(event_log[event_log.size() - 1])
 
 func advance_step(delta: float) -> void:
 	forge_progress += delta
@@ -128,10 +130,10 @@ func _route_ball(ball: Dictionary) -> void:
 	if String(ball.get("kind", "clean")) == "junk":
 		if junk_sieve_enabled:
 			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
-			event_log.append("Modifier:Junk Sieve 过滤 Junk，Pool 污染被清理")
+			_append_counter_event("Modifier:Junk Sieve 过滤 Junk，Pool 污染被清理")
 		else:
 			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
-			event_log.append("Counter:Pool Polluter Junk 发射后无有效 Unit 结算")
+			_append_counter_event("Counter:Pool Polluter Junk 发射后无有效 Unit 结算")
 		_finalize_queue_output([], 0, 0)
 		return
 
@@ -174,7 +176,7 @@ func _route_ball(ball: Dictionary) -> void:
 		if echo_breaker_active and echo_breaker_charges > 0:
 			echo_breaker_charges -= 1
 			echo_breaker_active = false
-			event_log.append("Counter:Echo Breaker Echo 复制降级为 Gate")
+			_append_counter_event("Counter:Echo Breaker Echo 复制降级为 Gate")
 		else:
 			added_entries.append_array(_apply_unit_hit(slot_id, value, "EchoCopy"))
 
@@ -214,7 +216,7 @@ func _finalize_queue_output(added_entries: Array[Dictionary], natural_slot_id: i
 		for entry: Dictionary in output_entries:
 			if String(entry.get("source", "")) != "QueueBrace":
 				entry["count"] = int(entry.get("count", 1)) + 1
-				event_log.append("Modifier:Muster Pair 同槽成对出兵")
+				_append_counter_event("Modifier:Muster Pair 同槽成对出兵")
 				break
 
 	for entry: Dictionary in output_entries:
@@ -250,20 +252,26 @@ func get_pool_capacity() -> int:
 
 func apply_pool_polluter_junk() -> bool:
 	if pool_polluter_junk_count >= 2:
-		event_log.append("Counter:Pool Polluter 上限已满，未继续插入 Junk")
+		_append_counter_event("Counter:Pool Polluter 上限已满，未继续插入 Junk")
 		return false
 	if pool.size() >= pool_capacity:
-		event_log.append("Counter:Pool Polluter 因 Pool 已满未插入 Junk")
+		_append_counter_event("Counter:Pool Polluter 因 Pool 已满未插入 Junk")
 		return false
 	pool.append({"kind": "junk", "value": 0, "source": "Pool Polluter"})
 	pool_polluter_junk_count += 1
-	event_log.append("Counter:Pool Polluter Junk 插入 Pool 槽 %d" % pool.size())
+	_append_counter_event("Counter:Pool Polluter Junk 插入 Pool 槽 %d" % pool.size())
 	return true
 
 func arm_echo_breaker() -> void:
 	echo_breaker_active = true
 	echo_breaker_charges = 1
-	event_log.append("Counter:Echo Breaker 已锁定 Echo 槽")
+	_append_counter_event("Counter:Echo Breaker 已锁定 Echo 槽")
+
+func _append_counter_event(log_line: String) -> void:
+	event_log.append(log_line)
+	counter_log.append(log_line)
+	while counter_log.size() > 8:
+		counter_log.pop_front()
 
 func _modifier_display_name(modifier_id: String) -> String:
 	match modifier_id:
