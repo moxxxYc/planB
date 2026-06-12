@@ -5,9 +5,11 @@ const MachineStripViewScript := preload("res://scripts/ui/machine_strip_view.gd"
 const QueueBridgeViewScript := preload("res://scripts/ui/queue_bridge_view.gd")
 const BattlefieldViewScript := preload("res://scripts/ui/battlefield_view.gd")
 const CounterStateScript := preload("res://scripts/model/counter/counter_state.gd")
+const MachineSlotExposureStateScript := preload("res://scripts/model/machine/machine_slot_exposure_state.gd")
 
 const DEPLOY_TICK_SECONDS: float = 0.5
 const BRIDGE_TRANSFER_DWELL_SECONDS: float = 1.5
+const EXPOSURE_GATE_SAMPLE_TIMES: Array[float] = [0.0, 12.0, 24.0, 30.0]
 
 @onready var machine_view: MachineStripViewScript = %MachineStripView
 @onready var bridge_view: QueueBridgeViewScript = %QueueBridgeView
@@ -31,10 +33,12 @@ var last_deploy_elapsed: float = 0.0
 var stagger_warning_timer: float = 0.0
 var pool_polluter_insert_timer: float = 0.0
 var active_counter_record: Dictionary = {}
+var exposure_state: RefCounted = MachineSlotExposureStateScript.new()
 
 func _ready() -> void:
 	_ensure_views()
 	_connect_machine_physics()
+	_sync_exposure_runtime()
 	battlefield_view.lane_clicked.connect(_on_lane_clicked)
 	set_physics_process(true)
 	_render()
@@ -119,7 +123,13 @@ func get_active_counter_record() -> Dictionary:
 	return (counter_state.call("to_record") as Dictionary).duplicate(true)
 
 func get_battlefield_record() -> Dictionary:
-	return lanes.get_telemetry_record()
+	var record: Dictionary = lanes.get_telemetry_record()
+	if battle_number == 1:
+		record["battle1.exposure_gate_snapshot"] = _build_battle_one_exposure_snapshot()
+	return record
+
+func get_exposure_gate_snapshot_for_verifier() -> Dictionary:
+	return _build_battle_one_exposure_snapshot()
 
 func get_player_guardian_hp() -> int:
 	return lanes.get_player_guardian_hp()
@@ -145,6 +155,7 @@ func configure_for_run(p_battle_number: int, p_session: RunSessionModel, payload
 	run_payload = payload.duplicate(true)
 	lanes.configure(battle_number, battle_number >= 6, run_session.guardian_hp if run_session != null else 100)
 	_configure_counter_runtime(payload)
+	_sync_exposure_runtime()
 	_apply_run_modifiers()
 	_render()
 
@@ -153,6 +164,7 @@ func get_battle_modifier_marker_text() -> String:
 
 func advance_simulation(delta: float, use_seeded_physics: bool = false) -> void:
 	elapsed += delta
+	_sync_exposure_runtime()
 	_advance_bridge_transfer(delta)
 	_advance_counter(delta)
 	var launch_requests: Array[Dictionary] = machine.advance_supply(delta)
@@ -174,6 +186,8 @@ func advance_for_verifier(seconds: float) -> void:
 		advance_simulation(seconds / float(steps), true)
 
 func _on_machine_landing_resolved(result: MachinePhysicsResult) -> void:
+	if result != null:
+		machine.set_battle_elapsed(maxf(elapsed, result.battle_elapsed))
 	machine.apply_physics_result(result)
 	_render()
 
@@ -195,6 +209,7 @@ func _deploy_queue_head() -> void:
 
 func _render() -> void:
 	_ensure_views()
+	_sync_exposure_runtime()
 	machine_view.render(machine, _counter_target_component())
 	bridge_view.render(machine, deploy)
 	battlefield_view.render(deploy, lanes)
@@ -383,9 +398,33 @@ func _ensure_views() -> void:
 	if status_label == null:
 		status_label = get_node("SafeArea/RootRows/StatusBar/StatusLabel") as Label
 	_connect_machine_physics()
+	_sync_exposure_runtime()
 
 func _connect_machine_physics() -> void:
 	if machine_view == null:
 		return
 	if not machine_view.landing_resolved.is_connected(_on_machine_landing_resolved):
 		machine_view.landing_resolved.connect(_on_machine_landing_resolved)
+
+func _sync_exposure_runtime() -> void:
+	if machine != null:
+		machine.set_exposure_state(exposure_state)
+		machine.set_battle_elapsed(elapsed)
+	if machine_view != null:
+		machine_view.set_exposure_state(exposure_state)
+		if machine_view.has_method("set_battle_elapsed"):
+			machine_view.call("set_battle_elapsed", elapsed)
+
+func _build_battle_one_exposure_snapshot() -> Dictionary:
+	var sampled_times: Array[float] = EXPOSURE_GATE_SAMPLE_TIMES.duplicate()
+	var snapshots: Array[Dictionary] = []
+	var record: Dictionary = {
+		"runtime_elapsed": elapsed,
+		"sampled_times": sampled_times,
+		"snapshots": snapshots,
+	}
+	for sample_time: float in sampled_times:
+		var sample: Dictionary = exposure_state.call("snapshot", sample_time) as Dictionary
+		record["t_%d" % int(sample_time)] = sample
+		snapshots.append(sample)
+	return record

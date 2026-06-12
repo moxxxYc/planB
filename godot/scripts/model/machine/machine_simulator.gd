@@ -1,6 +1,8 @@
 class_name MachineSimulator
 extends RefCounted
 
+const MachineSlotExposureStateScript := preload("res://scripts/model/machine/machine_slot_exposure_state.gd")
+
 const SLOT_REQUIREMENTS: Dictionary = {
 	1: 3,
 	2: 5,
@@ -35,12 +37,33 @@ var pool_polluter_junk_count: int = 0
 var counter_log: Array[String] = []
 var active_modifier_ids: Array[String] = []
 var active_modifier_markers: Array[String] = []
+var battle_elapsed: float = 0.0
+var exposure_state: RefCounted = MachineSlotExposureStateScript.new()
 var _step_index: int = 0
 var _next_chain_index: int = 0
 var _pending_physics_chains: Dictionary = {}
 var _pending_chain_order: Array[String] = []
 var _last_machine_chain_sample: Dictionary = {}
 var _physics_queue_chains: Array[Dictionary] = []
+
+func set_exposure_state(p_exposure_state: RefCounted) -> void:
+	if p_exposure_state == null:
+		return
+	exposure_state = p_exposure_state
+
+func get_exposure_state() -> RefCounted:
+	return exposure_state
+
+func set_battle_elapsed(seconds: float) -> void:
+	battle_elapsed = maxf(0.0, seconds)
+
+func get_battle_elapsed() -> float:
+	return battle_elapsed
+
+func get_exposure_gate_snapshot() -> Dictionary:
+	if exposure_state == null:
+		return {}
+	return exposure_state.call("snapshot", battle_elapsed) as Dictionary
 
 func apply_modifier(modifier_id: String, payload: Dictionary = {}) -> void:
 	var slot_id: int = int(payload.get("slot_id", 1))
@@ -131,6 +154,12 @@ func advance_step(delta: float) -> Array[Dictionary]:
 func apply_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
 	if result == null:
 		return []
+	if result.component == "Unit" and exposure_state != null:
+		var guarded_slot_id: int = clampi(result.slot_id, 1, 4)
+		var guard_elapsed: float = maxf(battle_elapsed, result.battle_elapsed)
+		if not bool(exposure_state.call("is_slot_open_for_progress", guarded_slot_id, guard_elapsed)):
+			event_log.append("Unit：S%d 暴露闸门未开启，球被挡开" % guarded_slot_id)
+			return []
 	_register_physics_result(result)
 	var produced_entries: Array[Dictionary] = []
 	match result.component:
@@ -188,8 +217,9 @@ func build_verifier_seeded_chain_for_ball(ball: Dictionary, step: int = -1) -> A
 
 	var tuning_result: String = _tuning_result_for_verifier_step(verifier_step)
 	var slot_id: int = _slot_for_verifier_step(verifier_step)
+	var seeded_elapsed: float = _seeded_battle_elapsed_for_slot(slot_id)
 	results.append(MachinePhysicsResult.make("Tuning", tuning_result, 0, int(ball.get("value", 1)), ball_kind, "verifier_seed", chain_id))
-	results.append(MachinePhysicsResult.make("Unit", "UnitHit", slot_id, 0, ball_kind, "verifier_seed", chain_id))
+	results.append(MachinePhysicsResult.make("Unit", "UnitHit", slot_id, 0, ball_kind, "verifier_seed", chain_id, seeded_elapsed))
 	return results
 
 func get_machine_chain_sample() -> Dictionary:
@@ -628,6 +658,18 @@ func _tuning_result_for_verifier_step(step: int) -> String:
 func _slot_for_verifier_step(step: int) -> int:
 	var pattern: Array[int] = [1, 1, 2, 1, 2, 3, 1, 4]
 	return pattern[(step - 1) % pattern.size()]
+
+func _seeded_battle_elapsed_for_slot(slot_id: int) -> float:
+	if exposure_state == null:
+		return battle_elapsed
+	var snapshot: Dictionary = exposure_state.call("snapshot", battle_elapsed) as Dictionary
+	var slots_variant: Variant = snapshot.get("slots", {})
+	if slots_variant is Dictionary:
+		var slots: Dictionary = slots_variant as Dictionary
+		if slots.has(slot_id) and slots[slot_id] is Dictionary:
+			var slot_info: Dictionary = slots[slot_id] as Dictionary
+			return maxf(battle_elapsed, float(slot_info.get("start_seconds", battle_elapsed)))
+	return battle_elapsed
 
 func _unit_id_for_slot(slot_id: int) -> String:
 	match slot_id:

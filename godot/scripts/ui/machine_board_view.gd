@@ -47,6 +47,10 @@ var last_physics_result: Dictionary = {}
 var last_machine_chain_sample: Dictionary = {}
 var physics_queue_chain_count: int = 0
 var last_physics_queue_chain: Dictionary = {}
+var exposure_gate_snapshot: Dictionary = {}
+var blocked_bounce_count: int = 0
+var last_blocked_bounce: Dictionary = {}
+var has_unit_gate_blockers: bool = false
 
 func _ready() -> void:
 	custom_minimum_size = MIN_VIEW_SIZE
@@ -58,6 +62,12 @@ func _ready() -> void:
 
 func render(machine, p_counter_target_component: String = "") -> void:
 	_ensure_physics_board()
+	if machine.has_method("get_exposure_state"):
+		var next_exposure_state = machine.call("get_exposure_state")
+		if next_exposure_state != null:
+			physics_board.set_exposure_state(next_exposure_state)
+	if machine.has_method("get_battle_elapsed"):
+		physics_board.set_battle_elapsed(float(machine.call("get_battle_elapsed")))
 	forge_ratio = clampf(machine.forge_progress / FORGE_CYCLE_SECONDS, 0.0, 1.0)
 	launcher_ratio = clampf(machine.launcher_progress / LAUNCHER_CYCLE_SECONDS, 0.0, 1.0)
 	pool_count = machine.pool.size()
@@ -84,6 +94,7 @@ func render(machine, p_counter_target_component: String = "") -> void:
 		if not chains.is_empty() and chains[chains.size() - 1] is Dictionary:
 			last_physics_queue_chain = (chains[chains.size() - 1] as Dictionary).duplicate(true)
 	_layout_physics_board()
+	_update_exposure_contract_from_physics_board()
 	queue_redraw()
 
 func get_visual_contract_summary() -> Dictionary:
@@ -115,6 +126,10 @@ func get_visual_contract_summary() -> Dictionary:
 		"physics_queue_chain_count": physics_queue_chain_count,
 		"last_physics_queue_chain": last_physics_queue_chain.duplicate(true),
 		"machine_chain_sample": last_machine_chain_sample.duplicate(true),
+		"exposure_gate_snapshot": exposure_gate_snapshot.duplicate(true),
+		"blocked_bounce_count": blocked_bounce_count,
+		"last_blocked_bounce": last_blocked_bounce.duplicate(true),
+		"has_unit_gate_blockers": has_unit_gate_blockers,
 		"pool_count": pool_count,
 		"queue_count": queue_count,
 		"active_board_index": active_board_index,
@@ -136,6 +151,10 @@ func launch_ball(ball: Dictionary, battle_elapsed: float) -> void:
 func set_exposure_state(exposure_state) -> void:
 	_ensure_physics_board()
 	physics_board.set_exposure_state(exposure_state)
+
+func set_battle_elapsed(seconds: float) -> void:
+	_ensure_physics_board()
+	physics_board.set_battle_elapsed(seconds)
 
 func emit_seeded_landing_for_verifier(result: MachinePhysicsResult) -> MachinePhysicsResult:
 	_ensure_physics_board()
@@ -246,6 +265,20 @@ func _layout_physics_board() -> void:
 	if physics_board == null or not is_instance_valid(physics_board):
 		return
 	physics_board.set_stage_rects(_stage_rects_for_current_size())
+	_update_exposure_contract_from_physics_board()
+
+func _update_exposure_contract_from_physics_board() -> void:
+	if physics_board == null or not is_instance_valid(physics_board):
+		return
+	var board_contract: Dictionary = physics_board.get_runtime_contract()
+	exposure_gate_snapshot = (board_contract.get("exposure_gate_snapshot", {}) as Dictionary).duplicate(true)
+	blocked_bounce_count = int(board_contract.get("blocked_bounce_count", 0))
+	var bounce_variant: Variant = board_contract.get("last_blocked_bounce", {})
+	if bounce_variant is Dictionary:
+		last_blocked_bounce = (bounce_variant as Dictionary).duplicate(true)
+	else:
+		last_blocked_bounce = {}
+	has_unit_gate_blockers = bool(board_contract.get("has_unit_gate_blockers", false))
 
 func _stage_rects_for_current_size() -> Dictionary:
 	var current_size: Vector2 = size
@@ -330,15 +363,34 @@ func _draw_unit_slots(board_rect: Rect2) -> void:
 	var gap := 8.0
 	var slot_width := (board_rect.size.x - 20.0 - gap * 3.0) / 4.0
 	var slot_y := board_rect.position.y + board_rect.size.y - 31.0
+	if not last_blocked_bounce.is_empty():
+		var blocked_slot_id: int = int(last_blocked_bounce.get("slot_id", 0))
+		var target_slot_id: int = int(last_blocked_bounce.get("target_slot_id", 0))
+		_draw_text(font, board_rect.position + Vector2(10.0, 39.0), "闸门挡开：S%d 转向 S%d" % [blocked_slot_id, target_slot_id], 10, COLOR_COUNTER_TARGET)
 	for slot_id: int in range(1, 5):
 		var progress: int = int(slot_progress.get(slot_id, 0))
 		var required: int = int(SLOT_REQUIREMENTS[slot_id])
 		var ratio := clampf(float(progress) / float(required), 0.0, 1.0)
+		var exposure_info: Dictionary = _exposure_slot_info(slot_id)
+		var exposure_ratio: float = clampf(float(exposure_info.get("ratio", 1.0 if slot_id == 1 else 0.0)), 0.0, 1.0)
+		var is_open: bool = bool(exposure_info.get("open", exposure_ratio > 0.0))
+		var is_fully_exposed: bool = bool(exposure_info.get("fully_exposed", exposure_ratio >= 1.0))
 		var slot_rect := Rect2(board_rect.position.x + 10.0 + float(slot_id - 1) * (slot_width + gap), slot_y, slot_width, 23.0)
 		draw_rect(slot_rect, COLOR_BG, true)
 		draw_rect(Rect2(slot_rect.position, Vector2(slot_rect.size.x * ratio, slot_rect.size.y)), COLOR_UNIT.darkened(0.2), true)
+		if exposure_ratio < 1.0:
+			var closed_rect := Rect2(
+				slot_rect.position + Vector2(slot_rect.size.x * exposure_ratio, 0.0),
+				Vector2(slot_rect.size.x * (1.0 - exposure_ratio), slot_rect.size.y)
+			)
+			draw_rect(closed_rect, Color("#443848"), true)
+			draw_rect(closed_rect, COLOR_MUTED, false, 1.0)
+			if exposure_ratio > 0.0:
+				var gate_x: float = slot_rect.position.x + slot_rect.size.x * exposure_ratio
+				draw_line(Vector2(gate_x, slot_rect.position.y), Vector2(gate_x, slot_rect.end.y), COLOR_ACTIVE, 1.5, true)
 		draw_rect(slot_rect, COLOR_UNIT, false, 1.0)
-		_draw_text(font, slot_rect.position + Vector2(5.0, 16.0), "S%d %d/%d" % [slot_id, progress, required], 10, COLOR_TEXT)
+		var gate_text: String = "已开" if is_fully_exposed else ("开%.0f%%" % (exposure_ratio * 100.0) if is_open else "未开")
+		_draw_text(font, slot_rect.position + Vector2(4.0, 15.0), "S%d %s %d/%d" % [slot_id, gate_text, progress, required], 9, COLOR_TEXT)
 
 func _draw_queue_preview(rect: Rect2) -> void:
 	var font := get_theme_default_font()
@@ -432,3 +484,15 @@ func _unit_name(unit_id: String) -> String:
 			return "碾壳兽"
 		_:
 			return "未知单位"
+
+func _exposure_slot_info(slot_id: int) -> Dictionary:
+	var slots_variant: Variant = exposure_gate_snapshot.get("slots", {})
+	if not (slots_variant is Dictionary):
+		return {}
+	var slots: Dictionary = slots_variant as Dictionary
+	if slots.has(slot_id) and slots[slot_id] is Dictionary:
+		return (slots[slot_id] as Dictionary).duplicate(true)
+	var slot_key: String = str(slot_id)
+	if slots.has(slot_key) and slots[slot_key] is Dictionary:
+		return (slots[slot_key] as Dictionary).duplicate(true)
+	return {}

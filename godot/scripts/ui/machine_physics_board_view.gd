@@ -3,6 +3,8 @@ extends Node2D
 
 signal landing_resolved(result: MachinePhysicsResult)
 
+const MachineSlotExposureStateScript := preload("res://scripts/model/machine/machine_slot_exposure_state.gd")
+
 const BALL_LAYER: int = 1
 const PEG_LAYER: int = 2
 const BIN_LAYER: int = 3
@@ -14,15 +16,22 @@ const DEFAULT_STAGE_HEIGHT: float = 112.0
 const VERIFIER_SOURCE: String = "verifier_seed"
 const RETIRED_BALL_DWELL_SECONDS: float = 0.5
 const MAX_RETIRED_BALLS: int = 4
+const UNIT_GATE_PLATE_EXTRA_HEIGHT: float = 18.0
+const UNIT_GATE_MIN_COLLISION_WIDTH: float = 1.0
 
 var active_ball: RigidBody2D = null
 var physics_landing_count: int = 0
 var last_physics_result: Dictionary = {}
+var exposure_gate_snapshot: Dictionary = {}
+var blocked_bounce_count: int = 0
+var last_blocked_bounce: Dictionary = {}
 var _stage_rects: Dictionary = {}
 var _stage_bins: Dictionary = {}
 var _launch_index: int = 0
 var _created_ball_count: int = 0
-var _exposure_state = null
+var _battle_elapsed: float = 0.0
+var _exposure_state: RefCounted = MachineSlotExposureStateScript.new()
+var _unit_gate_blockers: Dictionary = {}
 var _retired_balls: Array[RigidBody2D] = []
 
 func _ready() -> void:
@@ -42,8 +51,15 @@ func launch_ball(ball: Dictionary, battle_elapsed: float) -> void:
 	add_child(body)
 	_place_body_for_stage(body, "Launch", battle_elapsed)
 
-func set_exposure_state(exposure_state) -> void:
+func set_exposure_state(exposure_state: RefCounted) -> void:
+	if exposure_state == null:
+		return
 	_exposure_state = exposure_state
+	_update_unit_gate_blockers()
+
+func set_battle_elapsed(seconds: float) -> void:
+	_battle_elapsed = maxf(0.0, seconds)
+	_update_unit_gate_blockers()
 
 func get_runtime_contract() -> Dictionary:
 	_rebuild_board()
@@ -55,6 +71,12 @@ func get_runtime_contract() -> Dictionary:
 		"last_physics_result": last_physics_result.duplicate(true),
 		"created_ball_count": _created_ball_count,
 		"stage_count": _stage_rects.size(),
+		"exposure_gate_snapshot": exposure_gate_snapshot.duplicate(true),
+		"blocked_bounce_count": blocked_bounce_count,
+		"last_blocked_bounce": last_blocked_bounce.duplicate(true),
+		"has_unit_gate_blockers": _has_unit_gate_blockers(),
+		"unit_gate_blocker_count": _unit_gate_blockers.size(),
+		"battle_elapsed": _battle_elapsed,
 	}
 
 func emit_seeded_landing_for_verifier(result: MachinePhysicsResult) -> MachinePhysicsResult:
@@ -109,6 +131,7 @@ func _ensure_default_stage_rects() -> void:
 
 func _rebuild_board() -> void:
 	if get_node_or_null("StaticGeometry") != null:
+		_update_unit_gate_blockers()
 		return
 
 	var static_geometry := Node2D.new()
@@ -121,6 +144,7 @@ func _rebuild_board() -> void:
 	_build_stage_geometry("Launch", ["Tuning", "Split", "Recycle", "Waste"], Color("#7bcb6b"))
 	_build_stage_geometry("Tuning", ["Gate", "Prime", "Echo", "Surge"], Color("#e6b450"))
 	_build_stage_geometry("Unit", ["S1", "S2", "S3", "S4"], Color("#c58be8"))
+	_update_unit_gate_blockers()
 	_ensure_preview_ball()
 
 func _clear_board_geometry() -> void:
@@ -130,6 +154,7 @@ func _clear_board_geometry() -> void:
 			remove_child(existing)
 			existing.queue_free()
 	_stage_bins.clear()
+	_unit_gate_blockers.clear()
 	if active_ball != null and is_instance_valid(active_ball) and String(active_ball.get_meta("chain_id", "")) == "preview":
 		var launch_rect: Rect2 = _stage_rect("Launch")
 		active_ball.position = launch_rect.position + Vector2(launch_rect.size.x * 0.5, 18.0)
@@ -148,6 +173,89 @@ func _build_stage_geometry(stage: String, labels: Array[String], color: Color) -
 		var label: String = labels[index]
 		var center := Vector2(rect.position.x + bin_width * (float(index) + 0.5), rect.position.y + rect.size.y - 14.0)
 		_add_bin(stage, label, center, Vector2(bin_width - 8.0, 24.0), index, color)
+	if stage == "Unit":
+		_build_unit_gate_blockers(labels, color)
+
+func _build_unit_gate_blockers(labels: Array[String], color: Color) -> void:
+	var static_geometry: Node = get_node_or_null("StaticGeometry")
+	if static_geometry == null:
+		return
+	for index: int in range(labels.size()):
+		var slot_id: int = index + 1
+		if _unit_gate_blockers.has(slot_id):
+			continue
+		var blocker := StaticBody2D.new()
+		blocker.name = "UnitS%dExposureGateBlocker" % slot_id
+		blocker.collision_layer = 0
+		blocker.collision_mask = 0
+		blocker.set_collision_layer_value(PEG_LAYER, true)
+		blocker.set_collision_mask_value(BALL_LAYER, true)
+		blocker.set_meta("stage", "Unit")
+		blocker.set_meta("slot_id", slot_id)
+		blocker.set_meta("unit_gate_blocker", true)
+
+		var shape_node := CollisionShape2D.new()
+		shape_node.name = "GateShape"
+		var shape := RectangleShape2D.new()
+		shape.size = Vector2(UNIT_GATE_MIN_COLLISION_WIDTH, 24.0 + UNIT_GATE_PLATE_EXTRA_HEIGHT)
+		shape_node.shape = shape
+		blocker.add_child(shape_node)
+
+		var visual := Polygon2D.new()
+		visual.name = "GatePlate"
+		visual.color = color.darkened(0.55)
+		blocker.add_child(visual)
+
+		static_geometry.add_child(blocker)
+		_unit_gate_blockers[slot_id] = blocker
+
+func _update_unit_gate_blockers() -> void:
+	exposure_gate_snapshot = _exposure_snapshot(_battle_elapsed)
+	if _unit_gate_blockers.is_empty():
+		return
+	for slot_id: int in range(1, 5):
+		if not _unit_gate_blockers.has(slot_id):
+			continue
+		var blocker: StaticBody2D = _unit_gate_blockers[slot_id] as StaticBody2D
+		var bin: Area2D = _unit_bin(slot_id)
+		if blocker == null or bin == null:
+			continue
+		var bin_size: Vector2 = _bin_size(bin)
+		var ratio: float = _slot_exposure_ratio(slot_id, _battle_elapsed)
+		var closed_width: float = maxf(0.0, bin_size.x * (1.0 - ratio))
+		var closed_height: float = bin_size.y + UNIT_GATE_PLATE_EXTRA_HEIGHT
+		var active: bool = closed_width > UNIT_GATE_MIN_COLLISION_WIDTH
+		var shape_width: float = maxf(UNIT_GATE_MIN_COLLISION_WIDTH, closed_width)
+		var slot_left: float = bin.position.x - bin_size.x * 0.5
+		var exposed_width: float = bin_size.x * ratio
+
+		blocker.visible = active
+		blocker.position = Vector2(slot_left + exposed_width + shape_width * 0.5, bin.position.y - UNIT_GATE_PLATE_EXTRA_HEIGHT * 0.25)
+		blocker.set_meta("exposure_ratio", ratio)
+		blocker.set_meta("closed_width", closed_width)
+		blocker.set_meta("is_closed", active)
+
+		var shape_node: CollisionShape2D = blocker.get_node_or_null("GateShape") as CollisionShape2D
+		if shape_node != null:
+			shape_node.set_deferred("disabled", not active)
+			var rectangle: RectangleShape2D = shape_node.shape as RectangleShape2D
+			if rectangle == null:
+				rectangle = RectangleShape2D.new()
+				shape_node.shape = rectangle
+			rectangle.set_deferred("size", Vector2(shape_width, closed_height))
+		_update_gate_plate_visual(blocker, Vector2(shape_width, closed_height), ratio)
+
+func _update_gate_plate_visual(blocker: StaticBody2D, plate_size: Vector2, ratio: float) -> void:
+	var visual: Polygon2D = blocker.get_node_or_null("GatePlate") as Polygon2D
+	if visual == null:
+		return
+	visual.color = Color("#6d527a") if ratio > 0.0 else Color("#493750")
+	visual.polygon = PackedVector2Array([
+		Vector2(-plate_size.x * 0.5, -plate_size.y * 0.5),
+		Vector2(plate_size.x * 0.5, -plate_size.y * 0.5),
+		Vector2(plate_size.x * 0.5, plate_size.y * 0.5),
+		Vector2(-plate_size.x * 0.5, plate_size.y * 0.5),
+	])
 
 func _add_peg(peg_name: String, peg_position: Vector2, color: Color) -> void:
 	var peg := StaticBody2D.new()
@@ -201,6 +309,7 @@ func _add_bin(stage: String, label: String, bin_position: Vector2, bin_size: Vec
 	bin.set_meta("label", label)
 	bin.set_meta("slot_id", index + 1)
 	bin.set_meta("value", _value_for_stage_label(stage, label))
+	bin.set_meta("bin_size", bin_size)
 	var shape_node := CollisionShape2D.new()
 	var shape := RectangleShape2D.new()
 	shape.size = bin_size
@@ -264,6 +373,7 @@ func _make_ball(ball: Dictionary) -> RigidBody2D:
 	return body
 
 func _place_body_for_stage(body: RigidBody2D, stage: String, battle_elapsed: float) -> void:
+	set_battle_elapsed(battle_elapsed)
 	var rect: Rect2 = _stage_rect(stage)
 	var target_label: String = _target_label_for_body(body, stage)
 	var target_center: Vector2 = _bin_center(stage, target_label)
@@ -301,11 +411,69 @@ func _on_bin_body_entered(body: Node2D, bin: Area2D) -> void:
 		return
 	if bool(rigid_body.get_meta("resolving_stage", false)):
 		return
+	rigid_body.set_meta("battle_elapsed", _battle_elapsed)
 	rigid_body.set_meta("resolving_stage", true)
+	if bin_stage == "Unit" and _is_unit_gate_blocking_contact(rigid_body, bin):
+		_record_blocked_unit_bounce(rigid_body, bin)
+		call_deferred("_bounce_body_from_blocked_unit_gate", rigid_body, bin)
+		return
 	var result: MachinePhysicsResult = _result_from_bin(rigid_body, bin)
 	_record_landing(result)
 	landing_resolved.emit(result)
 	call_deferred("_advance_body_after_landing", rigid_body, result)
+
+func _is_unit_gate_blocking_contact(body: RigidBody2D, bin: Area2D) -> bool:
+	var slot_id: int = int(bin.get_meta("slot_id"))
+	var battle_elapsed: float = float(body.get_meta("battle_elapsed", _battle_elapsed))
+	var ratio: float = _slot_exposure_ratio(slot_id, battle_elapsed)
+	if ratio >= 1.0:
+		return false
+	if _exposure_state != null and not bool(_exposure_state.call("is_slot_open_for_progress", slot_id, battle_elapsed)):
+		return true
+	if ratio <= 0.0:
+		return true
+
+	var bin_size: Vector2 = _bin_size(bin)
+	var slot_left: float = bin.global_position.x - bin_size.x * 0.5
+	var exposed_right: float = slot_left + bin_size.x * ratio
+	return body.global_position.x > exposed_right
+
+func _record_blocked_unit_bounce(body: RigidBody2D, bin: Area2D) -> void:
+	var slot_id: int = int(bin.get_meta("slot_id"))
+	var battle_elapsed: float = float(body.get_meta("battle_elapsed", _battle_elapsed))
+	var target_slot_id: int = _open_unit_slot_for_bounce(slot_id, battle_elapsed)
+	var ratio: float = _slot_exposure_ratio(slot_id, battle_elapsed)
+	var message: String = "Unit：S%d 暴露闸门挡开，球转向 S%d" % [slot_id, target_slot_id]
+	blocked_bounce_count += 1
+	last_blocked_bounce = {
+		"component": "Unit",
+		"result_id": "BlockedBounce",
+		"slot_id": slot_id,
+		"target_slot_id": target_slot_id,
+		"battle_elapsed": battle_elapsed,
+		"exposure_ratio": ratio,
+		"source": "physics",
+		"chain_id": String(body.get_meta("chain_id", "")),
+		"message": message,
+	}
+	body.set_meta("blocked_bounce_target_slot_id", target_slot_id)
+	body.set_meta("last_blocked_bounce_message", message)
+
+func _bounce_body_from_blocked_unit_gate(body: RigidBody2D, _bin: Area2D) -> void:
+	if not is_instance_valid(body):
+		return
+	var battle_elapsed: float = float(body.get_meta("battle_elapsed", _battle_elapsed))
+	var target_slot_id: int = int(body.get_meta("blocked_bounce_target_slot_id", _open_unit_slot_for_bounce(1, battle_elapsed)))
+	var unit_rect: Rect2 = _stage_rect("Unit")
+	var target_x: float = _unit_slot_target_x(target_slot_id, battle_elapsed)
+	body.set_meta("stage", "Unit")
+	body.set_meta("resolving_stage", false)
+	body.position = Vector2(target_x, unit_rect.position.y + 18.0)
+	body.linear_velocity = Vector2((target_x - unit_rect.get_center().x) * 0.2, 160.0)
+	body.angular_velocity = 0.0
+	body.freeze = false
+	body.sleeping = false
+	body.reset_physics_interpolation()
 
 func _result_from_bin(body: RigidBody2D, bin: Area2D) -> MachinePhysicsResult:
 	var stage: String = String(bin.get_meta("stage"))
@@ -411,6 +579,26 @@ func _bin_center(stage: String, label: String) -> Vector2:
 	var rect: Rect2 = _stage_rect(stage)
 	return rect.position + Vector2(rect.size.x * 0.5, rect.size.y - 14.0)
 
+func _unit_bin(slot_id: int) -> Area2D:
+	var key: String = "Unit:S%d" % slot_id
+	if _stage_bins.has(key):
+		return _stage_bins[key] as Area2D
+	return null
+
+func _bin_size(bin: Area2D) -> Vector2:
+	var size_variant: Variant = bin.get_meta("bin_size", Vector2.ZERO)
+	if size_variant is Vector2:
+		var meta_size: Vector2 = size_variant as Vector2
+		if meta_size.x > 0.0 and meta_size.y > 0.0:
+			return meta_size
+	for child: Node in bin.get_children():
+		if child is CollisionShape2D:
+			var shape_node: CollisionShape2D = child as CollisionShape2D
+			var rectangle: RectangleShape2D = shape_node.shape as RectangleShape2D
+			if rectangle != null:
+				return rectangle.size
+	return Vector2(64.0, 24.0)
+
 func _bin_name(stage: String, label: String) -> String:
 	if stage == "Tuning" and label == "Gate":
 		return "GateBin"
@@ -437,6 +625,59 @@ func _has_visible_rigidbody_ball() -> bool:
 	if active_ball != null and is_instance_valid(active_ball):
 		return true
 	return _find_first_child_of_type(self, "RigidBody2D") != null
+
+func _has_unit_gate_blockers() -> bool:
+	if _unit_gate_blockers.size() < 4:
+		return false
+	for slot_id: int in range(1, 5):
+		if not _unit_gate_blockers.has(slot_id):
+			return false
+		var blocker: StaticBody2D = _unit_gate_blockers[slot_id] as StaticBody2D
+		if blocker == null:
+			return false
+		var shape_node: CollisionShape2D = blocker.get_node_or_null("GateShape") as CollisionShape2D
+		if shape_node == null or not (shape_node.shape is RectangleShape2D):
+			return false
+	return true
+
+func _exposure_snapshot(battle_elapsed: float) -> Dictionary:
+	if _exposure_state == null:
+		return {}
+	return _exposure_state.call("snapshot", battle_elapsed) as Dictionary
+
+func _slot_exposure_ratio(slot_id: int, battle_elapsed: float) -> float:
+	if _exposure_state == null:
+		return 1.0 if slot_id == 1 else 0.0
+	return float(_exposure_state.call("get_exposure_ratio", slot_id, battle_elapsed))
+
+func _open_unit_slot_for_bounce(blocked_slot_id: int, battle_elapsed: float) -> int:
+	if _exposure_state != null and bool(_exposure_state.call("is_slot_open_for_progress", blocked_slot_id, battle_elapsed)) and _slot_exposure_ratio(blocked_slot_id, battle_elapsed) > 0.0:
+		return blocked_slot_id
+	var best_slot_id: int = 0
+	var best_distance: int = 999
+	for slot_id: int in range(1, 5):
+		if _exposure_state != null and not bool(_exposure_state.call("is_slot_open_for_progress", slot_id, battle_elapsed)):
+			continue
+		var distance: int = absi(slot_id - blocked_slot_id)
+		if best_slot_id == 0 or distance < best_distance or (distance == best_distance and slot_id < best_slot_id):
+			best_slot_id = slot_id
+			best_distance = distance
+	if best_slot_id == 0:
+		return 1
+	return best_slot_id
+
+func _unit_slot_target_x(slot_id: int, battle_elapsed: float) -> float:
+	var bin: Area2D = _unit_bin(slot_id)
+	if bin == null:
+		return _stage_rect("Unit").get_center().x
+	var bin_size: Vector2 = _bin_size(bin)
+	var ratio: float = _slot_exposure_ratio(slot_id, battle_elapsed)
+	if ratio > 0.0 and ratio < 1.0:
+		var slot_left: float = bin.position.x - bin_size.x * 0.5
+		var open_width: float = bin_size.x * ratio
+		var local_target: float = clampf(open_width * 0.5, BALL_RADIUS + 2.0, maxf(BALL_RADIUS + 2.0, open_width - BALL_RADIUS - 2.0))
+		return slot_left + local_target
+	return bin.position.x
 
 func _find_first_child_of_type(node: Node, class_name_text: String) -> Node:
 	for child: Node in node.get_children():
