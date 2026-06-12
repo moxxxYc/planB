@@ -125,6 +125,22 @@ func _verify_required_learning_keys(run: Node) -> void:
 func _verify_learning_field_shapes(record: Dictionary) -> void:
 	_verify_machine_chain_sample(record)
 	_verify_exposure_gate_snapshot(record)
+	_verify_non_empty_string_fields(record, [
+		"guardian.choice_read",
+		"reward1.axis",
+		"reward1.component_operation",
+		"reward1.battlefield_expectation",
+		"reward1.battlefield_result",
+		"shop1.purchase_role",
+		"counter1.family",
+		"counter1.target_component",
+		"counter1.visible_effect",
+		"counter1.response_link",
+		"endpoint.main_break_reason",
+		"endpoint.next_run_watch_tag",
+	])
+	_verify_non_empty_selection_field(record, "battle1.deploy_lane_selection")
+	_verify_non_empty_dictionary_field(record, "battle1.lane_danger_snapshot")
 	_verify_non_empty_dictionary_field(record, "unit.key_queue_entries_by_slot")
 	_verify_non_empty_array_or_dictionary_field(record, "rest_windows")
 	_verify_non_empty_field(record, "endpoint.outcome")
@@ -202,6 +218,26 @@ func _verify_non_empty_dictionary_field(record: Dictionary, key: String) -> void
 	var value: Variant = record.get(key)
 	if not (value is Dictionary) or (value as Dictionary).is_empty():
 		failures.append("%s must be a non-empty Dictionary." % key)
+
+func _verify_non_empty_string_fields(record: Dictionary, keys: Array[String]) -> void:
+	for key: String in keys:
+		if not record.has(key):
+			continue
+		var value: Variant = record.get(key)
+		if not (value is String) or String(value).strip_edges().is_empty():
+			failures.append("%s must be a non-empty String." % key)
+
+func _verify_non_empty_selection_field(record: Dictionary, key: String) -> void:
+	if not record.has(key):
+		return
+	var value: Variant = record.get(key)
+	if value is String and not String(value).strip_edges().is_empty():
+		return
+	if value is Array and not (value as Array).is_empty():
+		return
+	if value is Dictionary and not (value as Dictionary).is_empty():
+		return
+	failures.append("%s must be a non-empty String, Array, or Dictionary." % key)
 
 func _verify_non_empty_array_or_dictionary_field(record: Dictionary, key: String) -> void:
 	if not record.has(key):

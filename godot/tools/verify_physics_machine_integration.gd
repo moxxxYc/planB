@@ -79,37 +79,98 @@ func _verify_physics_queue_chain(battle: Node, visual_contract: Dictionary) -> v
 		failures.append("last_physics_queue_chain must include source=physics and Unit/Queue entry evidence.")
 
 func _is_physics_queue_chain(chain: Dictionary) -> bool:
-	return _chain_has_physics_source(chain) and _chain_has_queue_entry(chain)
-
-func _chain_has_physics_source(chain: Dictionary) -> bool:
-	if String(chain.get("source", "")) == "physics":
-		return true
-	for key: String in ["physics_result", "last_physics_result", "machine_physics_result"]:
-		var result_variant: Variant = chain.get(key, {})
-		if result_variant is Dictionary and String((result_variant as Dictionary).get("source", "")) == "physics":
-			return true
-	for result_variant: Variant in _chain_results(chain):
-		if result_variant is Dictionary and String((result_variant as Dictionary).get("source", "")) == "physics":
-			return true
+	for queue_entry_variant: Variant in _chain_queue_entries(chain):
+		if not (queue_entry_variant is Dictionary):
+			continue
+		var queue_entry: Dictionary = queue_entry_variant as Dictionary
+		if not _is_structured_queue_entry(queue_entry):
+			continue
+		for result_variant: Variant in _chain_unit_physics_results(chain):
+			var unit_result: Dictionary = result_variant as Dictionary
+			if _queue_entry_is_tied_to_unit_result(queue_entry, unit_result):
+				return true
 	return false
 
-func _chain_has_queue_entry(chain: Dictionary) -> bool:
+func _is_structured_queue_entry(queue_entry: Dictionary) -> bool:
+	if queue_entry.is_empty():
+		return false
+	if String(queue_entry.get("unit_id", "")).strip_edges().is_empty():
+		return false
+	if int(queue_entry.get("slot_id", 0)) <= 0:
+		return false
+	if not _queue_entry_has_physics_source_or_chain_id(queue_entry):
+		return false
+	return true
+
+func _queue_entry_has_physics_source_or_chain_id(queue_entry: Dictionary) -> bool:
+	if String(queue_entry.get("source", "")).contains("physics"):
+		return true
+	if not String(queue_entry.get("chain_id", "")).strip_edges().is_empty():
+		return true
+	var source_tags_variant: Variant = queue_entry.get("source_tags", [])
+	if source_tags_variant is Array:
+		for tag_variant: Variant in source_tags_variant:
+			if String(tag_variant).contains("physics"):
+				return true
+	return false
+
+func _chain_unit_physics_results(chain: Dictionary) -> Array:
+	var results: Array = []
+	for key: String in ["unit_physics_result", "physics_result", "last_physics_result", "machine_physics_result"]:
+		var result_variant: Variant = chain.get(key, {})
+		if result_variant is Dictionary and _is_unit_physics_result(result_variant as Dictionary):
+			results.append(result_variant)
+	var physics_results_variant: Variant = chain.get("physics_results", [])
+	if physics_results_variant is Array:
+		for result_variant: Variant in physics_results_variant:
+			if result_variant is Dictionary and _is_unit_physics_result(result_variant as Dictionary):
+				results.append(result_variant)
+	for result_variant: Variant in _chain_results(chain):
+		if result_variant is Dictionary and _is_unit_physics_result(result_variant as Dictionary):
+			results.append(result_variant)
+	return results
+
+func _is_unit_physics_result(result: Dictionary) -> bool:
+	var component: String = String(result.get("component", result.get("source_component", "")))
+	if component != "Unit":
+		return false
+	if String(result.get("source", "")) != "physics":
+		return false
+	if int(result.get("slot_id", 0)) <= 0:
+		return false
+	return true
+
+func _chain_queue_entries(chain: Dictionary) -> Array:
+	var entries: Array = []
 	var queue_entry_variant: Variant = chain.get("queue_entry", {})
-	if queue_entry_variant is Dictionary and not (queue_entry_variant as Dictionary).is_empty():
-		return true
+	if queue_entry_variant is Dictionary:
+		entries.append(queue_entry_variant)
 	var queue_entries_variant: Variant = chain.get("queue_entries", [])
-	if queue_entries_variant is Array and not (queue_entries_variant as Array).is_empty():
-		return true
-	if not String(chain.get("unit_id", "")).is_empty():
-		return true
-	if not String(chain.get("queue_unit_id", "")).is_empty():
-		return true
+	if queue_entries_variant is Array:
+		for entry_variant: Variant in queue_entries_variant:
+			if entry_variant is Dictionary:
+				entries.append(entry_variant)
 	for result_variant: Variant in _chain_results(chain):
 		if result_variant is Dictionary:
 			var result: Dictionary = result_variant as Dictionary
-			var component: String = String(result.get("component", result.get("source_component", "")))
-			var result_id: String = String(result.get("result_id", result.get("result", "")))
-			if component == "Unit" and (result_id == "QueueEntry" or result.has("queue_entry")):
+			var nested_entry_variant: Variant = result.get("queue_entry", {})
+			if nested_entry_variant is Dictionary:
+				entries.append(nested_entry_variant)
+	return entries
+
+func _queue_entry_is_tied_to_unit_result(queue_entry: Dictionary, unit_result: Dictionary) -> bool:
+	var entry_chain_id: String = String(queue_entry.get("chain_id", "")).strip_edges()
+	var result_chain_id: String = String(unit_result.get("chain_id", "")).strip_edges()
+	if not entry_chain_id.is_empty() and entry_chain_id == result_chain_id:
+		return true
+	if int(queue_entry.get("slot_id", 0)) != int(unit_result.get("slot_id", -1)):
+		return false
+	if String(queue_entry.get("source", "")).contains("physics"):
+		return true
+	var source_tags_variant: Variant = queue_entry.get("source_tags", [])
+	if source_tags_variant is Array:
+		for tag_variant: Variant in source_tags_variant:
+			if String(tag_variant).contains("physics"):
 				return true
 	return false
 

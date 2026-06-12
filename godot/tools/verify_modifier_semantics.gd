@@ -13,7 +13,17 @@ func _initialize() -> void:
 	_finish()
 
 func _verify_junk_sieve_semantics() -> void:
-	var machine: MachineSimulator = MachineSimulator.new()
+	var machine: MachineSimulator = _new_machine_for("Junk Sieve", [
+		"apply_modifier",
+		"advance_step",
+	], [
+		"forge_progress",
+		"pool",
+		"queue",
+		"event_log",
+	])
+	if machine == null:
+		return
 	machine.apply_modifier("junk_sieve")
 	machine.forge_progress = -100.0
 	machine.pool = [
@@ -33,11 +43,16 @@ func _verify_junk_sieve_semantics() -> void:
 		failures.append("Junk Sieve must filter at most once per 10s cooldown window.")
 
 func _verify_surge_buffer_semantics() -> void:
-	var machine: MachineSimulator = MachineSimulator.new()
-	machine.apply_modifier("surge_buffer")
-	if not _has_property(machine, "surge_buffer_charge_by_slot"):
-		failures.append("Surge Buffer must expose per-slot charge state: surge_buffer_charge_by_slot.")
+	var machine: MachineSimulator = _new_machine_for("Surge Buffer", [
+		"apply_modifier",
+		"apply_physics_result",
+	], [
+		"surge_buffer_charge_by_slot",
+		"queue",
+	])
+	if machine == null:
 		return
+	machine.apply_modifier("surge_buffer")
 
 	machine.apply_physics_result(MachinePhysicsResult.make("Tuning", "Surge", 2, 1, "clean", "verifier"))
 	var charge_by_slot: Dictionary = machine.get("surge_buffer_charge_by_slot") as Dictionary
@@ -61,11 +76,15 @@ func _verify_surge_buffer_semantics() -> void:
 		failures.append("Surge Buffer must clear the slot charge after that slot creates a queue entry.")
 
 func _verify_queue_brace_semantics() -> void:
-	var machine: MachineSimulator = MachineSimulator.new()
-	machine.apply_modifier("queue_brace")
-	if not machine.has_method("record_empty_deploy_gap"):
-		failures.append("Queue Brace requires MachineSimulator.record_empty_deploy_gap(delta, battle_elapsed, exposure_state).")
+	var machine: MachineSimulator = _new_machine_for("Queue Brace", [
+		"apply_modifier",
+		"record_empty_deploy_gap",
+	], [
+		"slot_progress",
+	])
+	if machine == null:
 		return
+	machine.apply_modifier("queue_brace")
 
 	var exposure: Object = _new_exposure_state()
 	if exposure == null:
@@ -81,7 +100,14 @@ func _verify_queue_brace_semantics() -> void:
 		failures.append("Queue Brace must respect its 12s cooldown after triggering.")
 
 func _verify_muster_pair_semantics() -> void:
-	var machine: MachineSimulator = MachineSimulator.new()
+	var machine: MachineSimulator = _new_machine_for("Muster Pair", [
+		"apply_modifier",
+		"apply_physics_result",
+	], [
+		"queue",
+	])
+	if machine == null:
+		return
 	machine.apply_modifier("muster_pair")
 	machine.apply_physics_result(MachinePhysicsResult.make("Unit", "QueueEntry", 1, 3, "clean", "verifier"))
 	if machine.queue.size() != 1:
@@ -105,7 +131,16 @@ func _verify_muster_pair_semantics() -> void:
 		failures.append("Muster Pair merged entry must include source_tags=[Muster Pair].")
 
 func _verify_echo_latch_semantics() -> void:
-	var machine: MachineSimulator = MachineSimulator.new()
+	var machine: MachineSimulator = _new_machine_for("Echo Latch", [
+		"apply_modifier",
+		"apply_physics_result",
+	], [
+		"slot_progress",
+		"queue",
+		"event_log",
+	])
+	if machine == null:
+		return
 	machine.apply_modifier("echo_latch")
 	machine.slot_progress[1] = 2
 	machine.apply_physics_result(MachinePhysicsResult.make("Tuning", "Echo", 1, 1, "clean", "verifier"))
@@ -157,6 +192,21 @@ func _event_log_contains_any(event_log: Array[String], needles: Array[String]) -
 			if line.contains(needle):
 				return true
 	return false
+
+func _new_machine_for(label: String, methods: Array[String], properties: Array[String]) -> MachineSimulator:
+	var machine: MachineSimulator = MachineSimulator.new()
+	var has_required_api: bool = true
+	for method_name: String in methods:
+		if not machine.has_method(method_name):
+			failures.append("%s requires MachineSimulator.%s()." % [label, method_name])
+			has_required_api = false
+	for property_name: String in properties:
+		if not _has_property(machine, property_name):
+			failures.append("%s requires MachineSimulator property %s." % [label, property_name])
+			has_required_api = false
+	if not has_required_api:
+		return null
+	return machine
 
 func _has_property(object: Object, property_name: String) -> bool:
 	for property_info: Dictionary in object.get_property_list():
