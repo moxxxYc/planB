@@ -157,9 +157,10 @@ func advance_simulation(delta: float, use_seeded_physics: bool = false) -> void:
 	_advance_counter(delta)
 	var launch_requests: Array[Dictionary] = machine.advance_supply(delta)
 	for launch_request: Dictionary in launch_requests:
-		machine_view.launch_ball(launch_request, elapsed)
 		if use_seeded_physics:
 			machine_view.run_seeded_chain_for_verifier(machine.build_verifier_seeded_chain_for_ball(launch_request))
+		else:
+			machine_view.launch_ball(launch_request, elapsed)
 	deploy_timer += delta
 	while deploy_timer >= DEPLOY_TICK_SECONDS:
 		deploy_timer -= DEPLOY_TICK_SECONDS

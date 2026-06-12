@@ -365,6 +365,8 @@ func _queue_free_retired_body_after_dwell(body: RigidBody2D) -> void:
 		_release_retired_body(body)
 		return
 	await get_tree().create_timer(RETIRED_BALL_DWELL_SECONDS).timeout
+	if not is_instance_valid(self) or not is_inside_tree():
+		return
 	_release_retired_body(body)
 
 func _release_retired_body(body: RigidBody2D) -> void:
