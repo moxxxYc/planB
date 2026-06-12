@@ -204,6 +204,7 @@
 - 本次烟测确认：窗口标题为 `PlanB 三仓球机`；Battle 1 可见物理球、Pool、Launch / Tuning / Unit 三板、Unit 暴露闸门、Queue Bridge 和三路战场；Battle 3 / Battle 5 可见断档惩罚者反制、反制目标、Queue 空档和路线压力；Endpoint 可见扫击预警；Final Result 填充守护者、奖励、商店、反制、部署路线影响、守护者压力、终点战结论和下一局观察。
 - 本次修正了玩家可见实现状态和英文残留：项目/窗口标题不再带 `DEBUG` / `MVP Reset`；奖励、商店、第二奖励、反制和敌方突袭虫名称改为中文显示；Final Result 不再显示 `lane leak watch`、`queue gap`、`进行中` 或英文奖励/反制名；机器板说明将 `Split / Recycle / Waste` 显示为 `分流 / 回流 / 废弃`。
 - 当前自动验证入口 `bash tools/verify_godot.sh` 已覆盖 project、M1-M4 run flow、实体战场、完整 handoff、Endpoint result fields、物理机器、暴露闸门、Guardian Contract、Hive unit/battle profile、modifier semantics 和 complete learning record。非实现者是否能读懂 `Launch / Tuning / Unit`、奖励预期、反制目标、Deploy Lane 和 Endpoint 胜负原因，仍必须通过单独 playtest acceptance protocol 记录，不能仅凭实现者烟测宣称已证明。
+- Task 8 实现提交为 `b4291b6`。Task 9 已新增 `docs/playtest/planb-mvp-v0-acceptance-protocol.md`，明确当前 M0-M4 人工验收必须使用默认 `godot/` 启动路径、当前验证入口、非实现者测试者、完整短局、至少一个胜利路径和一个失败路径，以及 Battle 1 / 第一次反制 / 第二次奖励 / Endpoint / Final Result 截图记录。
 
 ## 2026-06-05
 
