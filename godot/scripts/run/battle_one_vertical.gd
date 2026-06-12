@@ -274,9 +274,11 @@ func _on_lane_clicked(lane: String) -> void:
 
 func _deploy_queue_head() -> void:
 	if not machine.has_queue_entry():
+		machine.record_empty_deploy_gap(DEPLOY_TICK_SECONDS, elapsed, exposure_state)
 		return
 
 	var entry: Dictionary = machine.pop_queue_entry()
+	machine.record_queue_deployed()
 	lanes.deploy_player_queue_entry(deploy.current_lane, entry)
 	no_deploy_timer = 0.0
 	last_deploy_elapsed = elapsed

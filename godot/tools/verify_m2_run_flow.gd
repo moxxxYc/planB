@@ -381,24 +381,29 @@ func _verify_front_recycle_behavior() -> bool:
 func _verify_surge_buffer_behavior() -> bool:
 	var machine: MachineSimulator = MachineSimulator.new()
 	machine.apply_modifier("surge_buffer")
-	machine.pool = [{"kind": "clean", "value": 1}]
-	machine._step_index = 5
-	machine.advance_step(1.3)
 
-	if machine.surge_buffer_charge != 1:
-		push_error("Surge Buffer should store one buffer after Surge produces no Queue entry.")
+	machine.apply_physics_result(MachinePhysicsResult.make("Tuning", "Surge", 2, 1, "clean", "verifier"))
+	if not bool(machine.surge_buffer_charge_by_slot.get(2, false)):
+		push_error("Surge Buffer should store one slot-local buffer after Surge produces no Queue entry.")
 		return false
-	if not _event_log_contains(machine.event_log, "Surge Buffer stored buffer=1"):
+	if not _event_log_contains(machine.event_log, "Surge Buffer stored S2 charge=1"):
 		push_error("Surge Buffer should log buffer storage.")
 		return false
 
-	machine.pool = [{"kind": "clean", "value": 1}]
-	machine._step_index = 7
-	machine.advance_step(1.3)
-	if machine.surge_buffer_charge != 0:
-		push_error("Surge Buffer should consume buffer on the next valid Tuning hit.")
+	machine.apply_physics_result(MachinePhysicsResult.make("Tuning", "Gate", 1, 3, "clean", "verifier"))
+	if not bool(machine.surge_buffer_charge_by_slot.get(2, false)):
+		push_error("Surge Buffer charge should not be consumed by another slot.")
 		return false
-	if not _event_log_contains(machine.event_log, "Surge Buffer consumed buffer value+1"):
+
+	machine.apply_physics_result(MachinePhysicsResult.make("Tuning", "Gate", 2, 5, "clean", "verifier"))
+	if bool(machine.surge_buffer_charge_by_slot.get(2, false)):
+		push_error("Surge Buffer should consume buffer on the charged slot's next queue entry.")
+		return false
+	var entry: Dictionary = machine.queue[machine.queue.size() - 1] as Dictionary
+	if absf(float(entry.get("deploy_delay", -1.0)) - 0.25) > 0.001:
+		push_error("Surge Buffer should attach deploy_delay=0.25 to the charged slot's next queue entry.")
+		return false
+	if not _event_log_contains(machine.event_log, "Surge Buffer S2 charge consumed"):
 		push_error("Surge Buffer should log buffer consumption.")
 		return false
 
@@ -407,18 +412,19 @@ func _verify_surge_buffer_behavior() -> bool:
 func _verify_queue_brace_behavior() -> bool:
 	var machine: MachineSimulator = MachineSimulator.new()
 	machine.apply_modifier("queue_brace")
-	machine.queue_brace_gap_count = MachineSimulator.QUEUE_BRACE_MISS_THRESHOLD - 1
-	machine.pool = [{"kind": "clean", "value": 1}]
-	machine._step_index = 6
+	var exposure := MachineSlotExposureState.new()
+	machine.slot_progress = {1: 2, 2: 0, 3: 0, 4: 0}
 
-	var s1_progress_before: int = int(machine.slot_progress.get(1, 0))
-	machine.advance_step(1.3)
+	machine.record_empty_deploy_gap(3.0, 30.0, exposure)
 
-	if int(machine.slot_progress.get(1, 0)) < s1_progress_before + 1:
-		push_error("Queue Brace should compensate long no-Queue gaps with S1 +1 progress.")
+	if int(machine.slot_progress.get(2, 0)) != 1:
+		push_error("Queue Brace should compensate long no-Queue gaps on the lowest-progress exposed slot.")
 		return false
-	if not _event_log_contains(machine.event_log, "Queue Brace S1 +1"):
-		push_error("Queue Brace should log S1 compensation.")
+	if int(machine.slot_progress.get(1, 0)) != 2:
+		push_error("Queue Brace should not hard-code compensation to S1.")
+		return false
+	if not _event_log_contains(machine.event_log, "Queue Brace S2 +1"):
+		push_error("Queue Brace should log selected-slot compensation.")
 		return false
 
 	return true

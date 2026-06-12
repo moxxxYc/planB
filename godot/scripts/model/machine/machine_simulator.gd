@@ -11,6 +11,10 @@ const SLOT_REQUIREMENTS: Dictionary = {
 }
 const QUEUE_BRACE_MISS_THRESHOLD: int = 3
 const QUEUE_BRACE_COMPENSATION_VALUE: int = 1
+const QUEUE_BRACE_GAP_SECONDS: float = 3.0
+const QUEUE_BRACE_COOLDOWN_SECONDS: float = 12.0
+const JUNK_SIEVE_COOLDOWN_SECONDS: float = 10.0
+const MUSTER_PAIR_WINDOW_SECONDS: float = 1.2
 const MAX_PENDING_PHYSICS_CHAINS: int = 24
 const MAX_PHYSICS_QUEUE_CHAIN_TELEMETRY: int = 12
 
@@ -19,7 +23,11 @@ var launcher_progress: float = 0.0
 var pool_capacity: int = 5
 var prime_value_bonus: int = 1
 var surge_buffer_charge: int = 0
+var surge_buffer_charge_by_slot: Dictionary = {1: false, 2: false, 3: false, 4: false}
 var queue_brace_gap_count: int = 0
+var queue_brace_empty_deploy_seconds: float = 0.0
+var queue_brace_next_ready_elapsed: float = 0.0
+var junk_sieve_cooldown: float = 0.0
 var pool: Array[Dictionary] = []
 var slot_progress: Dictionary = {1: 0, 2: 0, 3: 0, 4: 0}
 var slot_progress_floor: Dictionary = {}
@@ -42,6 +50,8 @@ var exposure_state: RefCounted = MachineSlotExposureStateScript.new()
 var guardian_contract: RefCounted = null
 var _step_index: int = 0
 var _next_chain_index: int = 0
+var _queue_entry_serial: int = 0
+var _muster_pair_pending_by_slot: Dictionary = {}
 var _pending_physics_chains: Dictionary = {}
 var _pending_chain_order: Array[String] = []
 var _last_machine_chain_sample: Dictionary = {}
@@ -107,7 +117,7 @@ func apply_modifier(modifier_id: String, payload: Dictionary = {}) -> void:
 			effect_marker = "surge_buffer_enabled=true max=1"
 		"queue_brace":
 			queue_brace_enabled = true
-			effect_marker = "queue_brace_enabled=true threshold=%d S1+1" % QUEUE_BRACE_MISS_THRESHOLD
+			effect_marker = "queue_brace_enabled=true gap=3s cooldown=12s"
 		"junk_sieve":
 			junk_sieve_enabled = true
 			effect_marker = "junk_sieve_enabled=true"
@@ -127,8 +137,11 @@ func apply_modifier(modifier_id: String, payload: Dictionary = {}) -> void:
 		_modifier_axis(modifier_id),
 		effect_marker,
 	])
+	var log_display_name: String = _modifier_display_name(modifier_id)
+	if modifier_id == "junk_sieve":
+		log_display_name = "Launch pollution patch"
 	event_log.append("Modifier:%s axis=%s key=%s id=%s %s" % [
-		_modifier_display_name(modifier_id),
+		log_display_name,
 		_modifier_axis(modifier_id),
 		active_key,
 		modifier_id,
@@ -141,6 +154,7 @@ func advance_supply(delta: float) -> Array[Dictionary]:
 	var launch_requests: Array[Dictionary] = []
 	forge_progress += delta
 	launcher_progress += delta
+	junk_sieve_cooldown = maxf(0.0, junk_sieve_cooldown - delta)
 
 	if forge_progress >= 2.2:
 		forge_progress -= 2.2
@@ -149,6 +163,8 @@ func advance_supply(delta: float) -> Array[Dictionary]:
 	if launcher_progress >= 1.3 and not pool.is_empty():
 		launcher_progress -= 1.3
 		var ball: Dictionary = pool.pop_front()
+		if _filter_head_junk_with_sieve(ball):
+			return launch_requests
 		var launch_request: Dictionary = _make_launch_request(ball)
 		_begin_machine_chain(launch_request)
 		event_log.append("Launch.Launcher fired %s ball to visible physics" % String(launch_request.get("kind", "clean")))
@@ -168,6 +184,8 @@ func advance_step(delta: float) -> Array[Dictionary]:
 func apply_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
 	if result == null:
 		return []
+	if result.battle_elapsed > 0.0:
+		set_battle_elapsed(maxf(battle_elapsed, result.battle_elapsed))
 	if result.component == "Unit" and result.result_id == "ExposureBlocked":
 		_register_physics_result(result)
 		event_log.append("Unit：S%d 暴露闸门挡开，球未产生 Unit 进度" % clampi(result.slot_id, 1, 4))
@@ -208,6 +226,17 @@ func apply_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
 	_commit_queue_chain_if_needed(result, produced_entries)
 	return produced_entries
 
+func apply_physics_result_at_time(result: MachinePhysicsResult, seconds: float) -> Array[Dictionary]:
+	return apply_timestamped_physics_result(result, seconds)
+
+func apply_timestamped_physics_result(result: MachinePhysicsResult, seconds: float) -> Array[Dictionary]:
+	if result == null:
+		return []
+	var timed_result: MachinePhysicsResult = result.duplicate_result()
+	timed_result.battle_elapsed = maxf(0.0, seconds)
+	set_battle_elapsed(timed_result.battle_elapsed)
+	return apply_physics_result(timed_result)
+
 func apply_verifier_seeded_chain_for_ball(ball: Dictionary) -> Array[Dictionary]:
 	_step_index += 1
 	var chain_id: String = String(ball.get("chain_id", "")).strip_edges()
@@ -217,12 +246,8 @@ func apply_verifier_seeded_chain_for_ball(ball: Dictionary) -> Array[Dictionary]
 
 	var ball_kind: String = "junk" if String(ball.get("kind", "clean")) == "junk" else "clean"
 	if ball_kind == "junk":
-		if junk_sieve_enabled:
-			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
-			_append_counter_event("Modifier:Junk Sieve 过滤 Junk，Pool 污染被清理")
-		else:
-			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
-			_append_counter_event("Counter:Pool Polluter Junk 发射后无有效 Unit 结算")
+		pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
+		_append_counter_event("Counter:Pool Polluter Junk 发射后无有效 Unit 结算")
 		return _finalize_queue_output([], 0, 0)
 
 	var produced_entries: Array[Dictionary] = []
@@ -271,7 +296,35 @@ func has_queue_entry() -> bool:
 func pop_queue_entry() -> Dictionary:
 	if queue.is_empty():
 		return {}
-	return queue.pop_front()
+	var entry: Dictionary = queue.pop_front()
+	_shift_muster_pair_pending_after_pop(entry)
+	entry.erase("_queue_entry_id")
+	return entry
+
+func record_queue_deployed() -> void:
+	queue_brace_empty_deploy_seconds = 0.0
+
+func record_empty_deploy_gap(delta: float, p_battle_elapsed: float, p_exposure_state: Object = null) -> Array[Dictionary]:
+	if not queue_brace_enabled:
+		return []
+	queue_brace_empty_deploy_seconds += maxf(0.0, delta)
+	if queue_brace_empty_deploy_seconds < QUEUE_BRACE_GAP_SECONDS:
+		return []
+	if p_battle_elapsed < queue_brace_next_ready_elapsed:
+		return []
+	var legal_exposure_state: Object = p_exposure_state
+	if not _has_exposure_state_contract(legal_exposure_state):
+		legal_exposure_state = exposure_state
+	if not _has_exposure_state_contract(legal_exposure_state):
+		return []
+	var slot_id: int = int(legal_exposure_state.call("lowest_progress_legal_slot", slot_progress, p_battle_elapsed))
+	if slot_id <= 0:
+		return []
+	var entries: Array[Dictionary] = _apply_unit_hit(slot_id, QUEUE_BRACE_COMPENSATION_VALUE, "QueueBrace", "", ["Queue Brace"])
+	event_log.append("Modifier:Queue Brace S%d +1 after %.1fs empty deploy gap" % [slot_id, queue_brace_empty_deploy_seconds])
+	queue_brace_empty_deploy_seconds = 0.0
+	queue_brace_next_ready_elapsed = p_battle_elapsed + QUEUE_BRACE_COOLDOWN_SECONDS
+	return _finalize_queue_output(entries, slot_id, QUEUE_BRACE_COMPENSATION_VALUE, "", ["Queue Brace"], p_battle_elapsed)
 
 func add_guardian_clean_pool_ball() -> bool:
 	return _add_pool_ball("clean")
@@ -291,6 +344,16 @@ func _add_pool_ball_front(kind: String, source: String) -> bool:
 	pool.push_front({"kind": kind, "value": 1})
 	event_log.append("Modifier:%s returned %s ball to Pool front" % [source, kind])
 	return true
+
+func _filter_head_junk_with_sieve(ball: Dictionary) -> bool:
+	if String(ball.get("kind", "clean")) != "junk":
+		return false
+	if junk_sieve_enabled and junk_sieve_cooldown <= 0.0:
+		pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
+		junk_sieve_cooldown = JUNK_SIEVE_COOLDOWN_SECONDS
+		_append_counter_event("Modifier:Junk Sieve 过滤 Pool 头部 Junk 为 Waste")
+		return true
+	return false
 
 func _apply_unit_hit(
 	slot_id: int,
@@ -327,20 +390,11 @@ func _finalize_queue_output(
 	natural_slot_id: int,
 	natural_value: int,
 	chain_id: String = "",
-	source_tags: Array[String] = []
+	source_tags: Array[String] = [],
+	queue_time: float = -1.0
 ) -> Array[Dictionary]:
 	var output_entries: Array[Dictionary] = added_entries.duplicate(true)
-	if output_entries.is_empty():
-		_maybe_apply_queue_brace(output_entries)
-	else:
-		queue_brace_gap_count = 0
-
-	if muster_pair_enabled:
-		for entry: Dictionary in output_entries:
-			if String(entry.get("source", "")) != "QueueBrace":
-				entry["count"] = int(entry.get("count", 1)) + 1
-				_append_counter_event("Modifier:Muster Pair 同槽成对出兵")
-				break
+	var generated_time: float = battle_elapsed if queue_time < 0.0 else maxf(0.0, queue_time)
 
 	for entry: Dictionary in output_entries:
 		if not chain_id.is_empty() and not entry.has("chain_id"):
@@ -353,26 +407,113 @@ func _finalize_queue_output(
 				if not merged_tags.has(tag):
 					merged_tags.append(tag)
 			entry["source_tags"] = merged_tags
-		queue.append(entry)
+		_apply_surge_buffer_to_queue_entry(entry)
 		var entry_slot_id: int = int(entry.get("slot_id", natural_slot_id))
 		var entry_value: int = QUEUE_BRACE_COMPENSATION_VALUE if String(entry.get("source", "")) == "QueueBrace" else natural_value
-		event_log.append(MachineResult.new("Unit", "QueueEntry", entry_slot_id, entry_value, entry).to_log_line())
+		if not _try_merge_muster_pair_entry(entry, generated_time):
+			_queue_entry_serial += 1
+			entry["_queue_entry_id"] = _queue_entry_serial
+			queue.append(entry)
+			_remember_unpaired_muster_entry(entry, queue.size() - 1, generated_time)
+		var log_entry: Dictionary = entry.duplicate(true)
+		log_entry.erase("_queue_entry_id")
+		event_log.append(MachineResult.new("Unit", "QueueEntry", entry_slot_id, entry_value, log_entry).to_log_line())
 		if String(entry.get("source", "")).contains("physics"):
 			event_log.append("Unit：S%d 槽满，%s进入 Queue" % [entry_slot_id, _unit_name_for_player(String(entry.get("unit_id", "")))])
 	return output_entries
 
-func _maybe_apply_queue_brace(output_entries: Array[Dictionary]) -> void:
-	if not queue_brace_enabled:
+func _apply_surge_buffer_to_queue_entry(entry: Dictionary) -> void:
+	if not surge_buffer_enabled:
 		return
-
-	queue_brace_gap_count += 1
-	if queue_brace_gap_count < QUEUE_BRACE_MISS_THRESHOLD:
+	var slot_id: int = int(entry.get("slot_id", 0))
+	if slot_id <= 0:
 		return
+	if not bool(surge_buffer_charge_by_slot.get(slot_id, false)):
+		return
+	entry["deploy_delay"] = 0.25
+	var source_tags: Array = []
+	if entry.get("source_tags", []) is Array:
+		source_tags = (entry.get("source_tags", []) as Array).duplicate()
+	if not source_tags.has("Surge Buffer"):
+		source_tags.append("Surge Buffer")
+	entry["source_tags"] = source_tags
+	surge_buffer_charge_by_slot[slot_id] = false
+	event_log.append("Modifier:Surge Buffer S%d charge consumed by next queue entry deploy_delay=0.25" % slot_id)
 
-	queue_brace_gap_count = 0
-	var brace_entries: Array[Dictionary] = _apply_unit_hit(1, QUEUE_BRACE_COMPENSATION_VALUE, "QueueBrace")
-	event_log.append("Modifier:Queue Brace S1 +1 after %d no-Queue routes" % QUEUE_BRACE_MISS_THRESHOLD)
-	output_entries.append_array(brace_entries)
+func _maybe_store_surge_buffer_charge(tuning_result: String, slot_id: int, produced_entries: Array[Dictionary]) -> void:
+	if not surge_buffer_enabled or tuning_result != "Surge" or not produced_entries.is_empty():
+		return
+	surge_buffer_charge_by_slot[slot_id] = true
+	event_log.append("Modifier:Surge Buffer stored S%d charge=1 after Surge no Queue" % slot_id)
+
+func _try_merge_muster_pair_entry(entry: Dictionary, generated_time: float) -> bool:
+	if not muster_pair_enabled:
+		return false
+	var slot_id: int = int(entry.get("slot_id", 0))
+	if slot_id <= 0 or not _muster_pair_pending_by_slot.has(slot_id):
+		return false
+	var pending: Dictionary = _muster_pair_pending_by_slot[slot_id] as Dictionary
+	var queue_index: int = int(pending.get("queue_index", -1))
+	var first_time: float = float(pending.get("time", -9999.0))
+	if queue_index < 0 or queue_index >= queue.size():
+		_muster_pair_pending_by_slot.erase(slot_id)
+		return false
+	if generated_time - first_time > MUSTER_PAIR_WINDOW_SECONDS:
+		_muster_pair_pending_by_slot.erase(slot_id)
+		return false
+	var previous_entry: Dictionary = queue[queue_index] as Dictionary
+	if bool(previous_entry.get("paired_entry", false)) or int(previous_entry.get("slot_id", 0)) != slot_id:
+		_muster_pair_pending_by_slot.erase(slot_id)
+		return false
+	previous_entry["count"] = 2
+	previous_entry["paired_entry"] = true
+	var source_tags: Array = []
+	if previous_entry.get("source_tags", []) is Array:
+		source_tags = (previous_entry.get("source_tags", []) as Array).duplicate()
+	if entry.get("source_tags", []) is Array:
+		for tag: String in entry.get("source_tags", []) as Array:
+			if not source_tags.has(tag):
+				source_tags.append(tag)
+	if not source_tags.has("Muster Pair"):
+		source_tags.append("Muster Pair")
+	previous_entry["source_tags"] = source_tags
+	queue[queue_index] = previous_entry
+	_muster_pair_pending_by_slot.erase(slot_id)
+	_append_counter_event("Modifier:Muster Pair 同槽 1.2s 内成对出兵")
+	return true
+
+func _remember_unpaired_muster_entry(entry: Dictionary, queue_index: int, generated_time: float) -> void:
+	if not muster_pair_enabled:
+		return
+	if bool(entry.get("paired_entry", false)):
+		return
+	var slot_id: int = int(entry.get("slot_id", 0))
+	if slot_id <= 0:
+		return
+	_muster_pair_pending_by_slot[slot_id] = {
+		"queue_index": queue_index,
+		"time": generated_time,
+		"entry_id": int(entry.get("_queue_entry_id", 0)),
+	}
+
+func _shift_muster_pair_pending_after_pop(popped_entry: Dictionary) -> void:
+	if _muster_pair_pending_by_slot.is_empty():
+		return
+	var popped_id: int = int(popped_entry.get("_queue_entry_id", 0))
+	var slots_to_erase: Array[int] = []
+	for slot_id_variant: Variant in _muster_pair_pending_by_slot.keys():
+		var slot_id: int = int(slot_id_variant)
+		var pending: Dictionary = _muster_pair_pending_by_slot[slot_id] as Dictionary
+		var queue_index: int = int(pending.get("queue_index", -1))
+		if popped_id != 0 and int(pending.get("entry_id", 0)) == popped_id:
+			slots_to_erase.append(slot_id)
+		elif queue_index <= 0:
+			slots_to_erase.append(slot_id)
+		else:
+			pending["queue_index"] = queue_index - 1
+			_muster_pair_pending_by_slot[slot_id] = pending
+	for slot_id: int in slots_to_erase:
+		_muster_pair_pending_by_slot.erase(slot_id)
 
 func get_modifier_marker_text() -> String:
 	if active_modifier_markers.is_empty():
@@ -388,12 +529,8 @@ func get_pool_capacity() -> int:
 
 func _apply_launch_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
 	if result.ball_kind == "junk":
-		if junk_sieve_enabled:
-			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
-			_append_counter_event("Modifier:Junk Sieve 过滤 Junk，Pool 污染被清理")
-		else:
-			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
-			_append_counter_event("Counter:Pool Polluter Junk 发射后无有效 Unit 结算")
+		pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
+		_append_counter_event("Counter:Pool Polluter Junk 发射后无有效 Unit 结算")
 		return _finalize_queue_output([], 0, 0, result.chain_id, [result.source])
 
 	event_log.append(MachineResult.new("Launch", result.result_id, 0, 0, {}).to_log_line())
@@ -441,10 +578,11 @@ func _apply_tuning_direct_result(result: MachinePhysicsResult) -> Array[Dictiona
 	if result.result_id == "Echo":
 		entries.append_array(_apply_unit_hit(slot_id, value, "EchoCopy", result.chain_id, [result.source, "EchoCopy"]))
 		if echo_latch_enabled:
-			entries.append_array(_apply_unit_hit(slot_id, 1, "EchoLatch", result.chain_id, [result.source, "EchoLatch"]))
-			event_log.append("Modifier:Echo Latch physics repeated hit")
+			event_log.append("Modifier:Echo Latch ghost hit marker locked to S%d" % slot_id)
 	event_log.append(MachineResult.new("Tuning", result.result_id, slot_id, value, {}).to_log_line())
-	return _finalize_queue_output(entries, slot_id, value, result.chain_id, [result.source, result.result_id])
+	var produced_entries: Array[Dictionary] = _finalize_queue_output(entries, slot_id, value, result.chain_id, [result.source, result.result_id], result.battle_elapsed)
+	_maybe_store_surge_buffer_charge(result.result_id, slot_id, produced_entries)
+	return produced_entries
 
 func _apply_unit_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
 	var chain: Dictionary = _chain_for_result(result)
@@ -467,13 +605,10 @@ func _apply_unit_physics_result(result: MachinePhysicsResult) -> Array[Dictionar
 		else:
 			entries.append_array(_apply_unit_hit(slot_id, value, result.source, result.chain_id, [result.source, "EchoCopy"]))
 			if echo_latch_enabled:
-				entries.append_array(_apply_unit_hit(slot_id, 1, result.source, result.chain_id, [result.source, "EchoLatch"]))
-				event_log.append("Modifier:Echo Latch physics ghost hit marker")
+				event_log.append("Modifier:Echo Latch ghost hit marker locked to S%d" % slot_id)
 
-	var produced_entries: Array[Dictionary] = _finalize_queue_output(entries, slot_id, value, result.chain_id, source_tags)
-	if surge_buffer_enabled and tuning_result == "Surge" and produced_entries.is_empty():
-		surge_buffer_charge = mini(1, surge_buffer_charge + 1)
-		event_log.append("Modifier:Surge Buffer stored buffer=1 after Surge no Queue")
+	var produced_entries: Array[Dictionary] = _finalize_queue_output(entries, slot_id, value, result.chain_id, source_tags, result.battle_elapsed)
+	_maybe_store_surge_buffer_charge(tuning_result, slot_id, produced_entries)
 
 	return produced_entries
 
@@ -700,10 +835,6 @@ func _value_for_tuning_result(result: MachinePhysicsResult) -> int:
 	var value: int = maxi(1, result.value)
 	if result.result_id == "Prime":
 		value += prime_value_bonus
-	if surge_buffer_enabled and surge_buffer_charge > 0:
-		surge_buffer_charge = 0
-		value += 1
-		event_log.append("Modifier:Surge Buffer consumed buffer value+1 on %s" % result.result_id)
 	return value
 
 func _unit_name_for_player(unit_id: String) -> String:
