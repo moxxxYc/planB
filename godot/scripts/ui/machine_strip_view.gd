@@ -1,6 +1,8 @@
 class_name MachineStripView
 extends VBoxContainer
 
+signal landing_resolved(result: MachinePhysicsResult)
+
 const MachineBoardViewScript := preload("res://scripts/ui/machine_board_view.gd")
 
 const FORGE_CYCLE_SECONDS: float = 2.2
@@ -20,6 +22,7 @@ const LOG_LINE_COUNT: int = 3
 
 func _ready() -> void:
 	_ensure_nodes()
+	_connect_machine_board()
 	add_theme_constant_override("separation", 8)
 	_configure_machine_panel_layout()
 	log_label.add_theme_color_override("font_color", Color("#c8c0ad"))
@@ -54,6 +57,26 @@ func render(machine, counter_target_component: String = "") -> void:
 func get_visual_contract_summary() -> Dictionary:
 	_ensure_nodes()
 	return machine_board.get_visual_contract_summary()
+
+func launch_ball(ball: Dictionary, battle_elapsed: float) -> void:
+	_ensure_nodes()
+	machine_board.launch_ball(ball, battle_elapsed)
+
+func set_exposure_state(exposure_state) -> void:
+	_ensure_nodes()
+	machine_board.set_exposure_state(exposure_state)
+
+func emit_seeded_landing_for_verifier(result: MachinePhysicsResult) -> MachinePhysicsResult:
+	_ensure_nodes()
+	return machine_board.emit_seeded_landing_for_verifier(result)
+
+func run_seeded_chain_for_verifier(results: Array[MachinePhysicsResult]) -> void:
+	_ensure_nodes()
+	machine_board.run_seeded_chain_for_verifier(results)
+
+func get_runtime_contract() -> Dictionary:
+	_ensure_nodes()
+	return machine_board.get_runtime_contract()
 
 func get_readable_log_text() -> String:
 	_ensure_nodes()
@@ -96,8 +119,14 @@ func _localized_log_line(log_line: String) -> String:
 		return "反制：Echo Breaker 让 Echo 复制降级为 Gate"
 	if log_line.contains("Muster Pair 同槽成对"):
 		return "Unit：Muster Pair 让同槽成对出兵"
+	if log_line.begins_with("物理落点"):
+		return log_line
+	if log_line.begins_with("Unit："):
+		return log_line
 	if log_line.begins_with("Launch.Forge added"):
 		return "Launch：Forge 加入 1 颗净球"
+	if log_line.begins_with("Launch.Launcher fired"):
+		return "Launch：Launcher 将 Pool 头球送入可见物理板"
 	if log_line.begins_with("Launch.Pool full rejected"):
 		return "Launch：Pool 已满，回流球丢失"
 	if log_line.begins_with("Launch.Waste"):
@@ -171,11 +200,11 @@ func _extract_unit_id(log_line: String) -> String:
 func _unit_name(unit_id: String) -> String:
 	match unit_id:
 		"hive_short_fang":
-			return "短牙"
+			return "短牙虫"
 		"hive_shield_shell":
-			return "盾壳"
+			return "盾壳虫"
 		"hive_acid_sac":
-			return "酸囊"
+			return "酸囊虫"
 		"hive_crush_shell_beast":
 			return "碾壳兽"
 		_:
@@ -218,3 +247,13 @@ func _ensure_nodes() -> void:
 		queue_hint_label = get_node("QueueHintLabel") as Label
 	if log_label == null:
 		log_label = get_node("MachineLogLabel") as Label
+	_connect_machine_board()
+
+func _connect_machine_board() -> void:
+	if machine_board == null:
+		return
+	if not machine_board.landing_resolved.is_connected(_on_machine_board_landing_resolved):
+		machine_board.landing_resolved.connect(_on_machine_board_landing_resolved)
+
+func _on_machine_board_landing_resolved(result: MachinePhysicsResult) -> void:
+	landing_resolved.emit(result)

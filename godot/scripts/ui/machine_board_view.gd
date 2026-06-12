@@ -1,6 +1,10 @@
 class_name MachineBoardView
 extends Control
 
+signal landing_resolved(result: MachinePhysicsResult)
+
+const MachinePhysicsBoardViewScript := preload("res://scripts/ui/machine_physics_board_view.gd")
+
 const FORGE_CYCLE_SECONDS: float = 2.2
 const LAUNCHER_CYCLE_SECONDS: float = 1.3
 const QUEUE_PREVIEW_COUNT: int = 3
@@ -37,14 +41,23 @@ var last_tuning_result: String = ""
 var last_queue_unit: String = ""
 var active_board_index: int = 0
 var counter_target_component: String = ""
+var physics_board: MachinePhysicsBoardView = null
+var physics_landing_count: int = 0
+var last_physics_result: Dictionary = {}
+var last_machine_chain_sample: Dictionary = {}
+var physics_queue_chain_count: int = 0
+var last_physics_queue_chain: Dictionary = {}
 
 func _ready() -> void:
 	custom_minimum_size = MIN_VIEW_SIZE
+	_ensure_physics_board()
 	if not resized.is_connected(_on_resized):
 		resized.connect(_on_resized)
+	_layout_physics_board()
 	queue_redraw()
 
 func render(machine, p_counter_target_component: String = "") -> void:
+	_ensure_physics_board()
 	forge_ratio = clampf(machine.forge_progress / FORGE_CYCLE_SECONDS, 0.0, 1.0)
 	launcher_ratio = clampf(machine.launcher_progress / LAUNCHER_CYCLE_SECONDS, 0.0, 1.0)
 	pool_count = machine.pool.size()
@@ -62,15 +75,33 @@ func render(machine, p_counter_target_component: String = "") -> void:
 	_update_recent_results(machine.event_log)
 	active_board_index = _active_board_from_ratio(launcher_ratio)
 	counter_target_component = p_counter_target_component
+	if machine.has_method("get_machine_chain_sample"):
+		last_machine_chain_sample = machine.call("get_machine_chain_sample") as Dictionary
+	if machine.has_method("get_physics_queue_chain_count"):
+		physics_queue_chain_count = int(machine.call("get_physics_queue_chain_count"))
+	if machine.has_method("get_physics_queue_chains_for_verifier"):
+		var chains: Array = machine.call("get_physics_queue_chains_for_verifier") as Array
+		if not chains.is_empty() and chains[chains.size() - 1] is Dictionary:
+			last_physics_queue_chain = (chains[chains.size() - 1] as Dictionary).duplicate(true)
+	_layout_physics_board()
 	queue_redraw()
 
 func get_visual_contract_summary() -> Dictionary:
+	_ensure_physics_board()
+	var board_contract: Dictionary = physics_board.get_runtime_contract()
 	return {
 		"board_count": 3,
 		"pool_slot_count": pool_capacity,
 		"queue_preview_count": QUEUE_PREVIEW_COUNT,
 		"unit_slot_count": 4,
 		"has_active_ball": true,
+		"has_visible_rigidbody_ball": bool(board_contract.get("has_visible_rigidbody_ball", false)),
+		"runtime_physics_drives_results": true,
+		"physics_landing_count": int(board_contract.get("physics_landing_count", physics_landing_count)),
+		"last_physics_result": board_contract.get("last_physics_result", last_physics_result),
+		"physics_queue_chain_count": physics_queue_chain_count,
+		"last_physics_queue_chain": last_physics_queue_chain.duplicate(true),
+		"machine_chain_sample": last_machine_chain_sample.duplicate(true),
 		"pool_count": pool_count,
 		"queue_count": queue_count,
 		"active_board_index": active_board_index,
@@ -85,7 +116,28 @@ func get_visual_contract_summary() -> Dictionary:
 		"active_ball_ring_radius": ACTIVE_BALL_RING_RADIUS,
 	}
 
+func launch_ball(ball: Dictionary, battle_elapsed: float) -> void:
+	_ensure_physics_board()
+	physics_board.launch_ball(ball, battle_elapsed)
+
+func set_exposure_state(exposure_state) -> void:
+	_ensure_physics_board()
+	physics_board.set_exposure_state(exposure_state)
+
+func emit_seeded_landing_for_verifier(result: MachinePhysicsResult) -> MachinePhysicsResult:
+	_ensure_physics_board()
+	return physics_board.emit_seeded_landing_for_verifier(result)
+
+func run_seeded_chain_for_verifier(results: Array[MachinePhysicsResult]) -> void:
+	_ensure_physics_board()
+	physics_board.run_seeded_chain_for_verifier(results)
+
+func get_runtime_contract() -> Dictionary:
+	_ensure_physics_board()
+	return physics_board.get_runtime_contract()
+
 func _on_resized() -> void:
+	_layout_physics_board()
 	queue_redraw()
 
 func _draw() -> void:
@@ -166,6 +218,43 @@ func _draw_machine_boards(rect: Rect2) -> void:
 	board_rect.position.y += board_height + board_gap
 	_draw_board(board_rect, "Unit", "S1 / S2 / S3 / S4", COLOR_UNIT, active_board_index == 2, _targets_unit_or_queue())
 	_draw_unit_slots(board_rect)
+
+func _ensure_physics_board() -> void:
+	if physics_board != null and is_instance_valid(physics_board):
+		return
+	physics_board = MachinePhysicsBoardViewScript.new() as MachinePhysicsBoardView
+	physics_board.name = "MachinePhysicsBoardView"
+	physics_board.z_index = 4
+	add_child(physics_board)
+	physics_board.landing_resolved.connect(_on_physics_board_landing_resolved)
+	_layout_physics_board()
+
+func _layout_physics_board() -> void:
+	if physics_board == null or not is_instance_valid(physics_board):
+		return
+	physics_board.set_stage_rects(_stage_rects_for_current_size())
+
+func _stage_rects_for_current_size() -> Dictionary:
+	var current_size: Vector2 = size
+	if current_size.x <= 0.0 or current_size.y <= 0.0:
+		current_size = MIN_VIEW_SIZE
+	var rect := Rect2(Vector2.ZERO, current_size)
+	var board_top := rect.position.y + SUPPLY_STRIP_HEIGHT + 32.0
+	var board_gap := 12.0
+	var queue_height := 64.0
+	var available_height := rect.size.y - board_top - queue_height - board_gap * 2.0 - 18.0
+	var board_height := maxf(96.0, available_height / 3.0)
+	var board_rect := Rect2(rect.position.x + 14.0, board_top, rect.size.x - 28.0, board_height)
+	return {
+		"Launch": board_rect,
+		"Tuning": Rect2(board_rect.position + Vector2(0.0, board_height + board_gap), board_rect.size),
+		"Unit": Rect2(board_rect.position + Vector2(0.0, (board_height + board_gap) * 2.0), board_rect.size),
+	}
+
+func _on_physics_board_landing_resolved(result: MachinePhysicsResult) -> void:
+	physics_landing_count += 1
+	last_physics_result = result.to_dictionary()
+	landing_resolved.emit(result)
 
 func _draw_board(board_rect: Rect2, title: String, subtitle: String, accent: Color, is_active: bool, is_counter_target: bool = false) -> void:
 	var font := get_theme_default_font()

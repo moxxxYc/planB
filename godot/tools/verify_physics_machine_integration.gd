@@ -5,6 +5,9 @@ const BATTLE_SCENE_PATH: String = "res://scenes/run/battle_one_vertical.tscn"
 var failures: Array[String] = []
 
 func _initialize() -> void:
+	_run_verification.call_deferred()
+
+func _run_verification() -> void:
 	var scene: PackedScene = load(BATTLE_SCENE_PATH)
 	if scene == null:
 		failures.append("Battle 1 vertical scene missing: %s" % BATTLE_SCENE_PATH)
@@ -19,15 +22,24 @@ func _initialize() -> void:
 
 	root.add_child(battle)
 	if _require_methods(battle, [
-		"advance_for_verifier",
 		"get_machine_visual_contract",
 		"get_active_machine_log_text",
 	]):
-		battle.call("advance_for_verifier", 8.0)
+		await _wait_for_runtime_physics_queue_chain(battle)
 		_verify_runtime_physics_contract(battle)
 	root.remove_child(battle)
 	battle.free()
 	_finish()
+
+func _wait_for_runtime_physics_queue_chain(battle: Node) -> void:
+	for _frame: int in range(720):
+		await physics_frame
+		var contract_variant: Variant = battle.call("get_machine_visual_contract")
+		if not (contract_variant is Dictionary):
+			continue
+		var visual_contract: Dictionary = contract_variant as Dictionary
+		if int(visual_contract.get("physics_queue_chain_count", 0)) > 0:
+			return
 
 func _verify_runtime_physics_contract(battle: Node) -> void:
 	var contract_variant: Variant = battle.call("get_machine_visual_contract")

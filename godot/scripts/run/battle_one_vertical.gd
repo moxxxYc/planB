@@ -31,14 +31,19 @@ var last_deploy_elapsed: float = 0.0
 var stagger_warning_timer: float = 0.0
 var pool_polluter_insert_timer: float = 0.0
 var active_counter_record: Dictionary = {}
+var _runtime_physics_tick_active: bool = false
 
 func _ready() -> void:
 	_ensure_views()
+	_connect_machine_physics()
 	battlefield_view.lane_clicked.connect(_on_lane_clicked)
+	set_physics_process(true)
 	_render()
 
-func _process(delta: float) -> void:
+func _physics_process(delta: float) -> void:
+	_runtime_physics_tick_active = true
 	advance_simulation(delta)
+	_runtime_physics_tick_active = false
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("deploy_left"):
@@ -132,6 +137,11 @@ func get_active_machine_log_text() -> String:
 		raw_log.append(log_line)
 	return "%s\n%s" % [machine_view.get_readable_log_text(), "\n".join(raw_log)]
 
+func get_machine_physics_queue_chains_for_verifier() -> Array[Dictionary]:
+	if machine.has_method("get_physics_queue_chains_for_verifier"):
+		return machine.call("get_physics_queue_chains_for_verifier") as Array[Dictionary]
+	return []
+
 func configure_for_run(p_battle_number: int, p_session: RunSessionModel, payload: Dictionary = {}) -> void:
 	battle_number = maxi(1, p_battle_number)
 	run_session = p_session
@@ -148,7 +158,11 @@ func advance_simulation(delta: float) -> void:
 	elapsed += delta
 	_advance_bridge_transfer(delta)
 	_advance_counter(delta)
-	machine.advance_step(delta)
+	var launch_requests: Array[Dictionary] = machine.advance_supply(delta)
+	for launch_request: Dictionary in launch_requests:
+		machine_view.launch_ball(launch_request, elapsed)
+		if _should_use_verifier_seeded_physics():
+			machine_view.run_seeded_chain_for_verifier(machine.build_verifier_seeded_chain_for_ball(launch_request))
 	deploy_timer += delta
 	while deploy_timer >= DEPLOY_TICK_SECONDS:
 		deploy_timer -= DEPLOY_TICK_SECONDS
@@ -160,6 +174,10 @@ func advance_for_verifier(seconds: float) -> void:
 	var steps: int = maxi(1, int(ceil(seconds / 0.25)))
 	for _i: int in range(steps):
 		advance_simulation(seconds / float(steps))
+
+func _on_machine_landing_resolved(result: MachinePhysicsResult) -> void:
+	machine.apply_physics_result(result)
+	_render()
 
 func _on_lane_clicked(lane: String) -> void:
 	select_deploy_lane(lane)
@@ -366,3 +384,13 @@ func _ensure_views() -> void:
 		battlefield_view = get_node("SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView") as BattlefieldViewScript
 	if status_label == null:
 		status_label = get_node("SafeArea/RootRows/StatusBar/StatusLabel") as Label
+	_connect_machine_physics()
+
+func _connect_machine_physics() -> void:
+	if machine_view == null:
+		return
+	if not machine_view.landing_resolved.is_connected(_on_machine_landing_resolved):
+		machine_view.landing_resolved.connect(_on_machine_landing_resolved)
+
+func _should_use_verifier_seeded_physics() -> bool:
+	return not _runtime_physics_tick_active

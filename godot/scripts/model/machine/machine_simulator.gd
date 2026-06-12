@@ -34,6 +34,10 @@ var counter_log: Array[String] = []
 var active_modifier_ids: Array[String] = []
 var active_modifier_markers: Array[String] = []
 var _step_index: int = 0
+var _next_chain_index: int = 0
+var _pending_physics_chains: Dictionary = {}
+var _last_machine_chain_sample: Dictionary = {}
+var _physics_queue_chains: Array[Dictionary] = []
 
 func apply_modifier(modifier_id: String, payload: Dictionary = {}) -> void:
 	var slot_id: int = int(payload.get("slot_id", 1))
@@ -93,7 +97,8 @@ func apply_modifier(modifier_id: String, payload: Dictionary = {}) -> void:
 	if modifier_id == "junk_sieve" or modifier_id == "muster_pair":
 		counter_log.append(event_log[event_log.size() - 1])
 
-func advance_step(delta: float) -> void:
+func advance_supply(delta: float) -> Array[Dictionary]:
+	var launch_requests: Array[Dictionary] = []
 	forge_progress += delta
 	launcher_progress += delta
 
@@ -104,19 +109,94 @@ func advance_step(delta: float) -> void:
 	if launcher_progress >= 1.3 and not pool.is_empty():
 		launcher_progress -= 1.3
 		var ball: Dictionary = pool.pop_front()
-		_route_ball(ball)
+		var launch_request: Dictionary = _make_launch_request(ball)
+		_begin_machine_chain(launch_request)
+		event_log.append("Launch.Launcher fired %s ball to visible physics" % String(launch_request.get("kind", "clean")))
+		launch_requests.append(launch_request)
 
-func apply_physics_result(result: MachinePhysicsResult) -> void:
+	return launch_requests
+
+# Legacy verifier wrapper. Normal Battle runtime calls advance_supply() and waits
+# for MachinePhysicsBoardView body_entered landings instead of resolving patterns.
+func advance_step(delta: float) -> Array[Dictionary]:
+	var produced_entries: Array[Dictionary] = []
+	var launch_requests: Array[Dictionary] = advance_supply(delta)
+	for launch_request: Dictionary in launch_requests:
+		produced_entries.append_array(apply_verifier_seeded_chain_for_ball(launch_request))
+	return produced_entries
+
+func apply_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
+	if result == null:
+		return []
+	_register_physics_result(result)
+	var produced_entries: Array[Dictionary] = []
 	match result.component:
 		"Launch":
-			_apply_launch_physics_result(result)
+			produced_entries = _apply_launch_physics_result(result)
 		"Tuning":
-			_apply_tuning_physics_result(result)
+			produced_entries = _apply_tuning_physics_result(result)
 		"Unit":
-			var entries: Array[Dictionary] = _apply_unit_hit(result.slot_id, maxi(1, result.value), result.source)
-			_finalize_queue_output(entries, result.slot_id, result.value)
+			produced_entries = _apply_unit_physics_result(result)
 		_:
 			push_error("Unknown machine physics component: %s" % result.component)
+	_commit_queue_chain_if_needed(result, produced_entries)
+	return produced_entries
+
+func apply_verifier_seeded_chain_for_ball(ball: Dictionary) -> Array[Dictionary]:
+	_step_index += 1
+	var chain_id: String = String(ball.get("chain_id", "")).strip_edges()
+	if chain_id.is_empty():
+		chain_id = _next_chain_id("verifier_seed")
+		ball["chain_id"] = chain_id
+
+	var ball_kind: String = "junk" if String(ball.get("kind", "clean")) == "junk" else "clean"
+	if ball_kind == "junk":
+		if junk_sieve_enabled:
+			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
+			_append_counter_event("Modifier:Junk Sieve 过滤 Junk，Pool 污染被清理")
+		else:
+			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
+			_append_counter_event("Counter:Pool Polluter Junk 发射后无有效 Unit 结算")
+		return _finalize_queue_output([], 0, 0)
+
+	var produced_entries: Array[Dictionary] = []
+	for result: MachinePhysicsResult in build_verifier_seeded_chain_for_ball(ball, _step_index):
+		produced_entries.append_array(apply_physics_result(result))
+	return produced_entries
+
+func build_verifier_seeded_chain_for_ball(ball: Dictionary, step: int = -1) -> Array[MachinePhysicsResult]:
+	if step < 0:
+		_step_index += 1
+	var verifier_step: int = _step_index if step < 0 else step
+	var chain_id: String = String(ball.get("chain_id", "")).strip_edges()
+	if chain_id.is_empty():
+		chain_id = _next_chain_id("verifier_seed")
+	var ball_kind: String = "junk" if String(ball.get("kind", "clean")) == "junk" else "clean"
+	if ball_kind == "junk":
+		return [
+			MachinePhysicsResult.make("Launch", "Waste", 0, 0, ball_kind, "verifier_seed", chain_id)
+		]
+	var launch_result: String = _launch_result_for_verifier_step(verifier_step)
+	var results: Array[MachinePhysicsResult] = [
+		MachinePhysicsResult.make("Launch", launch_result, 0, 0, ball_kind, "verifier_seed", chain_id)
+	]
+	if launch_result != "Tuning":
+		return results
+
+	var tuning_result: String = _tuning_result_for_verifier_step(verifier_step)
+	var slot_id: int = _slot_for_verifier_step(verifier_step)
+	results.append(MachinePhysicsResult.make("Tuning", tuning_result, 0, int(ball.get("value", 1)), ball_kind, "verifier_seed", chain_id))
+	results.append(MachinePhysicsResult.make("Unit", "UnitHit", slot_id, 0, ball_kind, "verifier_seed", chain_id))
+	return results
+
+func get_machine_chain_sample() -> Dictionary:
+	return _last_machine_chain_sample.duplicate(true)
+
+func get_physics_queue_chains_for_verifier() -> Array[Dictionary]:
+	return _physics_queue_chains.duplicate(true)
+
+func get_physics_queue_chain_count() -> int:
+	return _physics_queue_chains.size()
 
 func has_queue_entry() -> bool:
 	return not queue.is_empty()
@@ -140,91 +220,43 @@ func _add_pool_ball_front(kind: String, source: String) -> void:
 	pool.push_front({"kind": kind, "value": 1})
 	event_log.append("Modifier:%s returned %s ball to Pool front" % [source, kind])
 
-func _route_ball(ball: Dictionary) -> void:
-	_step_index += 1
-
-	if String(ball.get("kind", "clean")) == "junk":
-		if junk_sieve_enabled:
-			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
-			_append_counter_event("Modifier:Junk Sieve 过滤 Junk，Pool 污染被清理")
-		else:
-			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
-			_append_counter_event("Counter:Pool Polluter Junk 发射后无有效 Unit 结算")
-		_finalize_queue_output([], 0, 0)
-		return
-
-	var launch_result: String = _launch_result_for_step(_step_index)
-	event_log.append(MachineResult.new("Launch", launch_result, 0, 0, {}).to_log_line())
-
-	if launch_result == "Split":
-		_add_pool_ball("clean")
-		_add_pool_ball("clean")
-		_finalize_queue_output([], 0, 0)
-		return
-
-	if launch_result == "Recycle":
-		if front_recycle_enabled:
-			_add_pool_ball_front("clean", "Front Recycle")
-		else:
-			_add_pool_ball("clean")
-		_finalize_queue_output([], 0, 0)
-		return
-
-	if launch_result == "Waste":
-		event_log.append("Launch.Waste consumed ball")
-		_finalize_queue_output([], 0, 0)
-		return
-
-	var tuning_result: String = _tuning_result_for_step(_step_index)
-	var value: int = int(ball.get("value", 1))
-	if tuning_result == "Prime":
-		value += prime_value_bonus
-	if surge_buffer_enabled and surge_buffer_charge > 0:
-		surge_buffer_charge = 0
-		value += 1
-		event_log.append("Modifier:Surge Buffer consumed buffer value+1 on %s" % tuning_result)
-
-	var slot_id: int = _slot_for_step(_step_index)
-	var added_entries: Array[Dictionary] = _apply_unit_hit(slot_id, value, tuning_result)
-	event_log.append(MachineResult.new("Tuning", tuning_result, slot_id, value, {}).to_log_line())
-
-	if tuning_result == "Echo":
-		if echo_breaker_active and echo_breaker_charges > 0:
-			echo_breaker_charges -= 1
-			echo_breaker_active = false
-			_append_counter_event("Counter:Echo Breaker Echo 复制降级为 Gate")
-		else:
-			added_entries.append_array(_apply_unit_hit(slot_id, value, "EchoCopy"))
-			if echo_latch_enabled:
-				added_entries.append_array(_apply_unit_hit(slot_id, 1, "EchoLatch"))
-				event_log.append("Modifier:Echo Latch 同槽重复命中 +1")
-
-	if surge_buffer_enabled and tuning_result == "Surge" and added_entries.is_empty():
-		surge_buffer_charge = mini(1, surge_buffer_charge + 1)
-		event_log.append("Modifier:Surge Buffer stored buffer=1 after Surge no Queue")
-
-	_finalize_queue_output(added_entries, slot_id, value)
-
-func _apply_unit_hit(slot_id: int, value: int, source: String) -> Array[Dictionary]:
+func _apply_unit_hit(
+	slot_id: int,
+	value: int,
+	source: String,
+	chain_id: String = "",
+	source_tags: Array[String] = []
+) -> Array[Dictionary]:
 	var entries: Array[Dictionary] = []
 	slot_progress[slot_id] = int(slot_progress[slot_id]) + value
 	var required: int = int(SLOT_REQUIREMENTS[slot_id])
 
 	if int(slot_progress[slot_id]) >= required:
 		slot_progress[slot_id] = int(slot_progress[slot_id]) - required
-		entries.append({
+		var entry: Dictionary = {
 			"unit_id": _unit_id_for_slot(slot_id),
 			"slot_id": slot_id,
 			"source": source,
 			"count": 1,
-		})
+		}
+		if not chain_id.is_empty():
+			entry["chain_id"] = chain_id
+		if not source_tags.is_empty():
+			entry["source_tags"] = source_tags.duplicate()
+		entries.append(entry)
 
 	var floor_value: int = int(slot_progress_floor.get(slot_id, 0))
 	slot_progress[slot_id] = maxi(int(slot_progress[slot_id]), floor_value)
 
 	return entries
 
-func _finalize_queue_output(added_entries: Array[Dictionary], natural_slot_id: int, natural_value: int) -> void:
+func _finalize_queue_output(
+	added_entries: Array[Dictionary],
+	natural_slot_id: int,
+	natural_value: int,
+	chain_id: String = "",
+	source_tags: Array[String] = []
+) -> Array[Dictionary]:
 	var output_entries: Array[Dictionary] = added_entries.duplicate(true)
 	if output_entries.is_empty():
 		_maybe_apply_queue_brace(output_entries)
@@ -239,10 +271,23 @@ func _finalize_queue_output(added_entries: Array[Dictionary], natural_slot_id: i
 				break
 
 	for entry: Dictionary in output_entries:
+		if not chain_id.is_empty() and not entry.has("chain_id"):
+			entry["chain_id"] = chain_id
+		if not source_tags.is_empty():
+			var merged_tags: Array = []
+			if entry.get("source_tags", []) is Array:
+				merged_tags = (entry.get("source_tags", []) as Array).duplicate()
+			for tag: String in source_tags:
+				if not merged_tags.has(tag):
+					merged_tags.append(tag)
+			entry["source_tags"] = merged_tags
 		queue.append(entry)
 		var entry_slot_id: int = int(entry.get("slot_id", natural_slot_id))
 		var entry_value: int = QUEUE_BRACE_COMPENSATION_VALUE if String(entry.get("source", "")) == "QueueBrace" else natural_value
 		event_log.append(MachineResult.new("Unit", "QueueEntry", entry_slot_id, entry_value, entry).to_log_line())
+		if String(entry.get("source", "")).contains("physics"):
+			event_log.append("Unit：S%d 槽满，%s进入 Queue" % [entry_slot_id, _unit_name_for_player(String(entry.get("unit_id", "")))])
+	return output_entries
 
 func _maybe_apply_queue_brace(output_entries: Array[Dictionary]) -> void:
 	if not queue_brace_enabled:
@@ -269,34 +314,93 @@ func get_modifier_marker_text() -> String:
 func get_pool_capacity() -> int:
 	return pool_capacity
 
-func _apply_launch_physics_result(result: MachinePhysicsResult) -> void:
+func _apply_launch_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
+	if result.ball_kind == "junk":
+		if junk_sieve_enabled:
+			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
+			_append_counter_event("Modifier:Junk Sieve 过滤 Junk，Pool 污染被清理")
+		else:
+			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
+			_append_counter_event("Counter:Pool Polluter Junk 发射后无有效 Unit 结算")
+		return _finalize_queue_output([], 0, 0, result.chain_id, [result.source])
+
+	event_log.append(MachineResult.new("Launch", result.result_id, 0, 0, {}).to_log_line())
+	if result.source == "physics":
+		event_log.append("物理落点：Launch -> %s" % result.result_id)
 	match result.result_id:
 		"Tuning":
-			_apply_tuning_physics_result(MachinePhysicsResult.make("Tuning", "Gate", maxi(1, result.slot_id), maxi(1, result.value), result.ball_kind, result.source))
+			return []
 		"Split":
-			_add_pool_ball(result.ball_kind)
-			_add_pool_ball(result.ball_kind)
-			_finalize_queue_output([], 0, 0)
+			_add_pool_ball("clean")
+			_add_pool_ball("clean")
+			return _finalize_queue_output([], 0, 0, result.chain_id, [result.source])
 		"Recycle":
-			_add_pool_ball_front(result.ball_kind, "Physics Recycle")
-			_finalize_queue_output([], 0, 0)
+			if front_recycle_enabled:
+				_add_pool_ball_front("clean", "Front Recycle")
+			else:
+				_add_pool_ball("clean")
+			return _finalize_queue_output([], 0, 0, result.chain_id, [result.source])
 		"Waste":
 			event_log.append("Launch.Waste consumed physics ball")
-			_finalize_queue_output([], 0, 0)
+			return _finalize_queue_output([], 0, 0, result.chain_id, [result.source])
 		_:
 			push_error("Unknown Launch physics result: %s" % result.result_id)
+	return []
 
-func _apply_tuning_physics_result(result: MachinePhysicsResult) -> void:
+func _apply_tuning_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
+	if _is_staged_physics_source(result.source):
+		var chain: Dictionary = _chain_for_result(result)
+		var value: int = _value_for_tuning_result(result)
+		chain["tuning_result_id"] = result.result_id
+		chain["tuning_value"] = value
+		_pending_physics_chains[result.chain_id] = chain
+		event_log.append(MachineResult.new("Tuning", result.result_id, maxi(0, result.slot_id), value, {}).to_log_line())
+		return []
+
+	return _apply_tuning_direct_result(result)
+
+func _apply_tuning_direct_result(result: MachinePhysicsResult) -> Array[Dictionary]:
 	var slot_id: int = clampi(result.slot_id, 1, 4)
 	var value: int = maxi(1, result.value)
-	var entries: Array[Dictionary] = _apply_unit_hit(slot_id, value, result.result_id)
+	var entries: Array[Dictionary] = _apply_unit_hit(slot_id, value, result.result_id, result.chain_id, [result.source, result.result_id])
 	if result.result_id == "Echo":
-		entries.append_array(_apply_unit_hit(slot_id, value, "EchoCopy"))
+		entries.append_array(_apply_unit_hit(slot_id, value, "EchoCopy", result.chain_id, [result.source, "EchoCopy"]))
 		if echo_latch_enabled:
-			entries.append_array(_apply_unit_hit(slot_id, 1, "EchoLatch"))
+			entries.append_array(_apply_unit_hit(slot_id, 1, "EchoLatch", result.chain_id, [result.source, "EchoLatch"]))
 			event_log.append("Modifier:Echo Latch physics repeated hit")
 	event_log.append(MachineResult.new("Tuning", result.result_id, slot_id, value, {}).to_log_line())
-	_finalize_queue_output(entries, slot_id, value)
+	return _finalize_queue_output(entries, slot_id, value, result.chain_id, [result.source, result.result_id])
+
+func _apply_unit_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
+	var chain: Dictionary = _chain_for_result(result)
+	var tuning_result: String = String(chain.get("tuning_result_id", "Gate"))
+	var slot_id: int = clampi(result.slot_id, 1, 4)
+	var value: int = int(chain.get("tuning_value", result.value))
+	if value <= 0:
+		value = maxi(1, result.value)
+	var source_tags: Array[String] = [result.source, tuning_result]
+	var entries: Array[Dictionary] = _apply_unit_hit(slot_id, value, result.source, result.chain_id, source_tags)
+
+	if result.source == "physics":
+		event_log.append("物理落点：Tuning %s -> S%d +%d" % [tuning_result, slot_id, value])
+
+	if tuning_result == "Echo":
+		if echo_breaker_active and echo_breaker_charges > 0:
+			echo_breaker_charges -= 1
+			echo_breaker_active = false
+			_append_counter_event("Counter:Echo Breaker Echo 复制降级为 Gate")
+		else:
+			entries.append_array(_apply_unit_hit(slot_id, value, result.source, result.chain_id, [result.source, "EchoCopy"]))
+			if echo_latch_enabled:
+				entries.append_array(_apply_unit_hit(slot_id, 1, result.source, result.chain_id, [result.source, "EchoLatch"]))
+				event_log.append("Modifier:Echo Latch physics ghost hit marker")
+
+	var produced_entries: Array[Dictionary] = _finalize_queue_output(entries, slot_id, value, result.chain_id, source_tags)
+	if surge_buffer_enabled and tuning_result == "Surge" and produced_entries.is_empty():
+		surge_buffer_charge = mini(1, surge_buffer_charge + 1)
+		event_log.append("Modifier:Surge Buffer stored buffer=1 after Surge no Queue")
+
+	return produced_entries
 
 func apply_pool_polluter_junk() -> bool:
 	if pool_polluter_junk_count >= 2:
@@ -368,15 +472,128 @@ func _modifier_active_key(modifier_id: String, slot_id: int) -> String:
 			push_error("Unknown machine modifier: %s" % modifier_id)
 			return ""
 
-func _launch_result_for_step(step: int) -> String:
+func _make_launch_request(ball: Dictionary) -> Dictionary:
+	var request: Dictionary = ball.duplicate(true)
+	request["kind"] = String(request.get("kind", "clean"))
+	request["value"] = int(request.get("value", 1))
+	request["chain_id"] = _next_chain_id("physics")
+	request["source"] = "pool"
+	return request
+
+func _next_chain_id(prefix: String) -> String:
+	_next_chain_index += 1
+	return "%s_chain_%04d" % [prefix, _next_chain_index]
+
+func _begin_machine_chain(ball: Dictionary) -> void:
+	var chain_id: String = String(ball.get("chain_id", "")).strip_edges()
+	if chain_id.is_empty():
+		return
+	var chain: Dictionary = {
+		"chain_id": chain_id,
+		"pool": ball.duplicate(true),
+		"pool_to_launch": true,
+		"results": [],
+		"queue_entries": [],
+		"source": "physics",
+	}
+	_pending_physics_chains[chain_id] = chain
+	_last_machine_chain_sample = chain.duplicate(true)
+
+func _register_physics_result(result: MachinePhysicsResult) -> void:
+	if result.chain_id.strip_edges().is_empty():
+		result.chain_id = _next_chain_id(result.source)
+	var chain: Dictionary = _chain_for_result(result)
+	chain["source"] = result.source
+	var result_dict: Dictionary = result.to_dictionary()
+	match result.component:
+		"Launch":
+			chain["launch_physics_result"] = result_dict
+		"Tuning":
+			chain["tuning_physics_result"] = result_dict
+		"Unit":
+			chain["unit_physics_result"] = result_dict
+		_:
+			pass
+	var results: Array = []
+	if chain.get("results", []) is Array:
+		results = chain.get("results", []) as Array
+	results.append(result_dict)
+	chain["results"] = results
+	_pending_physics_chains[result.chain_id] = chain
+	_last_machine_chain_sample = chain.duplicate(true)
+
+func _chain_for_result(result: MachinePhysicsResult) -> Dictionary:
+	var chain_id: String = result.chain_id.strip_edges()
+	if chain_id.is_empty():
+		chain_id = _next_chain_id(result.source)
+		result.chain_id = chain_id
+	if _pending_physics_chains.has(chain_id):
+		return (_pending_physics_chains[chain_id] as Dictionary).duplicate(true)
+	return {
+		"chain_id": chain_id,
+		"pool": {
+			"kind": result.ball_kind,
+			"value": maxi(1, result.value),
+		},
+		"results": [],
+		"queue_entries": [],
+		"source": result.source,
+	}
+
+func _commit_queue_chain_if_needed(result: MachinePhysicsResult, produced_entries: Array[Dictionary]) -> void:
+	var chain: Dictionary = _chain_for_result(result)
+	if produced_entries.is_empty():
+		_pending_physics_chains[result.chain_id] = chain
+		_last_machine_chain_sample = chain.duplicate(true)
+		return
+	var queue_entries: Array = []
+	if chain.get("queue_entries", []) is Array:
+		queue_entries = chain.get("queue_entries", []) as Array
+	for entry: Dictionary in produced_entries:
+		queue_entries.append(entry.duplicate(true))
+	chain["queue_entries"] = queue_entries
+	_pending_physics_chains[result.chain_id] = chain
+	_last_machine_chain_sample = chain.duplicate(true)
+	if result.source == "physics":
+		_physics_queue_chains.append(chain.duplicate(true))
+		while _physics_queue_chains.size() > 12:
+			_physics_queue_chains.pop_front()
+
+func _is_staged_physics_source(source: String) -> bool:
+	return source == "physics" or source == "verifier_seed"
+
+func _value_for_tuning_result(result: MachinePhysicsResult) -> int:
+	var value: int = maxi(1, result.value)
+	if result.result_id == "Prime":
+		value += prime_value_bonus
+	if surge_buffer_enabled and surge_buffer_charge > 0:
+		surge_buffer_charge = 0
+		value += 1
+		event_log.append("Modifier:Surge Buffer consumed buffer value+1 on %s" % result.result_id)
+	return value
+
+func _unit_name_for_player(unit_id: String) -> String:
+	match unit_id:
+		"hive_short_fang":
+			return "短牙虫"
+		"hive_shield_shell":
+			return "盾壳虫"
+		"hive_acid_sac":
+			return "酸囊虫"
+		"hive_crush_shell_beast":
+			return "碾壳兽"
+		_:
+			return "未知单位"
+
+func _launch_result_for_verifier_step(step: int) -> String:
 	var pattern: Array[String] = ["Tuning", "Tuning", "Split", "Tuning", "Recycle", "Tuning", "Waste", "Tuning"]
 	return pattern[(step - 1) % pattern.size()]
 
-func _tuning_result_for_step(step: int) -> String:
+func _tuning_result_for_verifier_step(step: int) -> String:
 	var pattern: Array[String] = ["Gate", "Prime", "Gate", "Echo", "Gate", "Surge"]
 	return pattern[(step - 1) % pattern.size()]
 
-func _slot_for_step(step: int) -> int:
+func _slot_for_verifier_step(step: int) -> int:
 	var pattern: Array[int] = [1, 1, 2, 1, 2, 3, 1, 4]
 	return pattern[(step - 1) % pattern.size()]
 
