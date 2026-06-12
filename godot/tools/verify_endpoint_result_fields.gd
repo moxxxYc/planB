@@ -75,7 +75,29 @@ func _verify_visible_text(run: Node) -> void:
 	for text: String in ["最终结果", "主要机器轴", "关键选择", "敌方反制", "部署路线影响", "守护者压力", "终点战结论", "下一局观察"]:
 		if not _tree_contains_text(run, text) and not summary.contains(text):
 			failures.append("Final Result missing visible Chinese label: %s" % text)
-	for forbidden: String in ["M4 到此结束", "M5", "M6", "DEBUG", "后续里程碑"]:
+	for forbidden: String in [
+		"M4 到此结束",
+		"M5",
+		"M6",
+		"DEBUG",
+		"后续里程碑",
+		"lane leak watch",
+		"queue gap",
+		"Pool Pocket",
+		"Prime Charge",
+		"Slot Primer",
+		"Front Recycle",
+		"Surge Buffer",
+		"Queue Brace",
+		"Junk Sieve",
+		"Muster Pair",
+		"Echo Latch",
+		"Pool Polluter",
+		"Echo Breaker",
+		"Stagger Punisher",
+		"Raider",
+		"Guardian ",
+	]:
 		if _tree_contains_text(run, forbidden) or summary.contains(forbidden):
 			failures.append("Final Result contains implementation-state text: %s" % forbidden)
 

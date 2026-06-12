@@ -63,7 +63,7 @@ func _verify_full_flow(run: Node) -> void:
 	run.call("choose_second_reward", "echo_latch")
 	_expect_node(run, "battle_5")
 	var marker_text: String = String(run.call("get_battle_modifier_marker_text")) if run.has_method("get_battle_modifier_marker_text") else ""
-	if not marker_text.contains("Echo Latch"):
+	if not marker_text.contains("Echo 锁存"):
 		failures.append("Second Reward should be applied to Battle 5 machine markers.")
 	run.call("complete_current_battle_for_verifier", "Win")
 	_expect_node(run, "endpoint_prep")

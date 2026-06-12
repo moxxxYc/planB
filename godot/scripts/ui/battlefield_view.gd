@@ -45,7 +45,7 @@ func get_lane_button_text(lane: String) -> String:
 	var lane_name := _lane_name(lane)
 	var pressure_text := " | 受压路线" if lane == "Left" else ""
 	var danger_text := " | 危险 %d" % danger if danger > 0 else ""
-	var raider_text := " | 突袭 Raider x%d" % raiders if raiders > 0 else ""
+	var raider_text := " | 敌方突袭虫 x%d" % raiders if raiders > 0 else ""
 	if lane == selected_lane:
 		return "[[ %s出兵口 ]] ==> [[ 路线门 ]]\n选中路线 | 双轨生效%s%s%s\n单位：%d" % [
 			lane_name,

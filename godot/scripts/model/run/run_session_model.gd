@@ -379,7 +379,11 @@ func _merge_battle_records() -> void:
 
 func _ensure_endpoint_fields() -> void:
 	var endpoint_outcome := "胜利" if last_battle_result == RESULT_WIN and last_battle == NODE_ENDPOINT else ("失败" if last_battle == NODE_ENDPOINT else "未到达")
-	result_record["endpoint.outcome"] = result_record.get("endpoint.outcome", endpoint_outcome)
+	var recorded_endpoint_outcome: String = String(result_record.get("endpoint.outcome", ""))
+	if recorded_endpoint_outcome.is_empty() or recorded_endpoint_outcome == "进行中":
+		result_record["endpoint.outcome"] = endpoint_outcome
+	else:
+		result_record["endpoint.outcome"] = recorded_endpoint_outcome
 	result_record["endpoint.primary_axis_payoff"] = result_record.get("endpoint.primary_axis_payoff", _default_axis_payoff())
 	result_record["endpoint.main_break_reason"] = result_record.get("endpoint.main_break_reason", _main_break_reason())
 	result_record["endpoint.next_run_watch_tag"] = result_record.get("endpoint.next_run_watch_tag", _next_run_watch_tag())
@@ -549,21 +553,21 @@ func _main_break_reason() -> String:
 	if planned_counter_id == "echo_breaker":
 		return "Echo / Surge 价值被打断"
 	if planned_counter_id == "stagger_punisher":
-		return "queue gap"
+		return "Queue 空档"
 	return "未定"
 
 func _next_run_watch_tag() -> String:
 	match _main_break_reason():
 		"Pool 卡住":
-			return "Launch pollution patch"
+			return "观察 Launch 污染补洞"
 		"Echo / Surge 价值被打断":
-			return "Tuning repeated hit"
-		"queue gap":
-			return "Unit gap patch"
+			return "观察 Tuning 重复命中"
+		"Queue 空档":
+			return "观察 Unit 队列空档"
 		"守护者 HP 被打穿":
-			return "Guardian HP pressure"
+			return "观察守护者 HP 压力"
 		_:
-			return "lane leak watch"
+			return "观察部署路线漏兵"
 
 func _extract_endpoint_hp(text: String, fallback: int) -> int:
 	var marker := "终点 "

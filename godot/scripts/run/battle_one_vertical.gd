@@ -411,13 +411,13 @@ func _advance_stagger_punisher(delta: float) -> void:
 	if no_deploy_timer >= 4.0 and stagger_warning_timer <= 0.0:
 		stagger_warning_timer = 3.0
 		stagger_target_lane = lanes.get_most_dangerous_lane()
-		lanes.set_lane_danger(stagger_target_lane, 2, "Stagger Punisher 队列空档预警")
+		lanes.set_lane_danger(stagger_target_lane, 2, "断档惩罚者队列空档预警")
 	if stagger_warning_timer > 0.0:
 		stagger_warning_timer = maxf(0.0, stagger_warning_timer - delta)
 		if stagger_warning_timer <= 0.0 and no_deploy_timer >= 4.0:
 			var target_lane: String = stagger_target_lane if not stagger_target_lane.is_empty() else lanes.get_most_dangerous_lane()
 			lanes.spawn_enemy_raiders(target_lane, 2, "Queue 空档惩罚")
-			counter_state.set("visible_effect", "Raider 因 Queue 空档出现")
+			counter_state.set("visible_effect", "敌方突袭虫因 Queue 空档出现")
 			counter_state.set("trigger_count", int(counter_state.get("trigger_count")) + 1)
 			no_deploy_timer = 0.0
 			last_deploy_elapsed = elapsed
@@ -461,21 +461,23 @@ func _active_modifier_names() -> String:
 func _modifier_display_name(modifier_id: String) -> String:
 	match modifier_id:
 		"pool_pocket":
-			return "Pool Pocket"
+			return "Pool 扩容袋"
 		"prime_charge":
-			return "Prime Charge"
+			return "Prime 充能"
 		"slot_primer":
-			return "Slot Primer"
+			return "S1 打底"
 		"front_recycle":
-			return "Front Recycle"
+			return "前置回流"
 		"surge_buffer":
-			return "Surge Buffer"
+			return "Surge 缓冲"
 		"queue_brace":
-			return "Queue Brace"
+			return "Queue 支撑"
 		"junk_sieve":
-			return "Junk Sieve"
+			return "废球筛"
 		"muster_pair":
-			return "Muster Pair"
+			return "成对集结"
+		"echo_latch":
+			return "Echo 锁存"
 		_:
 			return modifier_id
 

@@ -84,17 +84,17 @@ func _verify_second_reward_for_axis(
 func _modifier_display_name(modifier_id: String) -> String:
 	match modifier_id:
 		"front_recycle":
-			return "Front Recycle"
+			return "前置回流"
 		"junk_sieve":
-			return "Junk Sieve"
+			return "废球筛"
 		"surge_buffer":
-			return "Surge Buffer"
+			return "Surge 缓冲"
 		"queue_brace":
-			return "Queue Brace"
+			return "Queue 支撑"
 		"muster_pair":
-			return "Muster Pair"
+			return "成对集结"
 		"echo_latch":
-			return "Echo Latch"
+			return "Echo 锁存"
 		_:
 			return modifier_id
 

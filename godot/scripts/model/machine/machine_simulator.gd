@@ -654,23 +654,23 @@ func _drain_guardian_machine_logs() -> void:
 func _modifier_display_name(modifier_id: String) -> String:
 	match modifier_id:
 		"pool_pocket":
-			return "Pool Pocket"
+			return "Pool 扩容袋"
 		"prime_charge":
-			return "Prime Charge"
+			return "Prime 充能"
 		"slot_primer":
-			return "Slot Primer"
+			return "S1 打底"
 		"front_recycle":
-			return "Front Recycle"
+			return "前置回流"
 		"surge_buffer":
-			return "Surge Buffer"
+			return "Surge 缓冲"
 		"queue_brace":
-			return "Queue Brace"
+			return "Queue 支撑"
 		"junk_sieve":
-			return "Junk Sieve"
+			return "废球筛"
 		"muster_pair":
-			return "Muster Pair"
+			return "成对集结"
 		"echo_latch":
-			return "Echo Latch"
+			return "Echo 锁存"
 		_:
 			return modifier_id
 

@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="PlanB MVP v0 Reset"
+config/name="PlanB 三仓球机"
 config/description="Fresh Godot MVP reset implementation for PlanB."
 run/main_scene="res://scenes/ui/main_menu.tscn"
 config/features=PackedStringArray("4.6")

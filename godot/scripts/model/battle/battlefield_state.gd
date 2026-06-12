@@ -157,7 +157,7 @@ func spawn_enemy_raiders(lane: String, count: int, reason: String) -> void:
 		_spawn_unit("enemy_raider", lane, BattleUnitDefinition.SIDE_ENEMY)
 	enemy_raiders[lane] = int(enemy_raiders.get(lane, 0)) + count
 	lane_danger_level[lane] = maxi(int(lane_danger_level.get(lane, 0)), 2)
-	counter_events.append("%s 突袭：Enemy Raider x%d，%s" % [lane, count, reason])
+	counter_events.append("%s 突袭：敌方突袭虫 x%d，%s" % [lane, count, reason])
 
 func spawn_base_intruder_for_verifier(
 	unit_id: String = "enemy_raider",

@@ -33,7 +33,7 @@ func _build_summary_text(
 	var reward_id := String(record.get("reward1.choice_id", record.get("reward1_id", "")))
 	var shop_id := String(record.get("shop1.purchase_id", record.get("shop1_purchase_id", "")))
 	var second_reward_id := String(record.get("second_offer.choice_id", ""))
-	return "主要机器轴：%s\n关键选择：Guardian %s；奖励 %s / %s；商店 %s\nGuardian 选择：%s\n关键奖励：第一次 %s；第二次 %s\n关键商店：%s\nUnit 槽贡献：%s\n主要反制：第一次 %s 攻击 %s，效果 %s；第二次 %s\n敌方反制：%s\nDeploy Lane 影响：%s\n部署路线影响：%s\n守护者压力：%s\n终点战结论：%s；主轴兑现：%s；断裂原因：%s；HP：%s\n休整与 Gold：购买 %d 次，花费 %d Gold，恢复 %d HP\n下一局观察：%s" % [
+	return "主要机器轴：%s\n关键选择：守护者 %s；奖励 %s / %s；商店 %s\n守护者选择：%s\n关键奖励：第一次 %s；第二次 %s\n关键商店：%s\nUnit 槽贡献：%s\n主要反制：第一次 %s 攻击 %s，效果 %s；第二次 %s\n敌方反制：%s\nDeploy Lane 影响：%s\n部署路线影响：%s\n守护者压力：%s\n终点战结论：%s；主轴兑现：%s；断裂原因：%s；HP：%s\n休整与 Gold：购买 %d 次，花费 %d Gold，恢复 %d HP\n下一局观察：%s" % [
 		String(record.get("reward1.axis", "未记录")),
 		_guardian_name(guardian_id, guardian_defs),
 		_modifier_name(reward_id, reward_defs),
@@ -53,13 +53,13 @@ func _build_summary_text(
 		String(record.get("endpoint.deploy_lane_impact", "未记录")),
 		_pressure_text(record.get("guardian.hp_pressure_events", [])),
 		String(record.get("endpoint.outcome", "未记录")),
-		String(record.get("endpoint.primary_axis_payoff", "未记录")),
+		_result_tag_text(record.get("endpoint.primary_axis_payoff", "未记录")),
 		String(record.get("endpoint.main_break_reason", "未记录")),
 		String(record.get("endpoint.guardian_hp", "未记录")),
 		int(record.get("rest.total_purchases", 0)),
 		int(record.get("rest.total_gold_spent", 0)),
 		int(record.get("rest.total_hp_restored", 0)),
-		String(record.get("endpoint.next_run_watch_tag", "未记录")),
+		_result_tag_text(record.get("endpoint.next_run_watch_tag", "未记录")),
 	]
 
 func _guardian_name(guardian_id: String, guardian_defs: Dictionary) -> String:
@@ -83,11 +83,11 @@ func _modifier_name(modifier_id: String, modifier_defs: Dictionary) -> String:
 func _counter_name(counter_id: String) -> String:
 	match counter_id:
 		"pool_polluter":
-			return "Pool Polluter"
+			return "Pool 污染者"
 		"echo_breaker":
-			return "Echo Breaker"
+			return "Echo 破坏者"
 		"stagger_punisher":
-			return "Stagger Punisher"
+			return "断档惩罚者"
 		_:
 			return "未记录"
 
@@ -114,6 +114,31 @@ func _unit_contribution_text(value: Variant) -> String:
 	if value is Dictionary:
 		return JSON.stringify(value)
 	return "未记录"
+
+func _result_tag_text(value: Variant) -> String:
+	match String(value):
+		"Launch sustained flow":
+			return "Launch 持续补线"
+		"Launch pollution patch":
+			return "Launch 污染补洞"
+		"Tuning high-value hit":
+			return "Tuning 高价值命中"
+		"Tuning repeated hit":
+			return "Tuning 重复命中"
+		"Tuning fast landing":
+			return "Tuning 快速落地"
+		"Unit gap patch":
+			return "Unit 队列空档补洞"
+		"Unit batch release":
+			return "Unit 批量释放"
+		"Unit anchor slot":
+			return "Unit 锚点槽"
+		"Guardian HP pressure":
+			return "守护者 HP 压力"
+		"lane leak watch":
+			return "观察部署路线漏兵"
+		_:
+			return String(value)
 
 func _make_label(text: String, font_size: int) -> Label:
 	var label := Label.new()

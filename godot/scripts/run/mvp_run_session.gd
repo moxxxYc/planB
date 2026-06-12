@@ -13,6 +13,7 @@ const CounterDefinitionScript := preload("res://scripts/data/counter_definition.
 
 const BATTLE_SCENE_PATH: String = "res://scenes/run/battle_one_vertical.tscn"
 const BATTLE_AUTO_ROUTE_DWELL_SECONDS: float = 0.6
+const GAME_WINDOW_TITLE: String = "PlanB 三仓球机"
 
 @onready var hud_slot: Control = %HudSlot
 @onready var screen_slot: Control = %ScreenSlot
@@ -38,12 +39,18 @@ func _enter_tree() -> void:
 	_ensure_catalogs()
 
 func _ready() -> void:
+	_apply_game_window_title()
 	_ensure_shell_ready()
 	_ensure_hud()
 	_render_current_node()
 
 func _process(delta: float) -> void:
 	_poll_active_battle(delta)
+
+func _apply_game_window_title() -> void:
+	get_window().title = GAME_WINDOW_TITLE
+	await RenderingServer.frame_post_draw
+	DisplayServer.window_set_title(GAME_WINDOW_TITLE, get_window().get_window_id())
 
 func get_current_node_id() -> String:
 	return session.current_node_id
@@ -532,7 +539,7 @@ func _build_catalogs() -> void:
 	reward_defs = {
 		"pool_pocket": _make_modifier(
 			"pool_pocket",
-			"Pool Pocket",
+			"Pool 扩容袋",
 			ModifierDefinition.SourceType.REWARD,
 			"Launch",
 			"Launch.Pool.capacity",
@@ -543,7 +550,7 @@ func _build_catalogs() -> void:
 		),
 		"prime_charge": _make_modifier(
 			"prime_charge",
-			"Prime Charge",
+			"Prime 充能",
 			ModifierDefinition.SourceType.REWARD,
 			"Tuning",
 			"Tuning.Prime.value_bonus",
@@ -554,7 +561,7 @@ func _build_catalogs() -> void:
 		),
 		"slot_primer": _make_modifier(
 			"slot_primer",
-			"Slot Primer",
+			"S1 打底",
 			ModifierDefinition.SourceType.REWARD,
 			"Unit",
 			"Unit.S1.progress_floor",
@@ -568,18 +575,18 @@ func _build_catalogs() -> void:
 	shop_defs = {
 		"front_recycle": _make_modifier(
 			"front_recycle",
-			"Front Recycle",
+			"前置回流",
 			ModifierDefinition.SourceType.SHOP,
 			"Launch",
 			"Launch.Recycle.return_position",
 			"回流到队列前段",
 			"转向",
 			5,
-			"Recycle 回到更靠前的位置，服务 Launch 轴的持续供给。"
+			"回流球回到更靠前的位置，服务 Launch 轴的持续供给。"
 		),
 		"surge_buffer": _make_modifier(
 			"surge_buffer",
-			"Surge Buffer",
+			"Surge 缓冲",
 			ModifierDefinition.SourceType.SHOP,
 			"Tuning",
 			"Tuning.Surge.charge_buffer",
@@ -590,7 +597,7 @@ func _build_catalogs() -> void:
 		),
 		"queue_brace": _make_modifier(
 			"queue_brace",
-			"Queue Brace",
+			"Queue 支撑",
 			ModifierDefinition.SourceType.SHOP,
 			"Unit",
 			"Unit.Queue.empty_gap_response",
@@ -601,7 +608,7 @@ func _build_catalogs() -> void:
 		),
 		"junk_sieve": _make_modifier(
 			"junk_sieve",
-			"Junk Sieve",
+			"废球筛",
 			ModifierDefinition.SourceType.SHOP,
 			"Launch",
 			"Launch.Pool.junk_filter",
@@ -612,7 +619,7 @@ func _build_catalogs() -> void:
 		),
 		"muster_pair": _make_modifier(
 			"muster_pair",
-			"Muster Pair",
+			"成对集结",
 			ModifierDefinition.SourceType.SHOP,
 			"Unit",
 			"Unit.Queue.same_slot_pair",
@@ -631,7 +638,7 @@ func _build_catalogs() -> void:
 		"muster_pair": _make_second_reward_modifier_from_shop("muster_pair"),
 		"echo_latch": _make_modifier(
 			"echo_latch",
-			"Echo Latch",
+			"Echo 锁存",
 			ModifierDefinition.SourceType.REWARD,
 			"Tuning",
 			"Tuning.Echo.copy_latch",
@@ -645,7 +652,7 @@ func _build_catalogs() -> void:
 	counter_defs = {
 		"pool_polluter": _make_counter(
 			"pool_polluter",
-			"Pool Polluter",
+			"Pool 污染者",
 			"Pool",
 			4.0,
 			18.0,
@@ -654,7 +661,7 @@ func _build_catalogs() -> void:
 		),
 		"echo_breaker": _make_counter(
 			"echo_breaker",
-			"Echo Breaker",
+			"Echo 破坏者",
 			"Echo / Surge 价值",
 			4.0,
 			14.0,
@@ -663,11 +670,11 @@ func _build_catalogs() -> void:
 		),
 		"stagger_punisher": _make_counter(
 			"stagger_punisher",
-			"Stagger Punisher",
+			"断档惩罚者",
 			"Queue 空档",
 			3.0,
 			16.0,
-			"Raider 因 Queue 空档出现",
+			"敌方突袭虫因 Queue 空档出现",
 			["queue_brace", "slot_primer"]
 		),
 	}
@@ -836,7 +843,7 @@ func _second_reward_candidates_for_axis(axis: String) -> Array[Dictionary]:
 		"Unit":
 			return [
 				_make_second_reward_record("muster_pair", "deepen_current_axis", "深化当前主轴", "因为当前主轴是 Unit，继续强化同槽成对出兵。"),
-				_make_second_reward_record("queue_brace", "patch", "补洞", "补上 Queue 空档和 Stagger 风险。"),
+				_make_second_reward_record("queue_brace", "patch", "补洞", "补上 Queue 空档和断档风险。"),
 				_make_second_reward_record("front_recycle", "pivot", "转向", "转向 Launch 补线，减少 Unit 槽等待期间的空线。"),
 			]
 		_:

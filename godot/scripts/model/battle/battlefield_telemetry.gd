@@ -10,7 +10,7 @@ var first_window_lane_danger_snapshot: Dictionary = {}
 var guardian_hp_pressure_events: Array[String] = []
 var endpoint_primary_axis_payoff: String = "未明显兑现"
 var endpoint_main_break_reason: String = "未定"
-var endpoint_next_run_watch_tag: String = "lane leak watch"
+var endpoint_next_run_watch_tag: String = "观察部署路线漏兵"
 var endpoint_deploy_lane_impact: String = "未记录关键路线选择"
 var guardian_break_recorded: bool = false
 
@@ -58,7 +58,7 @@ func record_guardian_break(text: String) -> void:
 	guardian_break_recorded = true
 	record_guardian_pressure(text)
 	endpoint_main_break_reason = "守护者 HP 被打穿"
-	endpoint_next_run_watch_tag = "Guardian HP pressure"
+	endpoint_next_run_watch_tag = "观察守护者 HP 压力"
 
 func record_lane_danger_snapshot(lane_danger: Dictionary, enemy_raiders: Dictionary, player_units: Dictionary, battle_elapsed: float) -> void:
 	if battle_elapsed > 30.0:

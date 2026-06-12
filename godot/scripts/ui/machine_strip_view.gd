@@ -110,15 +110,37 @@ func _recent_log_text(event_log: Array[String], counter_log: Array[String] = [])
 
 func _localized_log_line(log_line: String) -> String:
 	if log_line.contains("Pool Polluter Junk 插入"):
-		return "反制：Pool Polluter 将 Junk 插入 Pool"
+		return "反制：Pool 污染者将 Junk 插入 Pool"
+	if log_line.contains("Pool Polluter 上限已满"):
+		return "反制：Pool 污染者已到插入上限"
+	if log_line.contains("Pool Polluter 因 Pool 已满"):
+		return "反制：Pool 已满，Pool 污染者未插入 Junk"
 	if log_line.contains("Junk Sieve 过滤 Junk"):
-		return "补洞：Junk Sieve 过滤 Junk，Pool 污染被清理"
+		return "补洞：废球筛过滤 Junk，Pool 污染被清理"
+	if log_line.contains("Junk Sieve 过滤 Pool 头部 Junk"):
+		return "补洞：废球筛过滤 Pool 头部 Junk"
 	if log_line.contains("Junk 发射后无有效 Unit"):
 		return "反制：Junk 发射，未产生有效 Unit 结算"
 	if log_line.contains("Echo Breaker Echo 复制降级"):
-		return "反制：Echo Breaker 让 Echo 复制降级为 Gate"
+		return "反制：Echo 破坏者让 Echo 复制降级为 Gate"
+	if log_line.contains("Echo Breaker 已锁定 Echo 槽"):
+		return "反制：Echo 破坏者锁定 Echo 槽"
+	if log_line.contains("Echo Breaker 活跃期结束"):
+		return "反制：Echo 破坏者活跃结束，未触发"
+	if log_line.contains("Surge Buffer stored"):
+		return "补洞：Surge 缓冲储存 1 次同槽加速"
+	if log_line.contains("Surge Buffer") and log_line.contains("charge consumed"):
+		return "补洞：Surge 缓冲被同槽 Queue 条目消耗"
+	if log_line.contains("Queue Brace"):
+		return "补洞：Queue 支撑补强最低进度槽"
 	if log_line.contains("Muster Pair 同槽成对"):
-		return "Unit：Muster Pair 让同槽成对出兵"
+		return "Unit：成对集结让同槽成对出兵"
+	if log_line.contains("Echo Latch ghost hit"):
+		return "Tuning：Echo 锁存显示幽影命中"
+	if log_line.contains("Front Recycle returned"):
+		return "Launch：前置回流把净球放回 Pool 前段"
+	if log_line.contains("Front Recycle front recycle rejected"):
+		return "Launch：Pool 已满，前置回流未能放回净球"
 	if log_line.begins_with("物理落点"):
 		return log_line
 	if log_line.begins_with("Unit："):
@@ -130,7 +152,7 @@ func _localized_log_line(log_line: String) -> String:
 	if log_line.begins_with("Launch.Pool full rejected"):
 		return "Launch：Pool 已满，回流球丢失"
 	if log_line.begins_with("Launch.Waste"):
-		return "Launch：球进入 Waste，未产生有效结算"
+		return "Launch：球进入废弃口，未产生有效结算"
 	if log_line.begins_with("Launch:"):
 		return _localized_launch_line(log_line)
 	if log_line.begins_with("Tuning:"):
@@ -145,11 +167,11 @@ func _localized_launch_line(log_line: String) -> String:
 		"Tuning":
 			return "Launch：球进入 Tuning"
 		"Split":
-			return "Launch：Split 分流，补入 Pool"
+			return "Launch：分流，补入 Pool"
 		"Recycle":
 			return "Launch：回收，球返回 Pool"
 		"Waste":
-			return "Launch：球进入 Waste，未产生有效结算"
+			return "Launch：球进入废弃口，未产生有效结算"
 		_:
 			return "Launch：球完成一次路线判定"
 

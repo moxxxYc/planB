@@ -241,7 +241,7 @@ func _draw_machine_boards(rect: Rect2) -> void:
 	var board_height := maxf(96.0, available_height / 3.0)
 	var board_rect := Rect2(rect.position.x + 14.0, board_top, rect.size.x - 28.0, board_height)
 
-	_draw_board(board_rect, "Launch", "进 Tuning / Split / 回收 / Waste", COLOR_LAUNCH, active_board_index == 0, _targets_pool())
+	_draw_board(board_rect, "Launch", "进 Tuning / 分流 / 回流 / 废弃", COLOR_LAUNCH, active_board_index == 0, _targets_pool())
 	_draw_launch_slots(board_rect)
 
 	board_rect.position.y += board_height + board_gap
@@ -341,7 +341,7 @@ func _draw_active_ball(board_rect: Rect2, accent: Color) -> void:
 	draw_arc(center, ACTIVE_BALL_RING_RADIUS, 0.0, TAU, 28, accent, 2.5, true)
 
 func _draw_launch_slots(board_rect: Rect2) -> void:
-	var labels: Array[String] = ["Tuning", "Split", "回收", "Waste"]
+	var labels: Array[String] = ["Tuning", "Split", "Recycle", "Waste"]
 	_draw_result_slots(board_rect, labels, COLOR_LAUNCH, last_launch_result)
 
 func _draw_tuning_slots(board_rect: Rect2) -> void:
@@ -360,7 +360,18 @@ func _draw_result_slots(board_rect: Rect2, labels: Array[String], accent: Color,
 		var is_counter_target := counter_target_label == label
 		draw_rect(slot_rect, accent.darkened(0.25) if is_active else COLOR_BG, true)
 		draw_rect(slot_rect, COLOR_COUNTER_TARGET if is_counter_target else (accent if is_active else COLOR_TRIM), false, 2.0 if is_counter_target else 1.0)
-		_draw_text(font, slot_rect.position + Vector2(4.0, 12.0), label, 10, COLOR_TEXT)
+		_draw_text(font, slot_rect.position + Vector2(4.0, 12.0), _slot_display_label(label), 10, COLOR_TEXT)
+
+func _slot_display_label(label: String) -> String:
+	match label:
+		"Split":
+			return "分流"
+		"Recycle":
+			return "回流"
+		"Waste":
+			return "废弃"
+		_:
+			return label
 
 func _draw_unit_slots(board_rect: Rect2) -> void:
 	var font := get_theme_default_font()

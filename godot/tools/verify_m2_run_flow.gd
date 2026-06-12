@@ -96,13 +96,16 @@ func _verify_reward_one_and_battle_two(run: Node) -> bool:
 	if not reward_text.contains("Tuning") or not reward_text.contains("Prime") or not reward_text.contains("数值 +1 提升到 +2"):
 		push_error("Prime Charge card must show axis, component, and operation.")
 		return false
+	if _text_has_internal_path(reward_text):
+		push_error("Reward 1 card must not expose internal component paths.")
+		return false
 	if reward_text.contains("Reward"):
 		push_error("Reward 1 card should localize player-facing role labels.")
 		return false
 	if (
-		not _node_tree_text_contains(run, "Pool Pocket")
-		or not _node_tree_text_contains(run, "Prime Charge")
-		or not _node_tree_text_contains(run, "Slot Primer")
+		not _node_tree_text_contains(run, "Pool 扩容袋")
+		or not _node_tree_text_contains(run, "Prime 充能")
+		or not _node_tree_text_contains(run, "S1 打底")
 	):
 		push_error("Reward 1 screen must visibly render all three reward cards.")
 		return false
@@ -116,7 +119,7 @@ func _verify_reward_one_and_battle_two(run: Node) -> bool:
 		return false
 
 	var marker_text: String = String(run.call("get_battle_modifier_marker_text"))
-	if not marker_text.contains("Prime Charge") or not marker_text.contains("Tuning"):
+	if not marker_text.contains("Prime 充能") or not marker_text.contains("Tuning"):
 		push_error("Battle 2 should expose the selected Reward 1 machine marker.")
 		return false
 
@@ -146,16 +149,16 @@ func _verify_shop_rest_and_battle_three(run: Node) -> bool:
 		return false
 
 	var shop_text: String = String(run.call("get_shop_card_text", "surge_buffer"))
-	if not shop_text.contains("4 Gold") or not shop_text.contains("补洞") or not shop_text.contains("Tuning.Surge"):
+	if not shop_text.contains("4 Gold") or not shop_text.contains("补洞") or not shop_text.contains("Tuning") or not shop_text.contains("Surge"):
 		push_error("Shop card must show price, role, and machine component.")
 		return false
-	if shop_text.contains("Patch") or shop_text.contains("+1 buffer"):
+	if shop_text.contains("Patch") or shop_text.contains("+1 buffer") or _text_has_internal_path(shop_text):
 		push_error("Shop card should localize player-facing role and operation text.")
 		return false
 	if (
-		not _node_tree_text_contains(run, "Front Recycle")
-		or not _node_tree_text_contains(run, "Surge Buffer")
-		or not _node_tree_text_contains(run, "Queue Brace")
+		not _node_tree_text_contains(run, "前置回流")
+		or not _node_tree_text_contains(run, "Surge 缓冲")
+		or not _node_tree_text_contains(run, "Queue 支撑")
 	):
 		push_error("First Shop screen must visibly render all three shop cards.")
 		return false
@@ -203,7 +206,7 @@ func _verify_shop_rest_and_battle_three(run: Node) -> bool:
 		return false
 	var battle_three_marker_text: String = String(run.call("get_battle_modifier_marker_text"))
 	if (
-		not battle_three_marker_text.contains("Surge Buffer")
+		not battle_three_marker_text.contains("Surge 缓冲")
 		or not battle_three_marker_text.contains("Tuning")
 		or not battle_three_marker_text.contains("surge_buffer_enabled=true")
 	):
@@ -225,7 +228,7 @@ func _verify_result_routing(run: Node) -> bool:
 		return false
 
 	var result_text: String = String(run.call("get_result_summary_text"))
-	if not result_text.contains("巢脉母") or not result_text.contains("Prime Charge") or not result_text.contains("Surge Buffer"):
+	if not result_text.contains("巢脉母") or not result_text.contains("Prime 充能") or not result_text.contains("Surge 缓冲"):
 		push_error("Result Routing must summarize Guardian, Reward 1, and Shop 1.")
 		return false
 	if result_text.contains("battle_3") or result_text.contains("Loss"):
@@ -442,6 +445,20 @@ func _node_tree_text_contains(node: Node, needle: String) -> bool:
 		return true
 	for child: Node in node.get_children():
 		if _node_tree_text_contains(child, needle):
+			return true
+	return false
+
+func _text_has_internal_path(text: String) -> bool:
+	for internal_path: String in [
+		"Launch.Pool",
+		"Launch.Recycle",
+		"Tuning.Prime",
+		"Tuning.Surge",
+		"Tuning.Echo",
+		"Unit.S1",
+		"Unit.Queue",
+	]:
+		if text.contains(internal_path):
 			return true
 	return false
 

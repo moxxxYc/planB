@@ -23,6 +23,12 @@ func _initialize() -> void:
 		push_error("Unexpected main scene: %s" % main_scene)
 		failed = true
 
+	var project_name: String = ProjectSettings.get_setting("application/config/name", "")
+	for forbidden_name_part: String in ["DEBUG", "MVP", "Reset", "M5", "M6", "verifier", "stub", "sandbox", "后续里程碑"]:
+		if project_name.contains(forbidden_name_part):
+			push_error("Project title contains player-visible implementation wording: %s" % forbidden_name_part)
+			failed = true
+
 	var rendering_method: String = ProjectSettings.get_setting("rendering/renderer/rendering_method", "")
 	if rendering_method != "gl_compatibility":
 		push_error("Expected gl_compatibility rendering method, got: %s" % rendering_method)

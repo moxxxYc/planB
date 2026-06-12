@@ -45,7 +45,7 @@ func _verify_pool_polluter_path(scene: PackedScene) -> bool:
 		return false
 
 	var scout_text: String = String(run.call("get_counter_scout_text"))
-	if not scout_text.contains("Pool Polluter") or not scout_text.contains("Pool"):
+	if not scout_text.contains("Pool 污染者") or not scout_text.contains("Pool"):
 		push_error("Pool Polluter scout should name the family and Pool target.")
 		passed = false
 
@@ -66,7 +66,7 @@ func _verify_pool_polluter_path(scene: PackedScene) -> bool:
 	run.call("advance_active_battle_for_verifier", 25.5)
 
 	var banner_text: String = String(run.call("get_active_counter_banner_text"))
-	if not banner_text.contains("Pool Polluter") or not banner_text.contains("预警") or not banner_text.contains("Junk"):
+	if not banner_text.contains("Pool 污染者") or not banner_text.contains("预警") or not banner_text.contains("Junk"):
 		push_error("Pool Polluter warning should be visible during Battle 3. banner=%s record=%s" % [
 			banner_text,
 			str(run.call("get_counter_record")),
@@ -87,11 +87,11 @@ func _verify_pool_polluter_path(scene: PackedScene) -> bool:
 	if String(record.get("counter1.family", "")) != "pool_polluter":
 		push_error("Result record should store counter1.family=pool_polluter.")
 		passed = false
-	if String(record.get("counter1.response_link", "")) != "Junk Sieve":
+	if String(record.get("counter1.response_link", "")) != "废球筛":
 		push_error("Result record should link Pool Polluter to purchased Junk Sieve.")
 		passed = false
 	var result_text: String = String(run.call("get_result_summary_text"))
-	if not result_text.contains("Pool Polluter") or not result_text.contains("Junk Sieve"):
+	if not result_text.contains("Pool 污染者") or not result_text.contains("废球筛"):
 		push_error("Result screen should summarize Pool Polluter and Junk Sieve response.")
 		passed = false
 
@@ -113,7 +113,7 @@ func _verify_untriggered_counter_does_not_fake_effect(scene: PackedScene) -> boo
 		passed = false
 
 	var result_text: String = String(run.call("get_result_summary_text"))
-	if result_text.contains("Raider 因 Queue 空档出现") or not result_text.contains("未触发"):
+	if result_text.contains("敌方突袭虫因 Queue 空档出现") or not result_text.contains("未触发"):
 		push_error("Result screen should show untriggered counter as 未触发, not as Raider effect.")
 		passed = false
 
@@ -147,7 +147,7 @@ func _verify_stagger_mid_deployments_reset_gap(scene: PackedScene) -> bool:
 		passed = false
 
 	var counter_record: Dictionary = run.call("get_counter_record") as Dictionary
-	if String(counter_record.get("visible_effect", "")).contains("Raider"):
+	if String(counter_record.get("visible_effect", "")).contains("敌方突袭虫"):
 		push_error("Stagger should not record Raider effect while Mid deployments keep resetting Queue gap.")
 		passed = false
 
@@ -174,7 +174,7 @@ func _verify_echo_breaker_path(scene: PackedScene) -> bool:
 
 	run.call("advance_active_battle_for_verifier", 20.0)
 	var machine_log: String = String(run.call("get_active_machine_log_text"))
-	if not machine_log.contains("Echo Breaker") or not machine_log.contains("Echo 复制降级为 Gate"):
+	if not machine_log.contains("Echo 破坏者") or not machine_log.contains("Echo 复制降级为 Gate"):
 		push_error("Echo Breaker should visibly downgrade one Echo copy. record=%s log=%s" % [
 			str(run.call("get_counter_record")),
 			machine_log,
@@ -216,7 +216,7 @@ func _verify_stagger_punisher_path(scene: PackedScene) -> bool:
 	run.call("advance_active_battle_for_verifier", 30.0)
 	var banner_text: String = String(run.call("get_active_counter_banner_text"))
 	var lane_text: String = String(run.call("get_lane_button_text", "Left"))
-	if not banner_text.contains("Stagger Punisher") or not banner_text.contains("队列空档"):
+	if not banner_text.contains("断档惩罚者") or not banner_text.contains("队列空档"):
 		push_error("Stagger Punisher should show queue-gap warning.")
 		passed = false
 	if not lane_text.contains("突袭") or not lane_text.contains("危险 2"):
@@ -224,7 +224,7 @@ func _verify_stagger_punisher_path(scene: PackedScene) -> bool:
 		passed = false
 
 	var counter_record: Dictionary = run.call("get_counter_record") as Dictionary
-	if String(counter_record.get("visible_effect", "")) != "Raider 因 Queue 空档出现":
+	if String(counter_record.get("visible_effect", "")) != "敌方突袭虫因 Queue 空档出现":
 		push_error("Stagger result should record Raider queue-gap effect.")
 		passed = false
 	if String(_active_machine_visual_contract(run).get("counter_target_component", "")) != "Queue 空档":

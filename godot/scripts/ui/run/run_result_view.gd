@@ -128,11 +128,11 @@ func _counter_summary(record: Dictionary) -> String:
 func _counter_name(counter_id: String) -> String:
 	match counter_id:
 		"pool_polluter":
-			return "Pool Polluter"
+			return "Pool 污染者"
 		"echo_breaker":
-			return "Echo Breaker"
+			return "Echo 破坏者"
 		"stagger_punisher":
-			return "Stagger Punisher"
+			return "断档惩罚者"
 		_:
 			return "未记录"
 

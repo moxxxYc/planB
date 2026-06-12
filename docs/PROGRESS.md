@@ -200,6 +200,10 @@
 - 经用户确认后，窄版 Battle 4 / Reward 2 中间切片已在新的 `godot/` 活动工程内实现：Battle 3 休整后进入 Battle 4，Battle 4 胜利后进入第二次免费奖励，Battle 4 失败进入结果页，Battle 4 胜利不产生 Gold。
 - M4 第二次奖励按当前主轴生成 2-3 个候选：`Launch` 主轴含 `Front Recycle` / `Junk Sieve`，`Tuning` 主轴含第二次奖励专属 `Echo Latch` / `Surge Buffer`，`Unit` 主轴含 `Muster Pair` / `Queue Brace`；内部角色记录为 `deepen_current_axis` / `patch` / `pivot`，玩家可见标签为 `深化当前主轴` / `补洞` / `转向`。
 - Full gap repair 已将原 handoff 剩余部分纳入当前 M0-M4 目标：Battle 5、Endpoint Prep、Endpoint、Final Result、实体三路战场、Reward 2 后续兑现和完整验证链。
+- 2026-06-12 实现者 GUI 烟测已通过当前 `godot/` 运行时端口 7777 跑通：Main Menu -> Guardian Contract -> Battle 1 -> Reward 1 -> Battle 2 -> Shop / Rest -> Battle 3 -> Rest -> Battle 4 -> Reward 2 -> Battle 5 -> Endpoint Prep -> Endpoint -> Final Result。临时截图保存在 `/tmp/planb-mvp-v0-visual/`，覆盖 `battle1-live.png`、`battle3-counter-active.png`、`second-reward.png`、`battle5-stronger-counter.png`、`endpoint-sweep-warning.png`、`final-result.png` 和窗口标题截图。
+- 本次烟测确认：窗口标题为 `PlanB 三仓球机`；Battle 1 可见物理球、Pool、Launch / Tuning / Unit 三板、Unit 暴露闸门、Queue Bridge 和三路战场；Battle 3 / Battle 5 可见断档惩罚者反制、反制目标、Queue 空档和路线压力；Endpoint 可见扫击预警；Final Result 填充守护者、奖励、商店、反制、部署路线影响、守护者压力、终点战结论和下一局观察。
+- 本次修正了玩家可见实现状态和英文残留：项目/窗口标题不再带 `DEBUG` / `MVP Reset`；奖励、商店、第二奖励、反制和敌方突袭虫名称改为中文显示；Final Result 不再显示 `lane leak watch`、`queue gap`、`进行中` 或英文奖励/反制名；机器板说明将 `Split / Recycle / Waste` 显示为 `分流 / 回流 / 废弃`。
+- 当前自动验证入口 `bash tools/verify_godot.sh` 已覆盖 project、M1-M4 run flow、实体战场、完整 handoff、Endpoint result fields、物理机器、暴露闸门、Guardian Contract、Hive unit/battle profile、modifier semantics 和 complete learning record。非实现者是否能读懂 `Launch / Tuning / Unit`、奖励预期、反制目标、Deploy Lane 和 Endpoint 胜负原因，仍必须通过单独 playtest acceptance protocol 记录，不能仅凭实现者烟测宣称已证明。
 
 ## 2026-06-05
 
