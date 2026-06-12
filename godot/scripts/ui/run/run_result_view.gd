@@ -10,10 +10,11 @@ func render(
 	session: RunSessionModel,
 	guardian_defs: Dictionary,
 	reward_defs: Dictionary,
-	shop_defs: Dictionary
+	shop_defs: Dictionary,
+	second_reward_defs: Dictionary
 ) -> void:
 	_clear_children()
-	summary_text = _build_summary_text(session, guardian_defs, reward_defs, shop_defs)
+	summary_text = _build_summary_text(session, guardian_defs, reward_defs, shop_defs, second_reward_defs)
 
 	add_child(_make_label("结果路由", 26))
 	add_child(_make_label(summary_text, 16))
@@ -25,18 +26,21 @@ func _build_summary_text(
 	session: RunSessionModel,
 	guardian_defs: Dictionary,
 	reward_defs: Dictionary,
-	shop_defs: Dictionary
+	shop_defs: Dictionary,
+	second_reward_defs: Dictionary
 ) -> String:
 	var guardian_name: String = _guardian_name(session.selected_guardian_id, guardian_defs)
 	var reward_name: String = _modifier_name(session.reward_one_id, reward_defs)
 	var shop_name: String = _modifier_name(session.shop_purchase_id, shop_defs)
+	var second_reward_text: String = _second_reward_summary(session, second_reward_defs)
 	var counter_text: String = _counter_summary(session.counter_record)
-	var next_step: String = "下一步：M3 到此结束，等待后续里程碑确认。"
+	var next_step: String = "下一步：M4 到此结束，Battle 5 / Endpoint 留给后续里程碑。"
 
-	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次\n最后战斗：%s\n结果：%s\n%s\n%s" % [
+	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\n%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次\n最后战斗：%s\n结果：%s\n%s\n%s" % [
 		guardian_name,
 		reward_name,
 		shop_name,
+		second_reward_text,
 		session.gold,
 		session.first_shop_rest_count,
 		session.battle_three_rest_count,
@@ -54,6 +58,8 @@ func _battle_display_name(battle_id: String) -> String:
 			return "战斗 2"
 		RunSessionModel.NODE_BATTLE_3:
 			return "战斗 3"
+		"battle_4":
+			return "战斗 4"
 		_:
 			return "未记录"
 
@@ -83,6 +89,28 @@ func _modifier_name(modifier_id: String, modifier_defs: Dictionary) -> String:
 	if definition == null:
 		return modifier_id
 	return definition.display_name
+
+func _second_reward_summary(session: RunSessionModel, second_reward_defs: Dictionary) -> String:
+	if session.second_offer_current_axis.is_empty():
+		return "第二次奖励：未到达"
+	if session.second_reward_id.is_empty():
+		return "第二次奖励：未选择 | 当前主轴：%s" % session.second_offer_current_axis
+	return "第二次奖励：%s | 当前主轴：%s | 定位：%s" % [
+		_modifier_name(session.second_reward_id, second_reward_defs),
+		session.second_offer_current_axis,
+		_second_reward_role_label(session.second_offer_choice_role),
+	]
+
+func _second_reward_role_label(role_id: String) -> String:
+	match role_id:
+		"deepen_current_axis":
+			return "深化当前主轴"
+		"patch":
+			return "补洞"
+		"pivot":
+			return "转向"
+		_:
+			return "未选择"
 
 func _counter_summary(record: Dictionary) -> String:
 	if record.is_empty():

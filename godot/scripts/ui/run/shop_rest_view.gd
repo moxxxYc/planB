@@ -34,7 +34,7 @@ func render(
 
 	add_child(_make_label("休整", 26))
 	if hide_shop:
-		add_child(_make_label("战斗 3 后只开放守护者休息，然后进入本次 M2 结果。", 16))
+		add_child(_make_label("战斗 3 后只开放守护者休息，然后进入战斗 4。", 16))
 	else:
 		add_child(_make_label("第一次商店：最多购买 1 个中立机器修正。休息独立计算，不占商店购买名额。", 16))
 		if not p_counter_scout_text.is_empty():
@@ -100,7 +100,7 @@ func _render_rest() -> void:
 
 func _render_confirm_button() -> void:
 	var confirm_button: Button = Button.new()
-	confirm_button.text = "进入结果" if hide_shop else "离开商店，进入战斗 3"
+	confirm_button.text = "进入战斗 4" if hide_shop else "离开商店，进入战斗 3"
 	confirm_button.custom_minimum_size = Vector2(0.0, 58.0)
 	confirm_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_style_command_button(confirm_button)

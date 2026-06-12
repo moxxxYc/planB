@@ -3,6 +3,7 @@ extends Control
 
 const GuardianContractViewScript := preload("res://scripts/ui/run/guardian_contract_view.gd")
 const RewardChoiceViewScript := preload("res://scripts/ui/run/reward_choice_view.gd")
+const SecondRewardChoiceViewScript := preload("res://scripts/ui/run/second_reward_choice_view.gd")
 const ShopRestViewScript := preload("res://scripts/ui/run/shop_rest_view.gd")
 const RunResultViewScript := preload("res://scripts/ui/run/run_result_view.gd")
 const RunHudViewScript := preload("res://scripts/ui/run/run_hud_view.gd")
@@ -18,10 +19,13 @@ var session: RunSessionModel = RunSessionModel.new()
 var guardian_defs: Dictionary = {}
 var reward_defs: Dictionary = {}
 var shop_defs: Dictionary = {}
+var second_reward_defs: Dictionary = {}
 var counter_defs: Dictionary = {}
 var next_counter_override: String = ""
 var planned_counter_id: String = ""
 var visible_shop_item_ids: Array[String] = []
+var second_reward_candidate_ids: Array[String] = []
+var second_reward_candidate_records: Array[Dictionary] = []
 var hud_view = null
 var active_battle: BattleOneVertical = null
 var active_result_view = null
@@ -144,7 +148,12 @@ func get_rest_count() -> int:
 	return session.get_rest_count()
 
 func confirm_shop_and_rest() -> void:
-	session.confirm_shop_and_rest()
+	if session.current_node_id == RunSessionModel.NODE_SHOP_1:
+		session.confirm_shop_and_rest()
+	elif session.current_node_id == RunSessionModel.NODE_REST_AFTER_BATTLE_3:
+		session.confirm_battle_three_rest()
+	else:
+		push_error("Shop / Rest confirm is not available at: %s" % session.current_node_id)
 	_render_current_node()
 
 func set_next_counter_for_verifier(counter_id: String) -> void:
@@ -203,6 +212,38 @@ func get_result_summary_text() -> String:
 func get_result_record() -> Dictionary:
 	return session.result_record.duplicate(true)
 
+func get_second_reward_current_axis() -> String:
+	_ensure_second_reward_offer()
+	return session.second_offer_current_axis
+
+func get_second_reward_candidate_ids() -> Array[String]:
+	_ensure_second_reward_offer()
+	return second_reward_candidate_ids.duplicate()
+
+func get_second_reward_card_text(modifier_id: String) -> String:
+	_ensure_second_reward_offer()
+	if not second_reward_defs.has(modifier_id):
+		return ""
+	var definition: ModifierDefinition = second_reward_defs[modifier_id] as ModifierDefinition
+	if definition == null:
+		return ""
+	var record: Dictionary = _second_reward_record_for(modifier_id)
+	return "%s\n%s\n候选来源：%s" % [
+		definition.to_card_text(),
+		String(record.get("offer_role_label", "")),
+		String(record.get("reason", "")),
+	]
+
+func choose_second_reward(modifier_id: String) -> void:
+	_ensure_catalogs()
+	_ensure_second_reward_offer()
+	if not second_reward_candidate_ids.has(modifier_id):
+		push_error("Unknown Second Reward candidate: %s" % modifier_id)
+		return
+	var record: Dictionary = _second_reward_record_for(modifier_id)
+	session.choose_second_reward(modifier_id, String(record.get("offer_role", "")))
+	_render_current_node()
+
 func _render_current_node() -> void:
 	_ensure_shell_ready()
 	if screen_slot == null:
@@ -225,6 +266,10 @@ func _render_current_node() -> void:
 			_show_battle(3)
 		RunSessionModel.NODE_REST_AFTER_BATTLE_3:
 			_show_shop_rest(true)
+		"battle_4":
+			_show_battle(4)
+		"reward_2":
+			_show_second_reward()
 		RunSessionModel.NODE_RESULT_ROUTING:
 			_show_result()
 		_:
@@ -243,6 +288,13 @@ func _show_reward_one() -> void:
 	view.reward_chosen.connect(_on_reward_chosen)
 	view.render(reward_defs)
 
+func _show_second_reward() -> void:
+	_ensure_second_reward_offer()
+	var view = SecondRewardChoiceViewScript.new()
+	_add_screen_child(view)
+	view.reward_chosen.connect(_on_second_reward_chosen)
+	view.render(session.second_offer_current_axis, second_reward_candidate_records, second_reward_defs)
+
 func _show_shop_rest(p_hide_shop: bool) -> void:
 	var view = ShopRestViewScript.new()
 	_add_screen_child(view)
@@ -260,7 +312,7 @@ func _show_result() -> void:
 	var view = RunResultViewScript.new()
 	active_result_view = view
 	_add_screen_child(view)
-	view.render(session, guardian_defs, reward_defs, shop_defs)
+	view.render(session, guardian_defs, reward_defs, shop_defs, second_reward_defs)
 
 func _show_battle(battle_number: int) -> void:
 	var battle_scene: PackedScene = load(BATTLE_SCENE_PATH)
@@ -286,6 +338,9 @@ func _on_guardian_confirmed() -> void:
 func _on_reward_chosen(modifier_id: String) -> void:
 	choose_reward_one(modifier_id)
 
+func _on_second_reward_chosen(modifier_id: String) -> void:
+	choose_second_reward(modifier_id)
+
 func _on_shop_item_bought(modifier_id: String) -> void:
 	buy_shop_item(modifier_id)
 
@@ -293,11 +348,7 @@ func _on_rest_bought() -> void:
 	buy_rest()
 
 func _on_shop_rest_confirmed() -> void:
-	if session.current_node_id == RunSessionModel.NODE_SHOP_1:
-		confirm_shop_and_rest()
-	elif session.current_node_id == RunSessionModel.NODE_REST_AFTER_BATTLE_3:
-		session.confirm_battle_three_rest()
-		_render_current_node()
+	confirm_shop_and_rest()
 
 func _complete_active_battle(battle_result: String) -> void:
 	if not _is_battle_node(session.current_node_id):
@@ -328,6 +379,7 @@ func _is_battle_node(node_id: String) -> bool:
 		RunSessionModel.NODE_BATTLE_1,
 		RunSessionModel.NODE_BATTLE_2,
 		RunSessionModel.NODE_BATTLE_3,
+		"battle_4",
 	].has(node_id)
 
 func _ensure_hud() -> void:
@@ -344,7 +396,7 @@ func _ensure_hud() -> void:
 
 func _update_hud() -> void:
 	_ensure_hud()
-	hud_view.render(session, guardian_defs, reward_defs, shop_defs)
+	hud_view.render(session, guardian_defs, reward_defs, shop_defs, second_reward_defs)
 
 func _add_screen_child(child: Control) -> void:
 	_ensure_shell_ready()
@@ -406,7 +458,13 @@ func _apply_shell_styles() -> void:
 	shell_styles_applied = true
 
 func _ensure_catalogs() -> void:
-	if guardian_defs.is_empty() or reward_defs.is_empty() or shop_defs.is_empty() or counter_defs.is_empty():
+	if (
+		guardian_defs.is_empty()
+		or reward_defs.is_empty()
+		or shop_defs.is_empty()
+		or second_reward_defs.is_empty()
+		or counter_defs.is_empty()
+	):
 		_build_catalogs()
 
 func _build_catalogs() -> void:
@@ -523,6 +581,25 @@ func _build_catalogs() -> void:
 		),
 	}
 
+	second_reward_defs = {
+		"front_recycle": _make_second_reward_modifier_from_shop("front_recycle"),
+		"junk_sieve": _make_second_reward_modifier_from_shop("junk_sieve"),
+		"surge_buffer": _make_second_reward_modifier_from_shop("surge_buffer"),
+		"queue_brace": _make_second_reward_modifier_from_shop("queue_brace"),
+		"muster_pair": _make_second_reward_modifier_from_shop("muster_pair"),
+		"echo_latch": _make_modifier(
+			"echo_latch",
+			"Echo Latch",
+			ModifierDefinition.SourceType.REWARD,
+			"Tuning",
+			"Tuning.Echo.copy_latch",
+			"Echo 复制锁存",
+			"Tuning 深化",
+			0,
+			"第二次奖励专属深化：让 Echo 重复结算更集中、更容易被复盘。"
+		),
+	}
+
 	counter_defs = {
 		"pool_polluter": _make_counter(
 			"pool_polluter",
@@ -593,6 +670,32 @@ func _make_modifier(
 	definition.player_read = player_read
 	return definition
 
+func _make_second_reward_modifier_from_shop(modifier_id: String) -> ModifierDefinition:
+	var source: ModifierDefinition = shop_defs.get(modifier_id, null) as ModifierDefinition
+	if source == null:
+		return _make_modifier(
+			modifier_id,
+			modifier_id,
+			ModifierDefinition.SourceType.REWARD,
+			"",
+			"",
+			"",
+			"",
+			0,
+			""
+		)
+	return _make_modifier(
+		source.id,
+		source.display_name,
+		ModifierDefinition.SourceType.REWARD,
+		source.warehouse,
+		source.target_component,
+		source.operation,
+		source.role,
+		0,
+		source.player_read
+	)
+
 func _make_counter(
 	id: String,
 	display_name: String,
@@ -647,6 +750,79 @@ func _ensure_visible_shop_item_ids() -> void:
 			ids.append(fallback_id)
 	visible_shop_item_ids = ids.slice(0, 3)
 
+func _ensure_second_reward_offer() -> void:
+	_ensure_catalogs()
+	if not second_reward_candidate_ids.is_empty():
+		return
+
+	var axis: String = _current_main_axis()
+	second_reward_candidate_records = _second_reward_candidates_for_axis(axis)
+	second_reward_candidate_ids = []
+	for record: Dictionary in second_reward_candidate_records:
+		var modifier_id: String = String(record.get("modifier_id", ""))
+		if not modifier_id.is_empty():
+			second_reward_candidate_ids.append(modifier_id)
+	session.set_second_offer(axis, second_reward_candidate_records)
+
+func _current_main_axis() -> String:
+	if not session.reward_one_id.is_empty():
+		var reward: ModifierDefinition = reward_defs.get(session.reward_one_id, null) as ModifierDefinition
+		if reward != null:
+			return reward.warehouse
+	if not session.shop_purchase_id.is_empty():
+		var shop: ModifierDefinition = shop_defs.get(session.shop_purchase_id, null) as ModifierDefinition
+		if shop != null:
+			return shop.warehouse
+	return "Launch"
+
+func _second_reward_candidates_for_axis(axis: String) -> Array[Dictionary]:
+	match axis:
+		"Launch":
+			return [
+				_make_second_reward_record("front_recycle", "deepen_current_axis", "深化当前主轴", "因为当前主轴是 Launch，继续强化持续补线。"),
+				_make_second_reward_record("junk_sieve", "patch", "补洞", "因为 Pool 污染或 Junk 风险需要机器补洞。"),
+				_make_second_reward_record("muster_pair", "pivot", "转向", "转向 Unit 批量部署，让持续供给有更清晰的战场出口。"),
+			]
+		"Tuning":
+			return [
+				_make_second_reward_record("echo_latch", "deepen_current_axis", "深化当前主轴", "因为当前主轴是 Tuning，继续强化 Echo 重复结算。"),
+				_make_second_reward_record("surge_buffer", "patch", "补洞", "补上 Surge 未立刻落地的节奏空档。"),
+				_make_second_reward_record("front_recycle", "pivot", "转向", "转向 Launch 回流，让高价值命中有更稳定供给。"),
+			]
+		"Unit":
+			return [
+				_make_second_reward_record("muster_pair", "deepen_current_axis", "深化当前主轴", "因为当前主轴是 Unit，继续强化同槽成对出兵。"),
+				_make_second_reward_record("queue_brace", "patch", "补洞", "补上 Queue 空档和 Stagger 风险。"),
+				_make_second_reward_record("front_recycle", "pivot", "转向", "转向 Launch 补线，减少 Unit 槽等待期间的空线。"),
+			]
+		_:
+			return [
+				_make_second_reward_record("front_recycle", "deepen_current_axis", "深化当前主轴", "默认强化 Launch 持续供给。"),
+				_make_second_reward_record("queue_brace", "patch", "补洞", "默认补 Queue 空档。"),
+			]
+
+func _make_second_reward_record(
+	modifier_id: String,
+	offer_role: String,
+	offer_role_label: String,
+	reason: String
+) -> Dictionary:
+	var definition: ModifierDefinition = second_reward_defs.get(modifier_id, null) as ModifierDefinition
+	return {
+		"modifier_id": modifier_id,
+		"display_name": definition.display_name if definition != null else modifier_id,
+		"axis": definition.warehouse if definition != null else "",
+		"offer_role": offer_role,
+		"offer_role_label": offer_role_label,
+		"reason": reason,
+	}
+
+func _second_reward_record_for(modifier_id: String) -> Dictionary:
+	for record: Dictionary in second_reward_candidate_records:
+		if String(record.get("modifier_id", "")) == modifier_id:
+			return record.duplicate(true)
+	return {}
+
 func _selected_modifier_marker_text() -> String:
 	var markers := PackedStringArray()
 	if not session.reward_one_id.is_empty() and reward_defs.has(session.reward_one_id):
@@ -680,10 +856,13 @@ func _counter_response_link() -> String:
 	return _modifier_name(session.shop_purchase_id, shop_defs)
 
 func _build_result_summary_text() -> String:
-	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次\n最后战斗：%s\n结果：%s\n下一步：M2 到此结束，等待后续里程碑确认。" % [
+	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\n第二次奖励：%s | 当前主轴：%s | 定位：%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次\n最后战斗：%s\n结果：%s\n下一步：M4 到此结束，Battle 5 / Endpoint 留给后续里程碑。" % [
 		_guardian_name(session.selected_guardian_id),
 		_modifier_name(session.reward_one_id, reward_defs),
 		_modifier_name(session.shop_purchase_id, shop_defs),
+		_modifier_name(session.second_reward_id, second_reward_defs),
+		"未到达" if session.second_offer_current_axis.is_empty() else session.second_offer_current_axis,
+		_second_reward_role_label(session.second_offer_choice_role),
 		session.gold,
 		session.first_shop_rest_count,
 		session.battle_three_rest_count,
@@ -699,6 +878,8 @@ func _battle_display_name(battle_id: String) -> String:
 			return "战斗 2"
 		RunSessionModel.NODE_BATTLE_3:
 			return "战斗 3"
+		"battle_4":
+			return "战斗 4"
 		_:
 			return "未记录"
 
@@ -728,3 +909,14 @@ func _modifier_name(modifier_id: String, modifier_defs: Dictionary) -> String:
 	if definition == null:
 		return modifier_id
 	return definition.display_name
+
+func _second_reward_role_label(role_id: String) -> String:
+	match role_id:
+		"deepen_current_axis":
+			return "深化当前主轴"
+		"patch":
+			return "补洞"
+		"pivot":
+			return "转向"
+		_:
+			return "未选择"

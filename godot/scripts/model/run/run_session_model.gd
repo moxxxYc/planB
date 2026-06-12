@@ -8,6 +8,8 @@ const NODE_BATTLE_2: String = "battle_2"
 const NODE_SHOP_1: String = "shop_1"
 const NODE_BATTLE_3: String = "battle_3"
 const NODE_REST_AFTER_BATTLE_3: String = "rest_after_battle_3"
+const NODE_BATTLE_4: String = "battle_4"
+const NODE_REWARD_2: String = "reward_2"
 const NODE_RESULT_ROUTING: String = "result_routing"
 const RESULT_WIN: String = "Win"
 const RESULT_LOSS: String = "Loss"
@@ -16,6 +18,10 @@ var current_node_id: String = NODE_GUARDIAN_CONTRACT
 var selected_guardian_id: String = ""
 var reward_one_id: String = ""
 var shop_purchase_id: String = ""
+var second_reward_id: String = ""
+var second_offer_current_axis: String = ""
+var second_offer_candidates: Array[Dictionary] = []
+var second_offer_choice_role: String = ""
 var gold: int = 0
 var guardian_max_hp: int = 100
 var guardian_hp: int = 100
@@ -46,7 +52,7 @@ func confirm_guardian() -> void:
 	current_node_id = NODE_BATTLE_1
 
 func complete_battle(battle_result: String) -> void:
-	if not [NODE_BATTLE_1, NODE_BATTLE_2, NODE_BATTLE_3].has(current_node_id):
+	if not [NODE_BATTLE_1, NODE_BATTLE_2, NODE_BATTLE_3, NODE_BATTLE_4].has(current_node_id):
 		push_error("Current node is not a battle: %s" % current_node_id)
 		return
 
@@ -72,6 +78,8 @@ func complete_battle(battle_result: String) -> void:
 		NODE_BATTLE_3:
 			gold += 8
 			current_node_id = NODE_REST_AFTER_BATTLE_3
+		NODE_BATTLE_4:
+			current_node_id = NODE_REWARD_2
 
 func choose_reward_one(reward_id: String) -> void:
 	if current_node_id != NODE_REWARD_1:
@@ -132,9 +140,22 @@ func confirm_shop_and_rest() -> void:
 
 func confirm_battle_three_rest() -> void:
 	if current_node_id != NODE_REST_AFTER_BATTLE_3:
-		push_error("Battle 3 Rest can only route to result after Battle 3.")
+		push_error("Battle 3 Rest can only route to Battle 4 from Battle 3 Rest.")
 		return
 
+	current_node_id = NODE_BATTLE_4
+
+func set_second_offer(current_axis: String, candidates: Array[Dictionary]) -> void:
+	second_offer_current_axis = current_axis
+	second_offer_candidates = candidates.duplicate(true)
+
+func choose_second_reward(choice_id: String, choice_role: String) -> void:
+	if current_node_id != NODE_REWARD_2:
+		push_error("Second Reward can only be chosen at Reward 2.")
+		return
+
+	second_reward_id = choice_id
+	second_offer_choice_role = choice_role
 	_route_to_result()
 
 func get_rest_count() -> int:
@@ -169,3 +190,9 @@ func _route_to_result() -> void:
 	}
 	for key: String in counter_record.keys():
 		result_record["counter1.%s" % key] = counter_record[key]
+	if not second_offer_current_axis.is_empty():
+		result_record["second_offer.current_axis"] = second_offer_current_axis
+		result_record["second_offer.candidates"] = second_offer_candidates.duplicate(true)
+	if not second_reward_id.is_empty():
+		result_record["second_offer.choice_id"] = second_reward_id
+		result_record["second_offer.choice_role"] = second_offer_choice_role

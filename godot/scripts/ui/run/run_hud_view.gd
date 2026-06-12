@@ -12,14 +12,16 @@ func render(
 	session: RunSessionModel,
 	guardian_defs: Dictionary,
 	reward_defs: Dictionary,
-	shop_defs: Dictionary
+	shop_defs: Dictionary,
+	second_reward_defs: Dictionary
 ) -> void:
 	_ensure_label()
-	summary_label.text = "守护者：%s | Gold：%d | 第一次奖励：%s | 第一次商店：%s | 侦测反制：%s" % [
+	summary_label.text = "守护者：%s | Gold：%d | 第一次奖励：%s | 第一次商店：%s | 第二次奖励：%s | 侦测反制：%s" % [
 		_guardian_name(session.selected_guardian_id, guardian_defs),
 		session.gold,
 		_modifier_name(session.reward_one_id, reward_defs),
 		_modifier_name(session.shop_purchase_id, shop_defs),
+		_modifier_name(session.second_reward_id, second_reward_defs),
 		_counter_name(session.planned_counter_id),
 	]
 
