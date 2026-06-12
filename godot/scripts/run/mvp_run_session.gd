@@ -6,6 +6,7 @@ const RewardChoiceViewScript := preload("res://scripts/ui/run/reward_choice_view
 const ShopRestViewScript := preload("res://scripts/ui/run/shop_rest_view.gd")
 const RunResultViewScript := preload("res://scripts/ui/run/run_result_view.gd")
 const RunHudViewScript := preload("res://scripts/ui/run/run_hud_view.gd")
+const CounterDefinitionScript := preload("res://scripts/data/counter_definition.gd")
 
 const BATTLE_SCENE_PATH: String = "res://scenes/run/battle_one_vertical.tscn"
 const BATTLE_AUTO_ROUTE_DWELL_SECONDS: float = 0.6
@@ -17,6 +18,9 @@ var session: RunSessionModel = RunSessionModel.new()
 var guardian_defs: Dictionary = {}
 var reward_defs: Dictionary = {}
 var shop_defs: Dictionary = {}
+var counter_defs: Dictionary = {}
+var next_counter_override: String = ""
+var planned_counter_id: String = ""
 var hud_view = null
 var active_battle: BattleOneVertical = null
 var active_result_view = null
@@ -140,6 +144,22 @@ func get_rest_count() -> int:
 func confirm_shop_and_rest() -> void:
 	session.confirm_shop_and_rest()
 	_render_current_node()
+
+func set_next_counter_for_verifier(counter_id: String) -> void:
+	_ensure_catalogs()
+	if not counter_defs.has(counter_id):
+		push_error("Unknown M3 counter: %s" % counter_id)
+		return
+	next_counter_override = counter_id
+	planned_counter_id = counter_id
+
+func get_counter_scout_text() -> String:
+	_ensure_catalogs()
+	_ensure_planned_counter()
+	var definition: Resource = counter_defs.get(planned_counter_id, null) as Resource
+	if definition == null:
+		return "反制侦测：暂无"
+	return String(definition.call("to_scout_text"))
 
 func get_result_summary_text() -> String:
 	if active_result_view != null:
@@ -337,7 +357,7 @@ func _apply_shell_styles() -> void:
 	shell_styles_applied = true
 
 func _ensure_catalogs() -> void:
-	if guardian_defs.is_empty() or reward_defs.is_empty() or shop_defs.is_empty():
+	if guardian_defs.is_empty() or reward_defs.is_empty() or shop_defs.is_empty() or counter_defs.is_empty():
 		_build_catalogs()
 
 func _build_catalogs() -> void:
@@ -432,6 +452,36 @@ func _build_catalogs() -> void:
 		),
 	}
 
+	counter_defs = {
+		"pool_polluter": _make_counter(
+			"pool_polluter",
+			"Pool Polluter",
+			"Pool",
+			4.0,
+			18.0,
+			"Junk 插入 Pool",
+			["junk_sieve", "pool_pocket"]
+		),
+		"echo_breaker": _make_counter(
+			"echo_breaker",
+			"Echo Breaker",
+			"Echo / Surge 价值",
+			4.0,
+			14.0,
+			"Echo 复制降级为 Gate",
+			["surge_buffer", "prime_charge"]
+		),
+		"stagger_punisher": _make_counter(
+			"stagger_punisher",
+			"Stagger Punisher",
+			"Queue 空档",
+			3.0,
+			16.0,
+			"Raider 因 Queue 空档出现",
+			["queue_brace", "slot_primer"]
+		),
+	}
+
 func _make_guardian(
 	id: String,
 	display_name: String,
@@ -471,6 +521,33 @@ func _make_modifier(
 	definition.gold_cost = gold_cost
 	definition.player_read = player_read
 	return definition
+
+func _make_counter(
+	id: String,
+	display_name: String,
+	target_component: String,
+	warning_seconds: float,
+	active_seconds: float,
+	visible_effect: String,
+	patch_ids: Array[String]
+) -> Resource:
+	var definition = CounterDefinitionScript.new()
+	definition.id = id
+	definition.display_name = display_name
+	definition.target_component = target_component
+	definition.warning_seconds = warning_seconds
+	definition.active_seconds = active_seconds
+	definition.visible_effect = visible_effect
+	definition.patch_ids = patch_ids.duplicate()
+	return definition
+
+func _ensure_planned_counter() -> void:
+	if not planned_counter_id.is_empty() and counter_defs.has(planned_counter_id):
+		return
+	if not next_counter_override.is_empty() and counter_defs.has(next_counter_override):
+		planned_counter_id = next_counter_override
+		return
+	planned_counter_id = "pool_polluter"
 
 func _selected_modifier_marker_text() -> String:
 	var markers := PackedStringArray()
