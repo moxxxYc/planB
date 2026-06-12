@@ -56,4 +56,11 @@ fi
 
 run_godot_verifier "res://tools/verify_m2_run_flow.gd"
 
+if [[ ! -f "$PROJECT_DIR/tools/verify_m3_counter_flow.gd" ]]; then
+  echo "Missing required M3 verifier at $PROJECT_DIR/tools/verify_m3_counter_flow.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_m3_counter_flow.gd"
+
 echo "verify_godot: PASS"
