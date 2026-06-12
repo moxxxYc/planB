@@ -29,9 +29,9 @@ func _ready() -> void:
 func render(deploy, lanes) -> void:
 	_ensure_nodes()
 	_ensure_styles()
-	_render_lane_button(left_button, "Left", deploy.current_lane, lanes.get_player_units("Left"))
-	_render_lane_button(mid_button, "Mid", deploy.current_lane, lanes.get_player_units("Mid"))
-	_render_lane_button(right_button, "Right", deploy.current_lane, lanes.get_player_units("Right"))
+	_render_lane_button(left_button, "Left", deploy.current_lane, lanes.get_player_units("Left"), lanes.get_lane_danger_level("Left"), lanes.get_enemy_raiders("Left"))
+	_render_lane_button(mid_button, "Mid", deploy.current_lane, lanes.get_player_units("Mid"), lanes.get_lane_danger_level("Mid"), lanes.get_enemy_raiders("Mid"))
+	_render_lane_button(right_button, "Right", deploy.current_lane, lanes.get_player_units("Right"), lanes.get_lane_danger_level("Right"), lanes.get_enemy_raiders("Right"))
 	summary_label.text = "%s\n己方单位 | 左路 %d | 中路 %d | 右路 %d" % [
 		lanes.get_result_text(),
 		lanes.get_player_units("Left"),
@@ -56,9 +56,9 @@ func _on_mid_pressed() -> void:
 func _on_right_pressed() -> void:
 	lane_clicked.emit("Right")
 
-func _render_lane_button(button: Button, lane: String, current_lane: String, units: int) -> void:
+func _render_lane_button(button: Button, lane: String, current_lane: String, units: int, danger: int, raiders: int) -> void:
 	var is_selected: bool = lane == current_lane
-	button.text = _lane_body_text(lane, units, is_selected)
+	button.text = _lane_body_text(lane, units, is_selected, danger, raiders)
 	if is_selected:
 		_apply_lane_style(button, _selected_style, _selected_hover_style)
 	else:
@@ -91,19 +91,25 @@ func _make_lane_style(background: Color, border: Color, border_width: int) -> St
 	style.content_margin_bottom = 12.0
 	return style
 
-func _lane_body_text(lane: String, units: int, is_selected: bool) -> String:
+func _lane_body_text(lane: String, units: int, is_selected: bool, danger: int, raiders: int) -> String:
 	var lane_name := _lane_name(lane)
 	var pressure_text := " | 受压路线" if lane == "Left" else ""
+	var danger_text := " | 危险 %d" % danger if danger > 0 else ""
+	var raider_text := " | 突袭 Raider x%d" % raiders if raiders > 0 else ""
 	if is_selected:
-		return "[[ %s出兵口 ]] ==> [[ 路线门 ]]\n选中路线 | 双轨生效%s\n单位：%d" % [
+		return "[[ %s出兵口 ]] ==> [[ 路线门 ]]\n选中路线 | 双轨生效%s%s%s\n单位：%d" % [
 			lane_name,
 			pressure_text,
+			danger_text,
+			raider_text,
 			units,
 		]
 
-	return "[ %s出兵口 ] ---- [ 路线门 ]\n点击后续 Queue 将走这一路%s\n单位：%d" % [
+	return "[ %s出兵口 ] ---- [ 路线门 ]\n点击后续 Queue 将走这一路%s%s%s\n单位：%d" % [
 		lane_name,
 		pressure_text,
+		danger_text,
+		raider_text,
 		units,
 	]
 

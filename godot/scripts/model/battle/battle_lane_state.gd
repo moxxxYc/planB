@@ -10,6 +10,9 @@ const PRESSURED_LANE_REQUIRED_UNITS: int = 1
 const PRESSURE_LIMIT_SECONDS: float = 28.0
 
 var player_units: Dictionary = {"Left": 0, "Mid": 0, "Right": 0}
+var lane_danger_level: Dictionary = {"Left": 0, "Mid": 0, "Right": 0}
+var enemy_raiders: Dictionary = {"Left": 0, "Mid": 0, "Right": 0}
+var counter_events: Array[String] = []
 var deploy_log: Array[String] = []
 var battle_elapsed: float = 0.0
 var battle_result: String = RESULT_RUNNING
@@ -38,6 +41,27 @@ func get_player_units(lane: String) -> int:
 		return 0
 
 	return int(player_units.get(lane, 0))
+
+func set_lane_danger(lane: String, level: int, reason: String) -> void:
+	if not LANES.has(lane):
+		push_error("Invalid danger lane: %s" % lane)
+		return
+	lane_danger_level[lane] = clampi(level, 0, 3)
+	counter_events.append("%s 危险 %d：%s" % [lane, int(lane_danger_level[lane]), reason])
+
+func spawn_enemy_raiders(lane: String, count: int, reason: String) -> void:
+	if not LANES.has(lane):
+		push_error("Invalid Raider lane: %s" % lane)
+		return
+	enemy_raiders[lane] = int(enemy_raiders.get(lane, 0)) + count
+	lane_danger_level[lane] = maxi(int(lane_danger_level.get(lane, 0)), 2)
+	counter_events.append("%s 突袭：Enemy Raider x%d，%s" % [lane, count, reason])
+
+func get_lane_danger_level(lane: String) -> int:
+	return int(lane_danger_level.get(lane, 0))
+
+func get_enemy_raiders(lane: String) -> int:
+	return int(enemy_raiders.get(lane, 0))
 
 func get_battle_result() -> String:
 	return battle_result
