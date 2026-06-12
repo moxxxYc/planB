@@ -10,6 +10,10 @@ const NODE_BATTLE_3: String = "battle_3"
 const NODE_REST_AFTER_BATTLE_3: String = "rest_after_battle_3"
 const NODE_BATTLE_4: String = "battle_4"
 const NODE_REWARD_2: String = "reward_2"
+const NODE_BATTLE_5: String = "battle_5"
+const NODE_ENDPOINT_PREP: String = "endpoint_prep"
+const NODE_ENDPOINT: String = "endpoint"
+const NODE_FINAL_RESULT: String = "final_result"
 const NODE_RESULT_ROUTING: String = "result_routing"
 const RESULT_WIN: String = "Win"
 const RESULT_LOSS: String = "Loss"
@@ -25,44 +29,68 @@ var second_offer_choice_role: String = ""
 var gold: int = 0
 var guardian_max_hp: int = 100
 var guardian_hp: int = 100
+var endpoint_guardian_max_hp: int = 180
+var endpoint_guardian_hp: int = 180
 var first_shop_rest_count: int = 0
 var battle_three_rest_count: int = 0
+var endpoint_prep_rest_count: int = 0
 var last_battle: String = ""
 var last_battle_result: String = ""
 var planned_counter_id: String = ""
 var counter_record: Dictionary = {}
+var counter_two_record: Dictionary = {}
+var battle_records: Dictionary = {}
 var result_record: Dictionary = {}
+var endpoint_reached: bool = false
+
+func has_run_node(node_id: String) -> bool:
+	return [
+		NODE_GUARDIAN_CONTRACT,
+		NODE_BATTLE_1,
+		NODE_REWARD_1,
+		NODE_BATTLE_2,
+		NODE_SHOP_1,
+		NODE_BATTLE_3,
+		NODE_REST_AFTER_BATTLE_3,
+		NODE_BATTLE_4,
+		NODE_REWARD_2,
+		NODE_BATTLE_5,
+		NODE_ENDPOINT_PREP,
+		NODE_ENDPOINT,
+		NODE_FINAL_RESULT,
+		NODE_RESULT_ROUTING,
+	].has(node_id)
 
 func select_guardian(guardian_id: String) -> void:
 	if current_node_id != NODE_GUARDIAN_CONTRACT:
 		push_error("Guardian can only be selected at Guardian Contract.")
 		return
-
 	selected_guardian_id = guardian_id
 
 func confirm_guardian() -> void:
 	if current_node_id != NODE_GUARDIAN_CONTRACT:
 		push_error("Guardian can only be confirmed at Guardian Contract.")
 		return
-
 	if selected_guardian_id.is_empty():
 		push_error("Cannot confirm an empty Guardian selection.")
 		return
-
 	current_node_id = NODE_BATTLE_1
 
 func complete_battle(battle_result: String) -> void:
-	if not [NODE_BATTLE_1, NODE_BATTLE_2, NODE_BATTLE_3, NODE_BATTLE_4].has(current_node_id):
+	if not _battle_nodes().has(current_node_id):
 		push_error("Current node is not a battle: %s" % current_node_id)
 		return
-
-	if battle_result != RESULT_WIN:
-		if battle_result != RESULT_LOSS:
-			push_error("Unsupported battle result: %s" % battle_result)
-			return
+	if battle_result != RESULT_WIN and battle_result != RESULT_LOSS:
+		push_error("Unsupported battle result: %s" % battle_result)
+		return
 
 	last_battle = current_node_id
 	last_battle_result = battle_result
+
+	if current_node_id == NODE_ENDPOINT:
+		endpoint_reached = true
+		_route_to_final_result()
+		return
 
 	if battle_result == RESULT_LOSS:
 		_route_to_result()
@@ -80,12 +108,13 @@ func complete_battle(battle_result: String) -> void:
 			current_node_id = NODE_REST_AFTER_BATTLE_3
 		NODE_BATTLE_4:
 			current_node_id = NODE_REWARD_2
+		NODE_BATTLE_5:
+			current_node_id = NODE_ENDPOINT_PREP
 
 func choose_reward_one(reward_id: String) -> void:
 	if current_node_id != NODE_REWARD_1:
 		push_error("Reward 1 can only be chosen at Reward 1.")
 		return
-
 	reward_one_id = reward_id
 	current_node_id = NODE_BATTLE_2
 
@@ -95,17 +124,24 @@ func set_planned_counter(counter_id: String) -> void:
 func set_counter_record(record: Dictionary) -> void:
 	counter_record = record.duplicate(true)
 
+func set_counter_two_record(record: Dictionary) -> void:
+	counter_two_record = record.duplicate(true)
+
+func set_battle_record(battle_id: String, record: Dictionary) -> void:
+	if battle_id.is_empty():
+		return
+	battle_records[battle_id] = record.duplicate(true)
+	if battle_id == NODE_ENDPOINT and record.has("endpoint.guardian_hp"):
+		endpoint_guardian_hp = _extract_endpoint_hp(String(record.get("endpoint.guardian_hp", "")), endpoint_guardian_hp)
+
 func buy_shop_item(modifier_id: String, cost: int) -> bool:
 	if current_node_id != NODE_SHOP_1:
 		push_error("Shop item can only be bought at First Shop.")
 		return false
-
 	if not shop_purchase_id.is_empty():
 		return false
-
 	if gold < cost:
 		return false
-
 	shop_purchase_id = modifier_id
 	gold -= cost
 	return true
@@ -119,31 +155,34 @@ func can_buy_rest() -> bool:
 func buy_rest() -> bool:
 	if not can_buy_rest():
 		return false
-
 	gold -= 3
 	guardian_hp = mini(guardian_max_hp, guardian_hp + 20)
-
 	match current_node_id:
 		NODE_SHOP_1:
 			first_shop_rest_count += 1
 		NODE_REST_AFTER_BATTLE_3:
 			battle_three_rest_count += 1
-
+		NODE_ENDPOINT_PREP:
+			endpoint_prep_rest_count += 1
 	return true
 
 func confirm_shop_and_rest() -> void:
 	if current_node_id != NODE_SHOP_1:
 		push_error("First Shop / Rest can only route to Battle 3 from First Shop.")
 		return
-
 	current_node_id = NODE_BATTLE_3
 
 func confirm_battle_three_rest() -> void:
 	if current_node_id != NODE_REST_AFTER_BATTLE_3:
 		push_error("Battle 3 Rest can only route to Battle 4 from Battle 3 Rest.")
 		return
-
 	current_node_id = NODE_BATTLE_4
+
+func confirm_endpoint_prep() -> void:
+	if current_node_id != NODE_ENDPOINT_PREP:
+		push_error("Endpoint Prep can only route to Endpoint from Endpoint Prep.")
+		return
+	current_node_id = NODE_ENDPOINT
 
 func set_second_offer(current_axis: String, candidates: Array[Dictionary]) -> void:
 	second_offer_current_axis = current_axis
@@ -153,10 +192,9 @@ func choose_second_reward(choice_id: String, choice_role: String) -> void:
 	if current_node_id != NODE_REWARD_2:
 		push_error("Second Reward can only be chosen at Reward 2.")
 		return
-
 	second_reward_id = choice_id
 	second_offer_choice_role = choice_role
-	_route_to_result()
+	current_node_id = NODE_BATTLE_5
 
 func get_rest_count() -> int:
 	match current_node_id:
@@ -164,8 +202,38 @@ func get_rest_count() -> int:
 			return first_shop_rest_count
 		NODE_REST_AFTER_BATTLE_3:
 			return battle_three_rest_count
+		NODE_ENDPOINT_PREP:
+			return endpoint_prep_rest_count
 		_:
 			return 0
+
+func get_endpoint_prep_rest_limit_remaining() -> int:
+	if current_node_id != NODE_ENDPOINT_PREP:
+		return 0
+	return maxi(0, 2 - endpoint_prep_rest_count)
+
+func build_final_result_record() -> Dictionary:
+	result_record = _base_result_record()
+	result_record["guardian.choice_id"] = selected_guardian_id
+	result_record["guardian.outcome"] = _guardian_outcome()
+	result_record["reward1.choice_id"] = reward_one_id
+	result_record["reward1.axis"] = _axis_for_reward_one()
+	result_record["reward1.component_operation"] = _operation_for_reward_one()
+	result_record["reward1.battlefield_result"] = _battlefield_result_for_reward_one()
+	result_record["shop1.purchase_id"] = shop_purchase_id
+	result_record["shop1.purchase_role"] = _role_for_shop_purchase()
+	result_record["rest.windows_used"] = _rest_windows_used()
+	result_record["rest.total_purchases"] = first_shop_rest_count + battle_three_rest_count + endpoint_prep_rest_count
+	result_record["rest.gold_spent"] = 3 * int(result_record["rest.total_purchases"])
+	result_record["rest.endpoint_relevance"] = _rest_endpoint_relevance()
+	result_record["session.decision_windows"] = _decision_windows()
+	_merge_counter_records()
+	_merge_battle_records()
+	_ensure_endpoint_fields()
+	return result_record.duplicate(true)
+
+func _battle_nodes() -> Array[String]:
+	return [NODE_BATTLE_1, NODE_BATTLE_2, NODE_BATTLE_3, NODE_BATTLE_4, NODE_BATTLE_5, NODE_ENDPOINT]
 
 func _rest_limit_remaining() -> int:
 	match current_node_id:
@@ -173,26 +241,187 @@ func _rest_limit_remaining() -> int:
 			return maxi(0, 1 - first_shop_rest_count)
 		NODE_REST_AFTER_BATTLE_3:
 			return maxi(0, 1 - battle_three_rest_count)
+		NODE_ENDPOINT_PREP:
+			return maxi(0, 2 - endpoint_prep_rest_count)
 		_:
 			return 0
 
 func _route_to_result() -> void:
 	current_node_id = NODE_RESULT_ROUTING
-	result_record = {
+	result_record = _base_result_record()
+	_merge_counter_records()
+	_merge_battle_records()
+
+func _route_to_final_result() -> void:
+	current_node_id = NODE_FINAL_RESULT
+	build_final_result_record()
+
+func _base_result_record() -> Dictionary:
+	var record: Dictionary = {
 		"guardian_id": selected_guardian_id,
 		"reward1_id": reward_one_id,
 		"shop1_purchase_id": shop_purchase_id,
 		"gold": gold,
 		"rest_first_shop": first_shop_rest_count,
 		"rest_battle_three": battle_three_rest_count,
+		"rest_endpoint_prep": endpoint_prep_rest_count,
 		"last_battle": last_battle,
 		"battle_result": last_battle_result,
 	}
+	if not second_offer_current_axis.is_empty():
+		record["second_offer.current_axis"] = second_offer_current_axis
+		record["second_offer.candidates"] = second_offer_candidates.duplicate(true)
+	if not second_reward_id.is_empty():
+		record["second_offer.choice_id"] = second_reward_id
+		record["second_offer.choice_role"] = second_offer_choice_role
+	return record
+
+func _merge_counter_records() -> void:
 	for key: String in counter_record.keys():
 		result_record["counter1.%s" % key] = counter_record[key]
-	if not second_offer_current_axis.is_empty():
-		result_record["second_offer.current_axis"] = second_offer_current_axis
-		result_record["second_offer.candidates"] = second_offer_candidates.duplicate(true)
-	if not second_reward_id.is_empty():
-		result_record["second_offer.choice_id"] = second_reward_id
-		result_record["second_offer.choice_role"] = second_offer_choice_role
+	for key: String in counter_two_record.keys():
+		result_record["counter2.%s" % key] = counter_two_record[key]
+
+func _merge_battle_records() -> void:
+	for battle_id: String in battle_records.keys():
+		var record: Dictionary = battle_records[battle_id] as Dictionary
+		for key: String in record.keys():
+			if battle_id != NODE_ENDPOINT and ["endpoint.outcome", "endpoint.guardian_hp"].has(key):
+				continue
+			if not result_record.has(key):
+				result_record[key] = record[key]
+
+func _ensure_endpoint_fields() -> void:
+	var endpoint_outcome := "胜利" if last_battle_result == RESULT_WIN and last_battle == NODE_ENDPOINT else ("失败" if last_battle == NODE_ENDPOINT else "未到达")
+	result_record["endpoint.outcome"] = result_record.get("endpoint.outcome", endpoint_outcome)
+	result_record["endpoint.primary_axis_payoff"] = result_record.get("endpoint.primary_axis_payoff", _default_axis_payoff())
+	result_record["endpoint.main_break_reason"] = result_record.get("endpoint.main_break_reason", _main_break_reason())
+	result_record["endpoint.next_run_watch_tag"] = result_record.get("endpoint.next_run_watch_tag", _next_run_watch_tag())
+	result_record["endpoint.deploy_lane_impact"] = result_record.get("endpoint.deploy_lane_impact", "Queue 只改变部署落点，关键路线改变会记录在战场遥测。")
+	result_record["endpoint.guardian_hp"] = result_record.get("endpoint.guardian_hp", "玩家 %d / %d，终点 %d / %d" % [
+		guardian_hp,
+		guardian_max_hp,
+		endpoint_guardian_hp,
+		endpoint_guardian_max_hp,
+	])
+	result_record["guardian.hp_pressure_events"] = result_record.get("guardian.hp_pressure_events", [])
+	result_record["battle1.machine_chain_sample"] = result_record.get("battle1.machine_chain_sample", "Pool 入槽 -> fired ball -> Tuning 命中 -> Unit progress -> Queue entry")
+	result_record["unit.visible_contribution_slots"] = result_record.get("unit.visible_contribution_slots", [1])
+	result_record["unit.key_queue_entries_by_slot"] = result_record.get("unit.key_queue_entries_by_slot", {})
+
+func _guardian_outcome() -> String:
+	if last_battle == NODE_ENDPOINT and last_battle_result == RESULT_WIN:
+		return "到达 Endpoint 并胜利，结束 HP %d / %d" % [guardian_hp, guardian_max_hp]
+	if endpoint_reached:
+		return "到达 Endpoint 但失败，结束 HP %d / %d" % [guardian_hp, guardian_max_hp]
+	return "未到达 Endpoint，结束 HP %d / %d" % [guardian_hp, guardian_max_hp]
+
+func _axis_for_reward_one() -> String:
+	match reward_one_id:
+		"pool_pocket":
+			return "Launch"
+		"prime_charge":
+			return "Tuning"
+		"slot_primer":
+			return "Unit"
+		_:
+			return "未选择"
+
+func _operation_for_reward_one() -> String:
+	match reward_one_id:
+		"pool_pocket":
+			return "Pool capacity +1"
+		"prime_charge":
+			return "Prime hit value +1 -> +2"
+		"slot_primer":
+			return "Unit slot progress floor = 1"
+		_:
+			return "无"
+
+func _battlefield_result_for_reward_one() -> String:
+	match reward_one_id:
+		"pool_pocket":
+			return "Launch sustained flow"
+		"prime_charge":
+			return "Tuning high-value hit"
+		"slot_primer":
+			return "Unit anchor slot"
+		_:
+			return "未明显兑现"
+
+func _role_for_shop_purchase() -> String:
+	match shop_purchase_id:
+		"junk_sieve", "surge_buffer", "queue_brace":
+			return "Patch"
+		"front_recycle", "muster_pair":
+			return "Pivot"
+		_:
+			return "无"
+
+func _rest_windows_used() -> Array[String]:
+	var windows: Array[String] = []
+	if first_shop_rest_count > 0:
+		windows.append("第一次商店")
+	if battle_three_rest_count > 0:
+		windows.append("战斗 3 后")
+	if endpoint_prep_rest_count > 0:
+		windows.append("Endpoint 前整备")
+	return windows
+
+func _rest_endpoint_relevance() -> String:
+	if endpoint_prep_rest_count <= 0:
+		return "none"
+	if last_battle == NODE_ENDPOINT and last_battle_result == RESULT_WIN:
+		return "changed_endpoint_margin"
+	if last_battle == NODE_ENDPOINT and last_battle_result == RESULT_LOSS:
+		return "insufficient"
+	return "helped_survive_to_endpoint"
+
+func _decision_windows() -> Array[String]:
+	var windows: Array[String] = ["Guardian", "第一次奖励", "第一次商店", "战斗 3 后休整", "第二次奖励"]
+	if endpoint_prep_rest_count >= 0:
+		windows.append("Endpoint 前整备")
+	windows.append("关键 Deploy Lane 改变")
+	return windows
+
+func _default_axis_payoff() -> String:
+	if second_reward_id == "echo_latch":
+		return "Tuning repeated hit"
+	return _battlefield_result_for_reward_one()
+
+func _main_break_reason() -> String:
+	if last_battle_result == RESULT_WIN:
+		return "未断裂"
+	if guardian_hp <= 0:
+		return "Guardian HP 被打穿"
+	if planned_counter_id == "pool_polluter":
+		return "Pool 卡住"
+	if planned_counter_id == "echo_breaker":
+		return "Echo / Surge 价值被打断"
+	if planned_counter_id == "stagger_punisher":
+		return "queue gap"
+	return "未定"
+
+func _next_run_watch_tag() -> String:
+	match _main_break_reason():
+		"Pool 卡住":
+			return "Launch pollution patch"
+		"Echo / Surge 价值被打断":
+			return "Tuning repeated hit"
+		"queue gap":
+			return "Unit gap patch"
+		"Guardian HP 被打穿":
+			return "Guardian HP pressure"
+		_:
+			return "lane leak watch"
+
+func _extract_endpoint_hp(text: String, fallback: int) -> int:
+	var marker := "终点 "
+	var index := text.find(marker)
+	if index == -1:
+		return fallback
+	index += marker.length()
+	var slash := text.find(" /", index)
+	if slash == -1:
+		return fallback
+	return int(text.substr(index, slash - index))

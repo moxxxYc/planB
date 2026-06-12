@@ -6,6 +6,8 @@ const RewardChoiceViewScript := preload("res://scripts/ui/run/reward_choice_view
 const SecondRewardChoiceViewScript := preload("res://scripts/ui/run/second_reward_choice_view.gd")
 const ShopRestViewScript := preload("res://scripts/ui/run/shop_rest_view.gd")
 const RunResultViewScript := preload("res://scripts/ui/run/run_result_view.gd")
+const EndpointPrepViewScript := preload("res://scripts/ui/run/endpoint_prep_view.gd")
+const FinalResultViewScript := preload("res://scripts/ui/run/final_result_view.gd")
 const RunHudViewScript := preload("res://scripts/ui/run/run_hud_view.gd")
 const CounterDefinitionScript := preload("res://scripts/data/counter_definition.gd")
 
@@ -156,6 +158,10 @@ func confirm_shop_and_rest() -> void:
 		push_error("Shop / Rest confirm is not available at: %s" % session.current_node_id)
 	_render_current_node()
 
+func confirm_endpoint_prep() -> void:
+	session.confirm_endpoint_prep()
+	_render_current_node()
+
 func set_next_counter_for_verifier(counter_id: String) -> void:
 	_ensure_catalogs()
 	if not counter_defs.has(counter_id):
@@ -270,6 +276,14 @@ func _render_current_node() -> void:
 			_show_battle(4)
 		"reward_2":
 			_show_second_reward()
+		RunSessionModel.NODE_BATTLE_5:
+			_show_battle(5)
+		RunSessionModel.NODE_ENDPOINT_PREP:
+			_show_endpoint_prep()
+		RunSessionModel.NODE_ENDPOINT:
+			_show_battle(6)
+		RunSessionModel.NODE_FINAL_RESULT:
+			_show_final_result()
 		RunSessionModel.NODE_RESULT_ROUTING:
 			_show_result()
 		_:
@@ -295,6 +309,13 @@ func _show_second_reward() -> void:
 	view.reward_chosen.connect(_on_second_reward_chosen)
 	view.render(session.second_offer_current_axis, second_reward_candidate_records, second_reward_defs)
 
+func _show_endpoint_prep() -> void:
+	var view = EndpointPrepViewScript.new()
+	_add_screen_child(view)
+	view.rest_bought.connect(_on_rest_bought)
+	view.confirmed.connect(_on_endpoint_prep_confirmed)
+	view.render(session)
+
 func _show_shop_rest(p_hide_shop: bool) -> void:
 	var view = ShopRestViewScript.new()
 	_add_screen_child(view)
@@ -310,6 +331,12 @@ func _show_shop_rest(p_hide_shop: bool) -> void:
 
 func _show_result() -> void:
 	var view = RunResultViewScript.new()
+	active_result_view = view
+	_add_screen_child(view)
+	view.render(session, guardian_defs, reward_defs, shop_defs, second_reward_defs)
+
+func _show_final_result() -> void:
+	var view = FinalResultViewScript.new()
 	active_result_view = view
 	_add_screen_child(view)
 	view.render(session, guardian_defs, reward_defs, shop_defs, second_reward_defs)
@@ -350,6 +377,9 @@ func _on_rest_bought() -> void:
 func _on_shop_rest_confirmed() -> void:
 	confirm_shop_and_rest()
 
+func _on_endpoint_prep_confirmed() -> void:
+	confirm_endpoint_prep()
+
 func _complete_active_battle(battle_result: String) -> void:
 	if not _is_battle_node(session.current_node_id):
 		push_error("Cannot complete non-battle run node: %s" % session.current_node_id)
@@ -357,7 +387,17 @@ func _complete_active_battle(battle_result: String) -> void:
 	if active_battle != null and active_battle.has_method("get_active_counter_record"):
 		var record: Dictionary = active_battle.call("get_active_counter_record") as Dictionary
 		if not record.is_empty():
-			session.set_counter_record(record)
+			if session.current_node_id == RunSessionModel.NODE_BATTLE_5 or session.current_node_id == RunSessionModel.NODE_ENDPOINT:
+				session.set_counter_two_record(record)
+			else:
+				session.set_counter_record(record)
+	if active_battle != null and active_battle.has_method("get_battlefield_record"):
+		var battle_record: Dictionary = active_battle.call("get_battlefield_record") as Dictionary
+		session.set_battle_record(session.current_node_id, battle_record)
+	if active_battle != null and active_battle.has_method("get_player_guardian_hp"):
+		session.guardian_hp = int(active_battle.call("get_player_guardian_hp"))
+	if active_battle != null and active_battle.has_method("get_endpoint_guardian_hp"):
+		session.endpoint_guardian_hp = int(active_battle.call("get_endpoint_guardian_hp"))
 	session.complete_battle(battle_result)
 	_render_current_node()
 
@@ -380,6 +420,8 @@ func _is_battle_node(node_id: String) -> bool:
 		RunSessionModel.NODE_BATTLE_2,
 		RunSessionModel.NODE_BATTLE_3,
 		"battle_4",
+		RunSessionModel.NODE_BATTLE_5,
+		RunSessionModel.NODE_ENDPOINT,
 	].has(node_id)
 
 func _ensure_hud() -> void:
@@ -833,6 +875,10 @@ func _selected_modifier_marker_text() -> String:
 		var shop: ModifierDefinition = shop_defs[session.shop_purchase_id] as ModifierDefinition
 		if shop != null:
 			markers.append("%s (%s)" % [shop.display_name, shop.warehouse])
+	if not session.second_reward_id.is_empty() and second_reward_defs.has(session.second_reward_id):
+		var second_reward: ModifierDefinition = second_reward_defs[session.second_reward_id] as ModifierDefinition
+		if second_reward != null:
+			markers.append("%s (%s)" % [second_reward.display_name, second_reward.warehouse])
 	if markers.is_empty():
 		return "本局机器修正：无"
 	return "本局机器修正：%s" % ", ".join(markers)
@@ -856,7 +902,7 @@ func _counter_response_link() -> String:
 	return _modifier_name(session.shop_purchase_id, shop_defs)
 
 func _build_result_summary_text() -> String:
-	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\n第二次奖励：%s | 当前主轴：%s | 定位：%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次\n最后战斗：%s\n结果：%s\n下一步：M4 到此结束，Battle 5 / Endpoint 留给后续里程碑。" % [
+	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\n第二次奖励：%s | 当前主轴：%s | 定位：%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次，终点前 %d 次\n最后战斗：%s\n结果：%s" % [
 		_guardian_name(session.selected_guardian_id),
 		_modifier_name(session.reward_one_id, reward_defs),
 		_modifier_name(session.shop_purchase_id, shop_defs),
@@ -866,6 +912,7 @@ func _build_result_summary_text() -> String:
 		session.gold,
 		session.first_shop_rest_count,
 		session.battle_three_rest_count,
+		session.endpoint_prep_rest_count,
 		_battle_display_name(session.last_battle),
 		_result_display_name(session.last_battle_result),
 	]
@@ -880,6 +927,10 @@ func _battle_display_name(battle_id: String) -> String:
 			return "战斗 3"
 		"battle_4":
 			return "战斗 4"
+		RunSessionModel.NODE_BATTLE_5:
+			return "战斗 5"
+		RunSessionModel.NODE_ENDPOINT:
+			return "终点战"
 		_:
 			return "未记录"
 

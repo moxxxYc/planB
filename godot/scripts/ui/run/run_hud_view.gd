@@ -16,8 +16,12 @@ func render(
 	second_reward_defs: Dictionary
 ) -> void:
 	_ensure_label()
-	summary_label.text = "守护者：%s | Gold：%d | 第一次奖励：%s | 第一次商店：%s | 第二次奖励：%s | 侦测反制：%s" % [
+	summary_label.text = "守护者：%s | HP：%d/%d | 终点 HP：%d/%d | Gold：%d | 第一次奖励：%s | 第一次商店：%s | 第二次奖励：%s | 侦测反制：%s" % [
 		_guardian_name(session.selected_guardian_id, guardian_defs),
+		session.guardian_hp,
+		session.guardian_max_hp,
+		session.endpoint_guardian_hp,
+		session.endpoint_guardian_max_hp,
 		session.gold,
 		_modifier_name(session.reward_one_id, reward_defs),
 		_modifier_name(session.shop_purchase_id, shop_defs),

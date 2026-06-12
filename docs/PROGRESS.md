@@ -1,7 +1,7 @@
 # 进度与决策日志
 
 **最后更新：** 2026-06-12
-**仓库状态：** 文档主导；原 `mvp/` Godot MVP v0 实现已归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`，当前活动 Godot 实现目录为 `godot/`，M0-M4 已进入活动实现。本文记录设计状态和决策日志，不作为代码状态证明。
+**仓库状态：** 文档主导；原 `mvp/` Godot MVP v0 实现已归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`，当前活动 Godot 实现目录为 `godot/`，当前实现目标对齐原 reset handoff 的 M0-M4 全范围。本文记录设计状态和决策日志，不作为代码状态证明。
 
 ## 当前正式文档
 
@@ -33,9 +33,9 @@
 
 ## 当前总状态
 
-- 仓库当前处于“文档主导 + MVP v0 M0-M4 活动实现”阶段；原 `mvp/` Godot MVP v0 实现已归档，当前活动实现目录为 `godot/`。
-- M0-M4 之外的新里程碑、范围扩展或玩法 canon 变更，必须从当前正式文档重新写有范围约束的实现计划，并等待用户明确确认后再开始。
-- 当前可运行的 Godot MVP 主验证命令是 `bash tools/verify_godot.sh`；归档目录里的旧验证脚本只作历史背景，不作为当前验收入口。
+- 仓库当前处于“文档主导 + MVP v0 原 handoff M0-M4 全范围 gap repair”阶段；原 `mvp/` Godot MVP v0 实现已归档，当前活动实现目录为 `godot/`。
+- 此前 Battle 4 / Reward 2 的窄版 M4 只是中间切片；Battle 5、Endpoint Prep、Endpoint 和 Final Result 属于原 handoff M3/M4 未完成部分，不另起 M5/M6。
+- 当前可运行的 Godot MVP 主验证命令是 `bash tools/verify_godot.sh`；验证链覆盖 project parse、M1 machine-to-lane、M2 run flow、M3 counters、Battle 4 / Reward 2、entity battlefield、full handoff flow、Endpoint result fields、machine physics contract。归档目录里的旧验证脚本只作历史背景，不作为当前验收入口。
 - 旧 Web MVP、旧脚本、旧验证命令和旧实现假设都不再作为当前设计依据。
 - 旧 Godot prototype 已归档到 `docs/archive/prototypes/`，完全过期，不再作为 build、验证、评审或路由信号。
 - 当前正在从基础机制整理转入 Hive 第一种族设计；`Caste Hive` 方向已确认，单位工作名、占位剪影、轻行为和第一版攻击几何已定，两个 Guardian 的身份、轴倾向、技能结构、技能方向、战术技能目标优先级和第一版战术技能范围已定，最终美术资源和最终数值仍未定。
@@ -197,9 +197,9 @@
 
 - 经用户确认后，M3 已在新的 `godot/` 活动工程内实现并提交：Battle 3 反制侦测、三类反制家族、可见预警 / 触发效果、第一商店补洞优先项、`counter1.*` 结果记录，以及 M3 verifier。
 - M3 follow-up 修正已完成：`counter1.visible_effect` 只记录真实触发过的可见效果，未触发时结果页显示“未触发”；`Stagger Punisher` 改为惩罚真正的 Queue 部署空档，而不是惩罚未部署到左路；M3 verifier 新增未触发反制、持续中路部署不触发 Stagger、以及机器板反制目标传递检查。
-- 经用户确认后，M4 已在新的 `godot/` 活动工程内实现：Battle 3 休整后进入 Battle 4，Battle 4 胜利后进入第二次免费奖励，Battle 4 失败进入结果页，Battle 4 胜利不产生 Gold。
+- 经用户确认后，窄版 Battle 4 / Reward 2 中间切片已在新的 `godot/` 活动工程内实现：Battle 3 休整后进入 Battle 4，Battle 4 胜利后进入第二次免费奖励，Battle 4 失败进入结果页，Battle 4 胜利不产生 Gold。
 - M4 第二次奖励按当前主轴生成 2-3 个候选：`Launch` 主轴含 `Front Recycle` / `Junk Sieve`，`Tuning` 主轴含第二次奖励专属 `Echo Latch` / `Surge Buffer`，`Unit` 主轴含 `Muster Pair` / `Queue Brace`；内部角色记录为 `deepen_current_axis` / `patch` / `pivot`，玩家可见标签为 `深化当前主轴` / `补洞` / `转向`。
-- M4 结果记录已包含 `second_offer.current_axis`、`second_offer.candidates`、`second_offer.choice_id` 和 `second_offer.choice_role`；M4 不包含 Battle 5、Endpoint Prep、Endpoint、第二商店、Battle 4 Gold 或完整实体战场。
+- Full gap repair 已将原 handoff 剩余部分纳入当前 M0-M4 目标：Battle 5、Endpoint Prep、Endpoint、Final Result、实体三路战场、Reward 2 后续兑现和完整验证链。
 
 ## 2026-06-05
 
@@ -500,5 +500,5 @@
 
 ## 下一步
 
-下一步如果继续扩展 M4 之外的运行流程，应先写并确认新的 M5 实现计划。Battle 5、Endpoint Prep、Endpoint、终局复盘字段和完整实体战场仍未进入当前活动实现。
+下一步应围绕当前 Godot 实现做人工可玩性 review、视觉 QA 和 playtest；新的里程碑、玩法 canon 变更或原 handoff M0-M4 之外的范围，必须重新写计划并等待确认。
 3. 如实现需要，再收束 `Unit.Slot.Exposure Gate` 暴露插值方式。

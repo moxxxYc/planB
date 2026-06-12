@@ -16,7 +16,7 @@ const BRIDGE_TRANSFER_DWELL_SECONDS: float = 1.5
 
 var machine: MachineSimulator = MachineSimulator.new()
 var deploy: DeployLaneModel = DeployLaneModel.new()
-var lanes: BattleLaneState = BattleLaneState.new()
+var lanes: BattlefieldState = BattlefieldState.new()
 var deploy_timer: float = 0.0
 var elapsed: float = 0.0
 var bridge_transfer_timer: float = 0.0
@@ -116,6 +116,15 @@ func get_active_counter_record() -> Dictionary:
 		return {}
 	return (counter_state.call("to_record") as Dictionary).duplicate(true)
 
+func get_battlefield_record() -> Dictionary:
+	return lanes.get_telemetry_record()
+
+func get_player_guardian_hp() -> int:
+	return lanes.get_player_guardian_hp()
+
+func get_endpoint_guardian_hp() -> int:
+	return lanes.get_endpoint_guardian_hp()
+
 func get_active_machine_log_text() -> String:
 	_ensure_views()
 	var raw_log := PackedStringArray()
@@ -127,6 +136,7 @@ func configure_for_run(p_battle_number: int, p_session: RunSessionModel, payload
 	battle_number = maxi(1, p_battle_number)
 	run_session = p_session
 	run_payload = payload.duplicate(true)
+	lanes.configure(battle_number, battle_number >= 6, run_session.guardian_hp if run_session != null else 100)
 	_configure_counter_runtime(payload)
 	_apply_run_modifiers()
 	_render()
@@ -159,9 +169,10 @@ func _deploy_queue_head() -> void:
 		return
 
 	var entry: Dictionary = machine.pop_queue_entry()
-	lanes.apply_player_deploy(deploy.current_lane, entry)
+	lanes.deploy_player_queue_entry(deploy.current_lane, entry)
 	no_deploy_timer = 0.0
 	last_deploy_elapsed = elapsed
+	stagger_warning_timer = 0.0
 	lanes.clear_lane_danger("Left", "Queue 已恢复部署")
 	bridge_transfer_timer = BRIDGE_TRANSFER_DWELL_SECONDS
 	bridge_view.show_deploy_transfer(deploy.current_lane, entry)
@@ -172,7 +183,7 @@ func _render() -> void:
 	bridge_view.render(machine, deploy)
 	battlefield_view.render(deploy, lanes)
 	if lanes.get_battle_result() == BattleLaneState.RESULT_RUNNING:
-		var counter_text: String = " | %s" % get_active_counter_banner_text() if battle_number == 3 else ""
+		var counter_text: String = " | %s" % get_active_counter_banner_text() if [3, 5, 6].has(battle_number) else ""
 		status_label.text = "%s | %.1fs | 部署：%s | 修正：%s%s" % [
 			_battle_label(),
 			elapsed,
@@ -191,6 +202,8 @@ func _apply_run_modifiers() -> void:
 		machine.apply_modifier(run_session.reward_one_id, _modifier_payload(run_session.reward_one_id))
 	if battle_number >= 3 and not run_session.shop_purchase_id.is_empty():
 		machine.apply_modifier(run_session.shop_purchase_id, _modifier_payload(run_session.shop_purchase_id))
+	if battle_number >= 5 and not run_session.second_reward_id.is_empty():
+		machine.apply_modifier(run_session.second_reward_id, _modifier_payload(run_session.second_reward_id))
 
 func _modifier_payload(modifier_id: String) -> Dictionary:
 	if run_payload.has(modifier_id):
@@ -208,7 +221,7 @@ func _configure_counter_runtime(payload: Dictionary) -> void:
 	stagger_warning_timer = 0.0
 	pool_polluter_insert_timer = 0.0
 	active_counter_record = {}
-	if battle_number != 3 or not payload.has("counter_definition"):
+	if not [3, 5, 6].has(battle_number) or not payload.has("counter_definition"):
 		return
 	counter_definition = payload["counter_definition"] as Resource
 	if counter_definition == null:
@@ -283,6 +296,8 @@ func _counter_target_component() -> String:
 	return String(counter_definition.get("target_component"))
 
 func _battle_label() -> String:
+	if battle_number >= 6:
+		return "终点战"
 	return "战斗 %d" % battle_number
 
 func _active_modifier_names() -> String:
@@ -293,6 +308,8 @@ func _active_modifier_names() -> String:
 		names.append(_modifier_display_name(run_session.reward_one_id))
 	if battle_number >= 3 and not run_session.shop_purchase_id.is_empty():
 		names.append(_modifier_display_name(run_session.shop_purchase_id))
+	if battle_number >= 5 and not run_session.second_reward_id.is_empty():
+		names.append(_modifier_display_name(run_session.second_reward_id))
 	if names.is_empty():
 		return "无"
 	return " + ".join(names)

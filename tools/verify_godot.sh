@@ -70,4 +70,32 @@ fi
 
 run_godot_verifier "res://tools/verify_m4_second_reward_flow.gd"
 
+if [[ ! -f "$PROJECT_DIR/tools/verify_entity_battlefield.gd" ]]; then
+  echo "Missing required entity battlefield verifier at $PROJECT_DIR/tools/verify_entity_battlefield.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_entity_battlefield.gd"
+
+if [[ ! -f "$PROJECT_DIR/tools/verify_full_handoff_flow.gd" ]]; then
+  echo "Missing required full handoff verifier at $PROJECT_DIR/tools/verify_full_handoff_flow.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_full_handoff_flow.gd"
+
+if [[ ! -f "$PROJECT_DIR/tools/verify_endpoint_result_fields.gd" ]]; then
+  echo "Missing required endpoint result verifier at $PROJECT_DIR/tools/verify_endpoint_result_fields.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_endpoint_result_fields.gd"
+
+if [[ ! -f "$PROJECT_DIR/tools/verify_machine_physics_contract.gd" ]]; then
+  echo "Missing required machine physics verifier at $PROJECT_DIR/tools/verify_machine_physics_contract.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_machine_physics_contract.gd"
+
 echo "verify_godot: PASS"

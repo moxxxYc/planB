@@ -2,7 +2,7 @@
 
 当前仓库是文档主导的 Godot MVP 项目。原 `mvp/` Godot MVP v0 实现已在 2026-06-11 归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`；当前活动 Godot 实现目录是 `godot/`，用于经确认的 MVP v0 M0-M4 重新实现。正式设计来源仍在根目录和 `docs/` 下。旧 Web MVP、旧 Battle Lab、归档 prototype、归档实现、归档生成资源、旧包脚本、旧验证探针和项目内旧本地技能不再作为当前方向的依据。
 
-当前阶段是 MVP v0 M0-M4 活动实现：`godot/` 承载新工程、Battle 1 vertical、M2 run shell、M3 反制、M4 Battle 4 和第二次奖励，以及当前验证入口。M4 之后的新里程碑、范围扩展、玩法 canon 变更或新系统开发，必须先从当前正式文档写有范围约束的实现计划，并等待用户明确确认。Godot 工程目标为 Godot 4.6、GDScript、Compatibility / `gl_compatibility`，除非正式文档另行确认。
+当前阶段是 MVP v0 原 reset handoff 的 M0-M4 全范围 gap repair：`godot/` 承载新工程、Battle 1 vertical、M2 run shell、M3 反制、Battle 4 / Reward 2、Battle 5、Endpoint Prep、Endpoint、Final Result、实体三路战场、机器物理落点契约，以及当前验证入口。此前 Battle 4 / Reward 2 的窄版 M4 只是中间切片；Battle 5、Endpoint Prep、Endpoint 和 Final Result 属于原 handoff M3/M4 未完成部分，不另起 M5/M6。Godot 工程目标为 Godot 4.6、GDScript、Compatibility / `gl_compatibility`，除非正式文档另行确认。
 
 当前验证命令：
 
@@ -45,7 +45,7 @@
 - 未定事项必须标记为未定，不要用合理猜测补齐。
 - 不要恢复旧 Web MVP 或旧 Battle Lab 的实现假设。
 - 不要把归档 prototype 当作实现证明、验证命令来源或当前计划输入。
-- 如果进入新的实现里程碑或扩展 M0-M4 之外的范围，必须从当前正式文档重新写有范围约束的实现计划。
+- 如果进入新的实现里程碑、玩法 canon 变更或原 handoff M0-M4 之外的范围，必须从当前正式文档重新写有范围约束的实现计划。
 - 任何新里程碑、玩法 canon 变更或范围扩展开发前必须先获得用户明确确认。未经确认，不得创建、修改或恢复 M0-M4 范围之外的代码、资源、构建脚本、验证脚本、Godot/Web prototype 或其他实现文件；只能读取上下文、分析问题、提出候选方案、写用户明确要求的文档约束。
 - 优先长期清晰的项目结构，不为了表面连续性保留错误旧术语。
 

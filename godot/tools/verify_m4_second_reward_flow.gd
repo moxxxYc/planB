@@ -66,24 +66,37 @@ func _verify_second_reward_for_axis(
 		passed = false
 
 	run.call("choose_second_reward", expected_deepen_id)
-	var record: Dictionary = run.call("get_result_record") as Dictionary
-	if String(record.get("second_offer.current_axis", "")) != expected_axis:
-		push_error("Result should record second_offer.current_axis.")
+	if String(run.call("get_current_node_id")) != "battle_5":
+		push_error("Second Reward choice should route to Battle 5.")
 		passed = false
-	if String(record.get("second_offer.choice_id", "")) != expected_deepen_id:
-		push_error("Result should record second_offer.choice_id.")
+	var marker_text: String = String(run.call("get_battle_modifier_marker_text"))
+	if not marker_text.contains(_modifier_display_name(expected_deepen_id)):
+		push_error("Battle 5 should expose selected Second Reward marker.")
 		passed = false
-	if String(record.get("second_offer.choice_role", "")) != "deepen_current_axis":
-		push_error("Result should record second_offer.choice_role.")
-		passed = false
-
-	var result_text: String = String(run.call("get_result_summary_text"))
-	if not result_text.contains("第二次奖励") or not result_text.contains("深化当前主轴"):
-		push_error("Result screen should summarize Second Reward choice.")
+	run.call("complete_current_battle_for_verifier", "Win")
+	if String(run.call("get_current_node_id")) != "endpoint_prep":
+		push_error("Battle 5 win should route to Endpoint Prep.")
 		passed = false
 
 	_dispose(run)
 	return passed
+
+func _modifier_display_name(modifier_id: String) -> String:
+	match modifier_id:
+		"front_recycle":
+			return "Front Recycle"
+		"junk_sieve":
+			return "Junk Sieve"
+		"surge_buffer":
+			return "Surge Buffer"
+		"queue_brace":
+			return "Queue Brace"
+		"muster_pair":
+			return "Muster Pair"
+		"echo_latch":
+			return "Echo Latch"
+		_:
+			return modifier_id
 
 func _verify_battle_four_loss_routes_to_result(scene: PackedScene) -> bool:
 	var run: Node = _start_battle_four(scene, "prime_charge")

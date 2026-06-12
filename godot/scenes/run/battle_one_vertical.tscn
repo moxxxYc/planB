@@ -192,51 +192,12 @@ size_flags_horizontal = 3
 size_flags_stretch_ratio = 48.0
 custom_minimum_size = Vector2(480, 0)
 
-[node name="BattlefieldView" type="VBoxContainer" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel"]
+[node name="BattlefieldView" type="Control" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 12
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 16
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("4_battlefield_view")
-
-[node name="BattlefieldTitle" type="Label" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
-layout_mode = 2
-text = "三路战场"
-
-[node name="LaneHelpLabel" type="Label" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
-layout_mode = 2
-text = "直接点击左路 / 中路 / 右路。点击只改变后续部署路线。"
-
-[node name="LeftLane" type="Button" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 126)
-text = "[ 左路出兵口 ] ---- [ 路线门 ]\n点击后续 Queue 将走这一路\n单位：0"
-
-[node name="MidLane" type="Button" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 126)
-text = "[[ 中路出兵口 ]] ==> [[ 路线门 ]]\n选中路线 | 双轨生效\n单位：0"
-
-[node name="RightLane" type="Button" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 126)
-text = "[ 右路出兵口 ] ---- [ 路线门 ]\n点击后续 Queue 将走这一路\n单位：0"
-
-[node name="BattleSummaryLabel" type="Label" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "己方单位 | 左路 0 | 中路 0 | 右路 0"
-
-[node name="LastDeployLabel" type="Label" parent="SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "最近部署：暂无"

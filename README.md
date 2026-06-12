@@ -2,12 +2,12 @@
 
 planB 当前是文档主导、Godot 实现已重新启动的 MVP 项目。正式设计来源仍在根目录和 `docs/` 下；原 `mvp/` Godot MVP v0 实现已在 2026-06-11 归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`。
 
-当前阶段：MVP v0 M0-M4 活动实现。当前活动 Godot 工程位于 `godot/`，当前验证命令是 `bash tools/verify_godot.sh`。M4 之外的新里程碑、范围扩展或玩法 canon 变更，必须先从正式文档重新写有范围约束的实现计划，并等待用户明确确认。
+当前阶段：MVP v0 原 reset handoff 的 M0-M4 全范围 gap repair。当前活动 Godot 工程位于 `godot/`，当前验证命令是 `bash tools/verify_godot.sh`。此前 Battle 4 / Reward 2 的窄版 M4 只是中间切片；Battle 5、Endpoint Prep、Endpoint 和 Final Result 属于原 handoff M3/M4 未完成部分，不另起 M5/M6。
 
 ## MVP 实现状态
 
-- `godot/`：当前活动 Godot MVP 工程。M0 建立 fresh project、Main Menu 和验证入口；M1 建立 Battle 1 vertical；M2 建立 Guardian Contract 到 Battle 3 的短局骨架；M3 建立首次反制；M4 建立 Battle 4 和第二次奖励。
-- `tools/verify_godot.sh`：当前主验证入口。
+- `godot/`：当前活动 Godot MVP 工程。目标对齐原 handoff M0-M4：Main Menu 到 Final Result、Battle 1-5、Endpoint Prep、Endpoint、实体三路战场、Reward 1 / Shop / Reward 2、反制、结果页复盘。
+- `tools/verify_godot.sh`：当前主验证入口，覆盖 project parse、M1 machine-to-lane、M2 run flow、M3 counters、Battle 4 / Reward 2、entity battlefield、full handoff flow、Endpoint result fields、machine physics contract。
 - `mvp/`：旧实现路径已归档，不再作为活动实现或当前 build artifact。
 - `docs/archive/implementations/godot-mvp-v0-20260611/`：已归档的旧 Godot MVP v0 实现。它不是当前 build artifact，不是验证命令来源，也不能作为新实现的默认结构依据。
 - `docs/archive/prototypes/` 不是当前实现来源，不要从旧 prototype 恢复代码或验证假设。

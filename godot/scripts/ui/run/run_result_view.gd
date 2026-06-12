@@ -16,7 +16,7 @@ func render(
 	_clear_children()
 	summary_text = _build_summary_text(session, guardian_defs, reward_defs, shop_defs, second_reward_defs)
 
-	add_child(_make_label("结果路由", 26))
+	add_child(_make_label("战斗结果", 26))
 	add_child(_make_label(summary_text, 16))
 
 func get_summary_text() -> String:
@@ -34,9 +34,8 @@ func _build_summary_text(
 	var shop_name: String = _modifier_name(session.shop_purchase_id, shop_defs)
 	var second_reward_text: String = _second_reward_summary(session, second_reward_defs)
 	var counter_text: String = _counter_summary(session.counter_record)
-	var next_step: String = "下一步：M4 到此结束，Battle 5 / Endpoint 留给后续里程碑。"
 
-	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\n%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次\n最后战斗：%s\n结果：%s\n%s\n%s" % [
+	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\n%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次，终点前 %d 次\n最后战斗：%s\n结果：%s\n%s" % [
 		guardian_name,
 		reward_name,
 		shop_name,
@@ -44,10 +43,10 @@ func _build_summary_text(
 		session.gold,
 		session.first_shop_rest_count,
 		session.battle_three_rest_count,
+		session.endpoint_prep_rest_count,
 		_battle_display_name(session.last_battle),
 		_result_display_name(session.last_battle_result),
 		counter_text,
-		next_step,
 	]
 
 func _battle_display_name(battle_id: String) -> String:
@@ -60,6 +59,10 @@ func _battle_display_name(battle_id: String) -> String:
 			return "战斗 3"
 		"battle_4":
 			return "战斗 4"
+		RunSessionModel.NODE_BATTLE_5:
+			return "战斗 5"
+		RunSessionModel.NODE_ENDPOINT:
+			return "终点战"
 		_:
 			return "未记录"
 

@@ -26,6 +26,7 @@ var surge_buffer_enabled: bool = false
 var queue_brace_enabled: bool = false
 var junk_sieve_enabled: bool = false
 var muster_pair_enabled: bool = false
+var echo_latch_enabled: bool = false
 var echo_breaker_active: bool = false
 var echo_breaker_charges: int = 0
 var pool_polluter_junk_count: int = 0
@@ -69,6 +70,9 @@ func apply_modifier(modifier_id: String, payload: Dictionary = {}) -> void:
 		"muster_pair":
 			muster_pair_enabled = true
 			effect_marker = "muster_pair_enabled=true same_slot_pair=true"
+		"echo_latch":
+			echo_latch_enabled = true
+			effect_marker = "echo_latch_enabled=true repeated_hit=true"
 		_:
 			push_error("Unknown machine modifier: %s" % modifier_id)
 			return
@@ -101,6 +105,18 @@ func advance_step(delta: float) -> void:
 		launcher_progress -= 1.3
 		var ball: Dictionary = pool.pop_front()
 		_route_ball(ball)
+
+func apply_physics_result(result: MachinePhysicsResult) -> void:
+	match result.component:
+		"Launch":
+			_apply_launch_physics_result(result)
+		"Tuning":
+			_apply_tuning_physics_result(result)
+		"Unit":
+			var entries: Array[Dictionary] = _apply_unit_hit(result.slot_id, maxi(1, result.value), result.source)
+			_finalize_queue_output(entries, result.slot_id, result.value)
+		_:
+			push_error("Unknown machine physics component: %s" % result.component)
 
 func has_queue_entry() -> bool:
 	return not queue.is_empty()
@@ -179,6 +195,9 @@ func _route_ball(ball: Dictionary) -> void:
 			_append_counter_event("Counter:Echo Breaker Echo 复制降级为 Gate")
 		else:
 			added_entries.append_array(_apply_unit_hit(slot_id, value, "EchoCopy"))
+			if echo_latch_enabled:
+				added_entries.append_array(_apply_unit_hit(slot_id, 1, "EchoLatch"))
+				event_log.append("Modifier:Echo Latch 同槽重复命中 +1")
 
 	if surge_buffer_enabled and tuning_result == "Surge" and added_entries.is_empty():
 		surge_buffer_charge = mini(1, surge_buffer_charge + 1)
@@ -250,6 +269,35 @@ func get_modifier_marker_text() -> String:
 func get_pool_capacity() -> int:
 	return pool_capacity
 
+func _apply_launch_physics_result(result: MachinePhysicsResult) -> void:
+	match result.result_id:
+		"Tuning":
+			_apply_tuning_physics_result(MachinePhysicsResult.make("Tuning", "Gate", maxi(1, result.slot_id), maxi(1, result.value), result.ball_kind, result.source))
+		"Split":
+			_add_pool_ball(result.ball_kind)
+			_add_pool_ball(result.ball_kind)
+			_finalize_queue_output([], 0, 0)
+		"Recycle":
+			_add_pool_ball_front(result.ball_kind, "Physics Recycle")
+			_finalize_queue_output([], 0, 0)
+		"Waste":
+			event_log.append("Launch.Waste consumed physics ball")
+			_finalize_queue_output([], 0, 0)
+		_:
+			push_error("Unknown Launch physics result: %s" % result.result_id)
+
+func _apply_tuning_physics_result(result: MachinePhysicsResult) -> void:
+	var slot_id: int = clampi(result.slot_id, 1, 4)
+	var value: int = maxi(1, result.value)
+	var entries: Array[Dictionary] = _apply_unit_hit(slot_id, value, result.result_id)
+	if result.result_id == "Echo":
+		entries.append_array(_apply_unit_hit(slot_id, value, "EchoCopy"))
+		if echo_latch_enabled:
+			entries.append_array(_apply_unit_hit(slot_id, 1, "EchoLatch"))
+			event_log.append("Modifier:Echo Latch physics repeated hit")
+	event_log.append(MachineResult.new("Tuning", result.result_id, slot_id, value, {}).to_log_line())
+	_finalize_queue_output(entries, slot_id, value)
+
 func apply_pool_polluter_junk() -> bool:
 	if pool_polluter_junk_count >= 2:
 		_append_counter_event("Counter:Pool Polluter 上限已满，未继续插入 Junk")
@@ -291,6 +339,8 @@ func _modifier_display_name(modifier_id: String) -> String:
 			return "Junk Sieve"
 		"muster_pair":
 			return "Muster Pair"
+		"echo_latch":
+			return "Echo Latch"
 		_:
 			return modifier_id
 
@@ -298,7 +348,7 @@ func _modifier_axis(modifier_id: String) -> String:
 	match modifier_id:
 		"pool_pocket", "front_recycle", "junk_sieve":
 			return "Launch"
-		"prime_charge", "surge_buffer":
+		"prime_charge", "surge_buffer", "echo_latch":
 			return "Tuning"
 		"slot_primer", "queue_brace", "muster_pair":
 			return "Unit"
@@ -312,7 +362,7 @@ func _modifier_active_key(modifier_id: String, slot_id: int) -> String:
 				push_error("Unknown Slot Primer slot_id: %d" % slot_id)
 				return ""
 			return "%s:%d" % [modifier_id, slot_id]
-		"pool_pocket", "prime_charge", "front_recycle", "surge_buffer", "queue_brace", "junk_sieve", "muster_pair":
+		"pool_pocket", "prime_charge", "front_recycle", "surge_buffer", "queue_brace", "junk_sieve", "muster_pair", "echo_latch":
 			return modifier_id
 		_:
 			push_error("Unknown machine modifier: %s" % modifier_id)
