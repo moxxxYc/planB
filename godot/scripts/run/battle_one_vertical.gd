@@ -34,6 +34,7 @@ var echo_breaker_armed: bool = false
 var no_deploy_timer: float = 0.0
 var last_deploy_elapsed: float = 0.0
 var stagger_warning_timer: float = 0.0
+var stagger_target_lane: String = ""
 var pool_polluter_insert_timer: float = 0.0
 var active_counter_record: Dictionary = {}
 var exposure_state: RefCounted = MachineSlotExposureStateScript.new()
@@ -283,7 +284,9 @@ func _deploy_queue_head() -> void:
 	no_deploy_timer = 0.0
 	last_deploy_elapsed = elapsed
 	stagger_warning_timer = 0.0
-	lanes.clear_lane_danger("Left", "Queue 已恢复部署")
+	if not stagger_target_lane.is_empty():
+		lanes.clear_lane_danger(stagger_target_lane, "Queue 已恢复部署")
+	stagger_target_lane = ""
 	bridge_transfer_timer = BRIDGE_TRANSFER_DWELL_SECONDS
 	bridge_view.show_deploy_transfer(deploy.current_lane, entry)
 
@@ -331,6 +334,7 @@ func _configure_counter_runtime(payload: Dictionary) -> void:
 	no_deploy_timer = 0.0
 	last_deploy_elapsed = 0.0
 	stagger_warning_timer = 0.0
+	stagger_target_lane = ""
 	pool_polluter_insert_timer = 0.0
 	active_counter_record = {}
 	if not [3, 5, 6].has(battle_number) or not payload.has("counter_definition"):
@@ -394,17 +398,20 @@ func _advance_stagger_punisher(delta: float) -> void:
 	if int(counter_state.get("trigger_count")) >= 2:
 		return
 	no_deploy_timer = maxf(0.0, elapsed - last_deploy_elapsed)
-	if no_deploy_timer >= 3.0 and stagger_warning_timer <= 0.0:
+	if no_deploy_timer >= 4.0 and stagger_warning_timer <= 0.0:
 		stagger_warning_timer = 3.0
-		lanes.set_lane_danger("Left", 2, "Stagger Punisher 队列空档预警")
+		stagger_target_lane = lanes.get_most_dangerous_lane()
+		lanes.set_lane_danger(stagger_target_lane, 2, "Stagger Punisher 队列空档预警")
 	if stagger_warning_timer > 0.0:
 		stagger_warning_timer = maxf(0.0, stagger_warning_timer - delta)
 		if stagger_warning_timer <= 0.0 and no_deploy_timer >= 4.0:
-			lanes.spawn_enemy_raiders("Left", 2, "Queue 空档惩罚")
+			var target_lane: String = stagger_target_lane if not stagger_target_lane.is_empty() else lanes.get_most_dangerous_lane()
+			lanes.spawn_enemy_raiders(target_lane, 2, "Queue 空档惩罚")
 			counter_state.set("visible_effect", "Raider 因 Queue 空档出现")
 			counter_state.set("trigger_count", int(counter_state.get("trigger_count")) + 1)
 			no_deploy_timer = 0.0
 			last_deploy_elapsed = elapsed
+			stagger_target_lane = ""
 
 func _counter_definition_id() -> String:
 	if counter_definition == null:

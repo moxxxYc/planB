@@ -212,6 +212,19 @@ func get_lane_snapshot(lane: String) -> Dictionary:
 		"sweep_warning": sweep_warning_lane == lane and sweep_warning_timer > 0.0,
 	}
 
+func get_most_dangerous_lane() -> String:
+	var best_lane: String = LANES[0]
+	var best_score: int = -1
+	for lane: String in LANES:
+		var danger_score: int = int(lane_danger_level.get(lane, 0)) * 100
+		var raider_score: int = get_enemy_raiders(lane) * 10
+		var gate_pressure_score: int = BASE_GATE_HP - int(player_gate_hp.get(lane, BASE_GATE_HP))
+		var score: int = danger_score + raider_score + gate_pressure_score
+		if score > best_score:
+			best_lane = lane
+			best_score = score
+	return best_lane
+
 func get_telemetry_record() -> Dictionary:
 	var record: Dictionary = telemetry.to_record()
 	record["endpoint.outcome"] = _result_display()

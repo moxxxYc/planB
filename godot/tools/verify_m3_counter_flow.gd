@@ -134,8 +134,7 @@ func _verify_stagger_mid_deployments_reset_gap(scene: PackedScene) -> bool:
 		return false
 
 	battle.call("select_deploy_lane", "Mid")
-	run.call("advance_active_battle_for_verifier", 3.2)
-	for _i: int in range(4):
+	for _i: int in range(24):
 		if not _inject_verifier_queue_entry(run):
 			passed = false
 			break
