@@ -30,9 +30,10 @@ func _build_summary_text(
 	var guardian_name: String = _guardian_name(session.selected_guardian_id, guardian_defs)
 	var reward_name: String = _modifier_name(session.reward_one_id, reward_defs)
 	var shop_name: String = _modifier_name(session.shop_purchase_id, shop_defs)
-	var next_step: String = "下一步：M2 到此结束，等待后续里程碑确认。"
+	var counter_text: String = _counter_summary(session.counter_record)
+	var next_step: String = "下一步：M3 到此结束，等待后续里程碑确认。"
 
-	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次\n最后战斗：%s\n结果：%s\n%s" % [
+	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次\n最后战斗：%s\n结果：%s\n%s\n%s" % [
 		guardian_name,
 		reward_name,
 		shop_name,
@@ -41,6 +42,7 @@ func _build_summary_text(
 		session.battle_three_rest_count,
 		_battle_display_name(session.last_battle),
 		_result_display_name(session.last_battle_result),
+		counter_text,
 		next_step,
 	]
 
@@ -81,6 +83,27 @@ func _modifier_name(modifier_id: String, modifier_defs: Dictionary) -> String:
 	if definition == null:
 		return modifier_id
 	return definition.display_name
+
+func _counter_summary(record: Dictionary) -> String:
+	if record.is_empty():
+		return "第一次反制：未记录"
+	return "第一次反制：%s\n目标组件：%s\n可见结果：%s\n回应链路：%s" % [
+		_counter_name(String(record.get("family", ""))),
+		String(record.get("target_component", "未记录")),
+		String(record.get("visible_effect", "未记录")),
+		String(record.get("response_link", "无")),
+	]
+
+func _counter_name(counter_id: String) -> String:
+	match counter_id:
+		"pool_polluter":
+			return "Pool Polluter"
+		"echo_breaker":
+			return "Echo Breaker"
+		"stagger_punisher":
+			return "Stagger Punisher"
+		_:
+			return "未记录"
 
 func _make_label(text: String, font_size: int) -> Label:
 	var label: Label = Label.new()

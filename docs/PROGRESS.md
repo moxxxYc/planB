@@ -481,6 +481,10 @@
   - `docs/gstack-artifacts/planb-battle-ui-flow-1.0-draft-20260610.md`
   - 这些 artifact 是本次 UI flow 讨论记录和草案来源；正式规则仍以当前正式文档为准。
 
+## 2026-06-12
+
+- 经用户确认后，M3 已在新的 `godot/` 活动工程内实现：Battle 3 首次真实反制、`Pool Polluter` / `Echo Breaker` / `Stagger Punisher` 三类反制验证路径、反制预警和生效反馈、第一次商店反制补洞优先、以及 `counter1.*` 结果记录。M3 不包含 Battle 4、Battle 5、Reward 2、Endpoint 或完整实体战场。
+
 ## 当前未定
 
 - 中立修正的精确 playtest 后最终平衡。
