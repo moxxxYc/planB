@@ -20,8 +20,13 @@ signal command_received(command: String, params: Dictionary)
 
 func _ready() -> void:
 	name = "MCPRuntime"
+	if _should_skip_headless_verifier_server():
+		_enabled = false
+		print("[MCP Runtime] Autoload disabled for headless verifier")
+		return
 	_start_server()
-	print("[MCP Runtime] Autoload ready, server starting on port %d" % _port)
+	if _enabled:
+		print("[MCP Runtime] Autoload ready, server starting on port %d" % _port)
 
 
 func _process(_delta: float) -> void:
@@ -64,10 +69,27 @@ func _start_server() -> void:
 	_server = TCPServer.new()
 	var error = _server.listen(_port)
 	if error != OK:
-		push_error("[MCP Runtime] Failed to start server on port %d: %s" % [_port, error])
+		var message: String = "[MCP Runtime] Failed to start server on port %d: %s" % [_port, error]
+		if _is_headless_process():
+			push_warning(message)
+		else:
+			push_error(message)
 		_enabled = false
 	else:
 		print("[MCP Runtime] Server listening on port %d" % _port)
+
+
+func _should_skip_headless_verifier_server() -> bool:
+	if not _is_headless_process():
+		return false
+	for argument: String in OS.get_cmdline_args():
+		if argument.contains("res://tools/verify_") or argument.contains("/tools/verify_"):
+			return true
+	return false
+
+
+func _is_headless_process() -> bool:
+	return OS.has_feature("headless") or DisplayServer.get_name() == "headless"
 
 
 func _send_welcome(client: StreamPeerTCP) -> void:

@@ -184,12 +184,12 @@ func _verify_battle_scene() -> bool:
 		passed = false
 
 	if (
-		not instance.has_method("advance_simulation")
+		not instance.has_method("advance_for_verifier")
 		or not instance.has_method("get_lane_units")
 		or not instance.has_method("get_queue_count")
 		or not instance.has_method("get_machine_event_count")
 	):
-		push_error("Battle scene does not expose simulation advancement and lane counts.")
+		push_error("Battle scene does not expose explicit verifier advancement and lane counts.")
 		passed = false
 	else:
 		var left_units_before_deploy: int = int(instance.call("get_lane_units", "Left"))
@@ -233,7 +233,7 @@ func _verify_battle_scene() -> bool:
 			passed = false
 
 		for i: int in range(32):
-			instance.call("advance_simulation", 0.5)
+			_advance_battle_for_verifier(instance, 0.5)
 		if int(instance.call("get_lane_units", "Right")) <= right_units_before_switch:
 			push_error("Expected later Battle scene simulation to deploy units to newly selected Right lane.")
 			passed = false
@@ -297,7 +297,7 @@ func _instantiate_battle_scene() -> Node:
 
 func _advance_until_battle_result(instance: Node, expected_result: String, max_steps: int) -> bool:
 	for i: int in range(max_steps):
-		instance.call("advance_simulation", 0.5)
+		_advance_battle_for_verifier(instance, 0.5)
 		if String(instance.call("get_battle_result")) != "Running":
 			return String(instance.call("get_battle_result")) == expected_result
 	return false
@@ -308,7 +308,7 @@ func _verify_player_facing_machine_log(instance: Node) -> bool:
 		return false
 
 	for i: int in range(12):
-		instance.call("advance_simulation", 0.5)
+		_advance_battle_for_verifier(instance, 0.5)
 
 	var log_text: String = String(instance.call("get_machine_readable_log_text"))
 	if log_text.is_empty():
@@ -330,7 +330,7 @@ func _verify_bridge_transfer_feedback_after_next_deploy(instance: Node, lane: St
 
 	var transfer_text := ""
 	for i: int in range(24):
-		instance.call("advance_simulation", 0.5)
+		_advance_battle_for_verifier(instance, 0.5)
 		if int(instance.call("get_lane_units", lane)) > units_before:
 			transfer_text = String(instance.call("get_bridge_transfer_text"))
 			break
@@ -344,7 +344,7 @@ func _verify_bridge_transfer_feedback_after_next_deploy(instance: Node, lane: St
 		return false
 
 	for i: int in range(4):
-		instance.call("advance_simulation", 0.5)
+		_advance_battle_for_verifier(instance, 0.5)
 
 	var expired_transfer_text: String = String(instance.call("get_bridge_transfer_text"))
 	if not expired_transfer_text.is_empty():
@@ -352,6 +352,12 @@ func _verify_bridge_transfer_feedback_after_next_deploy(instance: Node, lane: St
 		return false
 
 	return true
+
+func _advance_battle_for_verifier(instance: Node, seconds: float) -> void:
+	if not instance.has_method("advance_for_verifier"):
+		push_error("Battle scene must expose advance_for_verifier() for deterministic headless gates.")
+		return
+	instance.call("advance_for_verifier", seconds)
 
 func _verify_machine_visual_contract(instance: Node) -> bool:
 	var passed := true

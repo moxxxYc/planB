@@ -89,6 +89,19 @@ func render(machine, p_counter_target_component: String = "") -> void:
 func get_visual_contract_summary() -> Dictionary:
 	_ensure_physics_board()
 	var board_contract: Dictionary = physics_board.get_runtime_contract()
+	var physics_landing_count_value: int = int(board_contract.get("physics_landing_count", physics_landing_count))
+	var last_result_variant: Variant = board_contract.get("last_physics_result", last_physics_result)
+	var last_result_source: String = ""
+	if last_result_variant is Dictionary:
+		last_result_source = String((last_result_variant as Dictionary).get("source", ""))
+	var has_physics_signal_wiring: bool = physics_board.landing_resolved.is_connected(_on_physics_board_landing_resolved)
+	var runtime_physics_drives_results: bool = (
+		has_physics_signal_wiring
+		and physics_board.has_method("launch_ball")
+		and bool(board_contract.get("has_physics_contract_nodes", false))
+	)
+	if physics_landing_count_value > 0:
+		runtime_physics_drives_results = runtime_physics_drives_results and last_result_source == "physics"
 	return {
 		"board_count": 3,
 		"pool_slot_count": pool_capacity,
@@ -96,9 +109,9 @@ func get_visual_contract_summary() -> Dictionary:
 		"unit_slot_count": 4,
 		"has_active_ball": true,
 		"has_visible_rigidbody_ball": bool(board_contract.get("has_visible_rigidbody_ball", false)),
-		"runtime_physics_drives_results": true,
-		"physics_landing_count": int(board_contract.get("physics_landing_count", physics_landing_count)),
-		"last_physics_result": board_contract.get("last_physics_result", last_physics_result),
+		"runtime_physics_drives_results": runtime_physics_drives_results,
+		"physics_landing_count": physics_landing_count_value,
+		"last_physics_result": last_result_variant,
 		"physics_queue_chain_count": physics_queue_chain_count,
 		"last_physics_queue_chain": last_physics_queue_chain.duplicate(true),
 		"machine_chain_sample": last_machine_chain_sample.duplicate(true),

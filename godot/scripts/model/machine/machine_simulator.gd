@@ -9,6 +9,8 @@ const SLOT_REQUIREMENTS: Dictionary = {
 }
 const QUEUE_BRACE_MISS_THRESHOLD: int = 3
 const QUEUE_BRACE_COMPENSATION_VALUE: int = 1
+const MAX_PENDING_PHYSICS_CHAINS: int = 24
+const MAX_PHYSICS_QUEUE_CHAIN_TELEMETRY: int = 12
 
 var forge_progress: float = 0.0
 var launcher_progress: float = 0.0
@@ -36,6 +38,7 @@ var active_modifier_markers: Array[String] = []
 var _step_index: int = 0
 var _next_chain_index: int = 0
 var _pending_physics_chains: Dictionary = {}
+var _pending_chain_order: Array[String] = []
 var _last_machine_chain_sample: Dictionary = {}
 var _physics_queue_chains: Array[Dictionary] = []
 
@@ -497,6 +500,7 @@ func _begin_machine_chain(ball: Dictionary) -> void:
 		"source": "physics",
 	}
 	_pending_physics_chains[chain_id] = chain
+	_remember_pending_chain(chain_id)
 	_last_machine_chain_sample = chain.duplicate(true)
 
 func _register_physics_result(result: MachinePhysicsResult) -> void:
@@ -520,6 +524,7 @@ func _register_physics_result(result: MachinePhysicsResult) -> void:
 	results.append(result_dict)
 	chain["results"] = results
 	_pending_physics_chains[result.chain_id] = chain
+	_remember_pending_chain(result.chain_id)
 	_last_machine_chain_sample = chain.duplicate(true)
 
 func _chain_for_result(result: MachinePhysicsResult) -> Dictionary:
@@ -542,22 +547,49 @@ func _chain_for_result(result: MachinePhysicsResult) -> Dictionary:
 
 func _commit_queue_chain_if_needed(result: MachinePhysicsResult, produced_entries: Array[Dictionary]) -> void:
 	var chain: Dictionary = _chain_for_result(result)
-	if produced_entries.is_empty():
-		_pending_physics_chains[result.chain_id] = chain
-		_last_machine_chain_sample = chain.duplicate(true)
-		return
-	var queue_entries: Array = []
-	if chain.get("queue_entries", []) is Array:
-		queue_entries = chain.get("queue_entries", []) as Array
-	for entry: Dictionary in produced_entries:
-		queue_entries.append(entry.duplicate(true))
-	chain["queue_entries"] = queue_entries
-	_pending_physics_chains[result.chain_id] = chain
+	if not produced_entries.is_empty():
+		var queue_entries: Array = []
+		if chain.get("queue_entries", []) is Array:
+			queue_entries = chain.get("queue_entries", []) as Array
+		for entry: Dictionary in produced_entries:
+			queue_entries.append(entry.duplicate(true))
+		chain["queue_entries"] = queue_entries
 	_last_machine_chain_sample = chain.duplicate(true)
-	if result.source == "physics":
+
+	if result.source == "physics" and not produced_entries.is_empty():
 		_physics_queue_chains.append(chain.duplicate(true))
-		while _physics_queue_chains.size() > 12:
+		while _physics_queue_chains.size() > MAX_PHYSICS_QUEUE_CHAIN_TELEMETRY:
 			_physics_queue_chains.pop_front()
+
+	if _is_terminal_physics_chain_result(result):
+		_erase_pending_chain(result.chain_id)
+	else:
+		_pending_physics_chains[result.chain_id] = chain
+		_remember_pending_chain(result.chain_id)
+
+func _is_terminal_physics_chain_result(result: MachinePhysicsResult) -> bool:
+	if result.component == "Unit":
+		return true
+	if result.component == "Launch":
+		return result.result_id != "Tuning" or result.ball_kind == "junk"
+	if result.component == "Tuning":
+		return not _is_staged_physics_source(result.source)
+	return true
+
+func _remember_pending_chain(chain_id: String) -> void:
+	if chain_id.strip_edges().is_empty():
+		return
+	if not _pending_chain_order.has(chain_id):
+		_pending_chain_order.append(chain_id)
+	while _pending_chain_order.size() > MAX_PENDING_PHYSICS_CHAINS:
+		var stale_chain_id: String = _pending_chain_order.pop_front()
+		_pending_physics_chains.erase(stale_chain_id)
+
+func _erase_pending_chain(chain_id: String) -> void:
+	if chain_id.strip_edges().is_empty():
+		return
+	_pending_physics_chains.erase(chain_id)
+	_pending_chain_order.erase(chain_id)
 
 func _is_staged_physics_source(source: String) -> bool:
 	return source == "physics" or source == "verifier_seed"

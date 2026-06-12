@@ -12,6 +12,8 @@ const WALL_THICKNESS: float = 6.0
 const DEFAULT_STAGE_WIDTH: float = 340.0
 const DEFAULT_STAGE_HEIGHT: float = 112.0
 const VERIFIER_SOURCE: String = "verifier_seed"
+const RETIRED_BALL_DWELL_SECONDS: float = 0.5
+const MAX_RETIRED_BALLS: int = 4
 
 var active_ball: RigidBody2D = null
 var physics_landing_count: int = 0
@@ -21,6 +23,7 @@ var _stage_bins: Dictionary = {}
 var _launch_index: int = 0
 var _created_ball_count: int = 0
 var _exposure_state = null
+var _retired_balls: Array[RigidBody2D] = []
 
 func _ready() -> void:
 	_ensure_default_stage_rects()
@@ -31,6 +34,7 @@ func launch_ball(ball: Dictionary, battle_elapsed: float) -> void:
 	_rebuild_board()
 	_launch_index += 1
 	_created_ball_count += 1
+	_remove_preview_ball()
 
 	var body: RigidBody2D = _make_ball(ball)
 	body.name = "ActiveBall" if active_ball == null or not is_instance_valid(active_ball) else "ActiveBall%d" % _created_ball_count
@@ -43,6 +47,7 @@ func set_exposure_state(exposure_state) -> void:
 
 func get_runtime_contract() -> Dictionary:
 	_rebuild_board()
+	_ensure_preview_ball()
 	return {
 		"has_visible_rigidbody_ball": _has_visible_rigidbody_ball(),
 		"has_physics_contract_nodes": has_physics_contract_nodes(),
@@ -123,7 +128,7 @@ func _clear_board_geometry() -> void:
 		var existing: Node = get_node_or_null(node_name)
 		if existing != null:
 			remove_child(existing)
-			existing.free()
+			existing.queue_free()
 	_stage_bins.clear()
 	if active_ball != null and is_instance_valid(active_ball) and String(active_ball.get_meta("chain_id", "")) == "preview":
 		var launch_rect: Rect2 = _stage_rect("Launch")
@@ -216,6 +221,8 @@ func _add_bin(stage: String, label: String, bin_position: Vector2, bin_size: Vec
 
 func _ensure_preview_ball() -> void:
 	if active_ball != null and is_instance_valid(active_ball):
+		return
+	if _find_first_child_of_type(self, "RigidBody2D") != null:
 		return
 	var preview := _make_ball({
 		"kind": "clean",
@@ -348,6 +355,45 @@ func _retire_body(body: RigidBody2D) -> void:
 	body.angular_velocity = 0.0
 	body.modulate = Color(1.0, 1.0, 1.0, 0.45)
 	body.set_meta("stage", "Retired")
+	if not _retired_balls.has(body):
+		_retired_balls.append(body)
+	_prune_retired_balls()
+	_queue_free_retired_body_after_dwell(body)
+
+func _queue_free_retired_body_after_dwell(body: RigidBody2D) -> void:
+	if not is_inside_tree():
+		_release_retired_body(body)
+		return
+	await get_tree().create_timer(RETIRED_BALL_DWELL_SECONDS).timeout
+	_release_retired_body(body)
+
+func _release_retired_body(body: RigidBody2D) -> void:
+	_retired_balls.erase(body)
+	if body == active_ball:
+		active_ball = null
+	if is_instance_valid(body):
+		body.queue_free()
+	call_deferred("_ensure_preview_ball_if_empty")
+
+func _prune_retired_balls() -> void:
+	while _retired_balls.size() > MAX_RETIRED_BALLS:
+		var body: RigidBody2D = _retired_balls.pop_front()
+		if body == active_ball:
+			active_ball = null
+		if is_instance_valid(body):
+			body.queue_free()
+
+func _ensure_preview_ball_if_empty() -> void:
+	if not is_inside_tree():
+		return
+	_ensure_preview_ball()
+
+func _remove_preview_ball() -> void:
+	for child: Node in get_children():
+		if child is RigidBody2D and String(child.get_meta("chain_id", "")) == "preview":
+			if child == active_ball:
+				active_ball = null
+			child.queue_free()
 
 func _stage_rect(stage: String) -> Rect2:
 	if _stage_rects.has(stage) and _stage_rects[stage] is Rect2:

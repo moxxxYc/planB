@@ -31,7 +31,6 @@ var last_deploy_elapsed: float = 0.0
 var stagger_warning_timer: float = 0.0
 var pool_polluter_insert_timer: float = 0.0
 var active_counter_record: Dictionary = {}
-var _runtime_physics_tick_active: bool = false
 
 func _ready() -> void:
 	_ensure_views()
@@ -41,9 +40,7 @@ func _ready() -> void:
 	_render()
 
 func _physics_process(delta: float) -> void:
-	_runtime_physics_tick_active = true
 	advance_simulation(delta)
-	_runtime_physics_tick_active = false
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("deploy_left"):
@@ -154,14 +151,14 @@ func configure_for_run(p_battle_number: int, p_session: RunSessionModel, payload
 func get_battle_modifier_marker_text() -> String:
 	return machine.get_modifier_marker_text()
 
-func advance_simulation(delta: float) -> void:
+func advance_simulation(delta: float, use_seeded_physics: bool = false) -> void:
 	elapsed += delta
 	_advance_bridge_transfer(delta)
 	_advance_counter(delta)
 	var launch_requests: Array[Dictionary] = machine.advance_supply(delta)
 	for launch_request: Dictionary in launch_requests:
 		machine_view.launch_ball(launch_request, elapsed)
-		if _should_use_verifier_seeded_physics():
+		if use_seeded_physics:
 			machine_view.run_seeded_chain_for_verifier(machine.build_verifier_seeded_chain_for_ball(launch_request))
 	deploy_timer += delta
 	while deploy_timer >= DEPLOY_TICK_SECONDS:
@@ -173,7 +170,7 @@ func advance_simulation(delta: float) -> void:
 func advance_for_verifier(seconds: float) -> void:
 	var steps: int = maxi(1, int(ceil(seconds / 0.25)))
 	for _i: int in range(steps):
-		advance_simulation(seconds / float(steps))
+		advance_simulation(seconds / float(steps), true)
 
 func _on_machine_landing_resolved(result: MachinePhysicsResult) -> void:
 	machine.apply_physics_result(result)
@@ -391,6 +388,3 @@ func _connect_machine_physics() -> void:
 		return
 	if not machine_view.landing_resolved.is_connected(_on_machine_landing_resolved):
 		machine_view.landing_resolved.connect(_on_machine_landing_resolved)
-
-func _should_use_verifier_seeded_physics() -> bool:
-	return not _runtime_physics_tick_active
