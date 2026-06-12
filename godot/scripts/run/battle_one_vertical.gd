@@ -160,15 +160,15 @@ func _deploy_queue_head() -> void:
 
 	var entry: Dictionary = machine.pop_queue_entry()
 	lanes.apply_player_deploy(deploy.current_lane, entry)
-	if deploy.current_lane == "Left":
-		no_deploy_timer = 0.0
-		last_deploy_elapsed = elapsed
+	no_deploy_timer = 0.0
+	last_deploy_elapsed = elapsed
+	lanes.clear_lane_danger("Left", "Queue 已恢复部署")
 	bridge_transfer_timer = BRIDGE_TRANSFER_DWELL_SECONDS
 	bridge_view.show_deploy_transfer(deploy.current_lane, entry)
 
 func _render() -> void:
 	_ensure_views()
-	machine_view.render(machine)
+	machine_view.render(machine, _counter_target_component())
 	bridge_view.render(machine, deploy)
 	battlefield_view.render(deploy, lanes)
 	if lanes.get_battle_result() == BattleLaneState.RESULT_RUNNING:
@@ -276,6 +276,11 @@ func _counter_definition_id() -> String:
 	if counter_definition == null:
 		return ""
 	return String(counter_definition.get("id"))
+
+func _counter_target_component() -> String:
+	if counter_state == null or counter_definition == null:
+		return ""
+	return String(counter_definition.get("target_component"))
 
 func _battle_label() -> String:
 	return "战斗 %d" % battle_number

@@ -24,12 +24,12 @@ func _ready() -> void:
 	_configure_machine_panel_layout()
 	log_label.add_theme_color_override("font_color", Color("#c8c0ad"))
 
-func render(machine) -> void:
+func render(machine, counter_target_component: String = "") -> void:
 	_ensure_nodes()
 	var forge_ratio: float = clampf(machine.forge_progress / FORGE_CYCLE_SECONDS, 0.0, 1.0)
 	var launcher_ratio: float = clampf(machine.launcher_progress / LAUNCHER_CYCLE_SECONDS, 0.0, 1.0)
 
-	machine_board.render(machine)
+	machine_board.render(machine, counter_target_component)
 	var pool_capacity: int = _machine_pool_capacity(machine)
 	forge_bar.value = forge_ratio * 100.0
 	launcher_bar.value = launcher_ratio * 100.0

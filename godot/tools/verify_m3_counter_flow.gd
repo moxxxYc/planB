@@ -13,6 +13,8 @@ func _initialize() -> void:
 	failed = not _verify_pool_polluter_path(scene) or failed
 	failed = not _verify_echo_breaker_path(scene) or failed
 	failed = not _verify_stagger_punisher_path(scene) or failed
+	failed = not _verify_untriggered_counter_does_not_fake_effect(scene) or failed
+	failed = not _verify_stagger_mid_deployments_reset_gap(scene) or failed
 
 	if failed:
 		quit(1)
@@ -66,6 +68,9 @@ func _verify_pool_polluter_path(scene: PackedScene) -> bool:
 	if not machine_log.contains("Junk 插入 Pool") or not machine_log.contains("Junk Sieve"):
 		push_error("Pool Polluter should insert Junk and purchased Junk Sieve should respond visibly.")
 		passed = false
+	if String(_active_machine_visual_contract(run).get("counter_target_component", "")) != "Pool":
+		push_error("Pool Polluter should pass Pool target to machine board visuals.")
+		passed = false
 
 	run.call("complete_current_battle_for_verifier", "Loss")
 	var record: Dictionary = run.call("get_result_record") as Dictionary
@@ -78,6 +83,63 @@ func _verify_pool_polluter_path(scene: PackedScene) -> bool:
 	var result_text: String = String(run.call("get_result_summary_text"))
 	if not result_text.contains("Pool Polluter") or not result_text.contains("Junk Sieve"):
 		push_error("Result screen should summarize Pool Polluter and Junk Sieve response.")
+		passed = false
+
+	_dispose(run)
+	return passed
+
+func _verify_untriggered_counter_does_not_fake_effect(scene: PackedScene) -> bool:
+	var run: Node = _start_shop_with_counter(scene, "stagger_punisher", "slot_primer")
+	if run == null:
+		return false
+
+	var passed: bool = true
+	run.call("confirm_shop_and_rest")
+	run.call("complete_current_battle_for_verifier", "Loss")
+
+	var record: Dictionary = run.call("get_result_record") as Dictionary
+	if String(record.get("counter1.visible_effect", "")) != "":
+		push_error("Untriggered counter should not record a fake visible effect.")
+		passed = false
+
+	var result_text: String = String(run.call("get_result_summary_text"))
+	if result_text.contains("Raider 因 Queue 空档出现") or not result_text.contains("未触发"):
+		push_error("Result screen should show untriggered counter as 未触发, not as Raider effect.")
+		passed = false
+
+	_dispose(run)
+	return passed
+
+func _verify_stagger_mid_deployments_reset_gap(scene: PackedScene) -> bool:
+	var run: Node = _start_shop_with_counter(scene, "stagger_punisher", "slot_primer")
+	if run == null:
+		return false
+
+	var passed: bool = true
+	run.call("confirm_shop_and_rest")
+	var battle: Node = run.get("active_battle") as Node
+	if battle == null:
+		push_error("Stagger regression test needs active Battle 3 node.")
+		_dispose(run)
+		return false
+
+	battle.call("select_deploy_lane", "Mid")
+	run.call("advance_active_battle_for_verifier", 3.2)
+	for _i: int in range(4):
+		if not _inject_verifier_queue_entry(run):
+			passed = false
+			break
+		run.call("advance_active_battle_for_verifier", 0.6)
+		run.call("advance_active_battle_for_verifier", 1.0)
+
+	var lane_text: String = String(run.call("get_lane_button_text", "Left"))
+	if lane_text.contains("突袭") or lane_text.contains("危险 2"):
+		push_error("Stagger should not punish sustained Queue deployments just because they went Mid.")
+		passed = false
+
+	var counter_record: Dictionary = run.call("get_counter_record") as Dictionary
+	if String(counter_record.get("visible_effect", "")).contains("Raider"):
+		push_error("Stagger should not record Raider effect while Mid deployments keep resetting Queue gap.")
 		passed = false
 
 	_dispose(run)
@@ -100,6 +162,9 @@ func _verify_echo_breaker_path(scene: PackedScene) -> bool:
 	if not machine_log.contains("Echo Breaker") or not machine_log.contains("Echo 复制降级为 Gate"):
 		push_error("Echo Breaker should visibly downgrade one Echo copy.")
 		passed = false
+	if String(_active_machine_visual_contract(run).get("counter_target_component", "")) != "Echo / Surge 价值":
+		push_error("Echo Breaker should pass Echo target to machine board visuals.")
+		passed = false
 
 	var counter_record: Dictionary = run.call("get_counter_record") as Dictionary
 	if String(counter_record.get("target_component", "")) != "Echo / Surge 价值":
@@ -121,6 +186,9 @@ func _verify_stagger_punisher_path(scene: PackedScene) -> bool:
 		passed = false
 
 	run.call("confirm_shop_and_rest")
+	if not _block_verifier_queue_output(run):
+		_dispose(run)
+		return false
 	run.call("advance_active_battle_for_verifier", 12.0)
 	var banner_text: String = String(run.call("get_active_counter_banner_text"))
 	var lane_text: String = String(run.call("get_lane_button_text", "Left"))
@@ -134,6 +202,9 @@ func _verify_stagger_punisher_path(scene: PackedScene) -> bool:
 	var counter_record: Dictionary = run.call("get_counter_record") as Dictionary
 	if String(counter_record.get("visible_effect", "")) != "Raider 因 Queue 空档出现":
 		push_error("Stagger result should record Raider queue-gap effect.")
+		passed = false
+	if String(_active_machine_visual_contract(run).get("counter_target_component", "")) != "Queue 空档":
+		push_error("Stagger Punisher should pass Queue target to machine board visuals.")
 		passed = false
 
 	_dispose(run)
@@ -175,6 +246,44 @@ func _has_methods(node: Node, methods: Array[String]) -> bool:
 		if not node.has_method(method_name):
 			push_error("M3 run scene missing method: %s" % method_name)
 			return false
+	return true
+
+func _active_machine_visual_contract(run: Node) -> Dictionary:
+	var battle: Node = run.get("active_battle") as Node
+	if battle == null or not battle.has_method("get_machine_visual_contract"):
+		return {}
+	return (battle.call("get_machine_visual_contract") as Dictionary).duplicate(true)
+
+func _inject_verifier_queue_entry(run: Node) -> bool:
+	var battle: Node = run.get("active_battle") as Node
+	if battle == null:
+		push_error("No active battle for verifier queue injection.")
+		return false
+	var machine: Object = battle.get("machine") as Object
+	if machine == null:
+		push_error("No machine simulator for verifier queue injection.")
+		return false
+	var queue: Array = machine.get("queue") as Array
+	queue.append({
+		"unit_id": "hive_short_fang",
+		"slot_id": 1,
+		"source": "Verifier",
+		"count": 1,
+	})
+	machine.set("queue", queue)
+	return true
+
+func _block_verifier_queue_output(run: Node) -> bool:
+	var battle: Node = run.get("active_battle") as Node
+	if battle == null:
+		push_error("No active battle for verifier queue blocking.")
+		return false
+	var machine: Object = battle.get("machine") as Object
+	if machine == null:
+		push_error("No machine simulator for verifier queue blocking.")
+		return false
+	machine.set("pool_capacity", 0)
+	machine.set("queue", [])
 	return true
 
 func _dispose(run: Node) -> void:

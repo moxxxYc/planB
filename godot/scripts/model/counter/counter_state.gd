@@ -51,7 +51,12 @@ func banner_text() -> String:
 				maxf(0.0, float(definition.get("warning_seconds")) - elapsed),
 			]
 		Phase.ACTIVE:
-			return "%s 生效：%s" % [String(definition.get("display_name")), String(definition.get("visible_effect"))]
+			if visible_effect.is_empty():
+				return "%s 生效中：等待 %s 的可见触发。" % [
+					String(definition.get("display_name")),
+					String(definition.get("target_component")),
+				]
+			return "%s 生效：%s" % [String(definition.get("display_name")), visible_effect]
 		Phase.RESOLVED:
 			return "%s 已结束：%s" % [String(definition.get("display_name")), visible_effect]
 		_:
@@ -63,6 +68,6 @@ func to_record() -> Dictionary:
 	return {
 		"family": String(definition.get("id")),
 		"target_component": String(definition.get("target_component")),
-		"visible_effect": visible_effect if not visible_effect.is_empty() else String(definition.get("visible_effect")),
+		"visible_effect": visible_effect,
 		"response_link": response_link,
 	}

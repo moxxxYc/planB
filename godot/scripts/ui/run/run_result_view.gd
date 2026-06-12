@@ -90,7 +90,7 @@ func _counter_summary(record: Dictionary) -> String:
 	return "第一次反制：%s\n目标组件：%s\n可见结果：%s\n回应链路：%s" % [
 		_counter_name(String(record.get("family", ""))),
 		String(record.get("target_component", "未记录")),
-		String(record.get("visible_effect", "未记录")),
+		_visible_effect_text(String(record.get("visible_effect", ""))),
 		String(record.get("response_link", "无")),
 	]
 
@@ -104,6 +104,11 @@ func _counter_name(counter_id: String) -> String:
 			return "Stagger Punisher"
 		_:
 			return "未记录"
+
+func _visible_effect_text(visible_effect: String) -> String:
+	if visible_effect.is_empty():
+		return "未触发"
+	return visible_effect
 
 func _make_label(text: String, font_size: int) -> Label:
 	var label: Label = Label.new()

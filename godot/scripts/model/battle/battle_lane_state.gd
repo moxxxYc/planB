@@ -49,6 +49,17 @@ func set_lane_danger(lane: String, level: int, reason: String) -> void:
 	lane_danger_level[lane] = clampi(level, 0, 3)
 	counter_events.append("%s 危险 %d：%s" % [lane, int(lane_danger_level[lane]), reason])
 
+func clear_lane_danger(lane: String, reason: String) -> void:
+	if not LANES.has(lane):
+		push_error("Invalid danger lane: %s" % lane)
+		return
+	if get_enemy_raiders(lane) > 0:
+		return
+	if int(lane_danger_level.get(lane, 0)) <= 0:
+		return
+	lane_danger_level[lane] = 0
+	counter_events.append("%s 危险解除：%s" % [lane, reason])
+
 func spawn_enemy_raiders(lane: String, count: int, reason: String) -> void:
 	if not LANES.has(lane):
 		push_error("Invalid Raider lane: %s" % lane)

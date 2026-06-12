@@ -16,6 +16,7 @@ const COLOR_TUNING: Color = Color("#e6b450")
 const COLOR_UNIT: Color = Color("#c58be8")
 const COLOR_ACTIVE: Color = Color("#f4f0d8")
 const COLOR_QUEUE: Color = Color("#56b4e9")
+const COLOR_COUNTER_TARGET: Color = Color("#ff8a66")
 
 const MIN_VIEW_SIZE: Vector2 = Vector2(380.0, 600.0)
 const SUPPLY_STRIP_HEIGHT: float = 164.0
@@ -35,6 +36,7 @@ var last_launch_result: String = ""
 var last_tuning_result: String = ""
 var last_queue_unit: String = ""
 var active_board_index: int = 0
+var counter_target_component: String = ""
 
 func _ready() -> void:
 	custom_minimum_size = MIN_VIEW_SIZE
@@ -42,7 +44,7 @@ func _ready() -> void:
 		resized.connect(_on_resized)
 	queue_redraw()
 
-func render(machine) -> void:
+func render(machine, p_counter_target_component: String = "") -> void:
 	forge_ratio = clampf(machine.forge_progress / FORGE_CYCLE_SECONDS, 0.0, 1.0)
 	launcher_ratio = clampf(machine.launcher_progress / LAUNCHER_CYCLE_SECONDS, 0.0, 1.0)
 	pool_count = machine.pool.size()
@@ -59,6 +61,7 @@ func render(machine) -> void:
 	}
 	_update_recent_results(machine.event_log)
 	active_board_index = _active_board_from_ratio(launcher_ratio)
+	counter_target_component = p_counter_target_component
 	queue_redraw()
 
 func get_visual_contract_summary() -> Dictionary:
@@ -71,6 +74,7 @@ func get_visual_contract_summary() -> Dictionary:
 		"pool_count": pool_count,
 		"queue_count": queue_count,
 		"active_board_index": active_board_index,
+		"counter_target_component": counter_target_component,
 		"last_launch_result": last_launch_result,
 		"last_tuning_result": last_tuning_result,
 		"machine_board_min_height": MIN_VIEW_SIZE.y,
@@ -116,6 +120,9 @@ func _draw_supply_strip(rect: Rect2) -> void:
 	draw_rect(pool_rect, COLOR_BG, true)
 	draw_rect(pool_rect, COLOR_TRIM, false, 1.5)
 	_draw_text(font, pool_rect.position + Vector2(12.0, 22.0), "Pool 球仓", 13, COLOR_TEXT)
+	if _targets_pool():
+		draw_rect(pool_rect.grow(3.0), COLOR_COUNTER_TARGET, false, 3.0)
+		_draw_text(font, pool_rect.position + Vector2(pool_rect.size.x - 82.0, 22.0), "反制目标", 12, COLOR_COUNTER_TARGET)
 
 	var slot_gap := 12.0
 	var visible_capacity: int = maxi(1, pool_capacity)
@@ -149,24 +156,26 @@ func _draw_machine_boards(rect: Rect2) -> void:
 	var board_height := maxf(96.0, available_height / 3.0)
 	var board_rect := Rect2(rect.position.x + 14.0, board_top, rect.size.x - 28.0, board_height)
 
-	_draw_board(board_rect, "Launch", "进 Tuning / Split / 回收 / Waste", COLOR_LAUNCH, active_board_index == 0)
+	_draw_board(board_rect, "Launch", "进 Tuning / Split / 回收 / Waste", COLOR_LAUNCH, active_board_index == 0, _targets_pool())
 	_draw_launch_slots(board_rect)
 
 	board_rect.position.y += board_height + board_gap
-	_draw_board(board_rect, "Tuning", "Gate / Prime / Echo / Surge", COLOR_TUNING, active_board_index == 1)
+	_draw_board(board_rect, "Tuning", "Gate / Prime / Echo / Surge", COLOR_TUNING, active_board_index == 1, _targets_echo())
 	_draw_tuning_slots(board_rect)
 
 	board_rect.position.y += board_height + board_gap
-	_draw_board(board_rect, "Unit", "S1 / S2 / S3 / S4", COLOR_UNIT, active_board_index == 2)
+	_draw_board(board_rect, "Unit", "S1 / S2 / S3 / S4", COLOR_UNIT, active_board_index == 2, _targets_unit_or_queue())
 	_draw_unit_slots(board_rect)
 
-func _draw_board(board_rect: Rect2, title: String, subtitle: String, accent: Color, is_active: bool) -> void:
+func _draw_board(board_rect: Rect2, title: String, subtitle: String, accent: Color, is_active: bool, is_counter_target: bool = false) -> void:
 	var font := get_theme_default_font()
-	var border_width := 3.0 if is_active else 1.5
+	var border_width := 3.5 if is_counter_target else (3.0 if is_active else 1.5)
 	draw_rect(board_rect, COLOR_PANEL, true)
-	draw_rect(board_rect, accent if is_active else COLOR_TRIM, false, border_width)
+	draw_rect(board_rect, COLOR_COUNTER_TARGET if is_counter_target else (accent if is_active else COLOR_TRIM), false, border_width)
 	_draw_text(font, board_rect.position + Vector2(10.0, 18.0), title, 15, accent)
 	_draw_text(font, board_rect.position + Vector2(90.0, 18.0), subtitle, 12, COLOR_MUTED)
+	if is_counter_target:
+		_draw_text(font, board_rect.position + Vector2(board_rect.size.x - 82.0, 18.0), "反制目标", 12, COLOR_COUNTER_TARGET)
 	_draw_pegs(board_rect, accent)
 	if is_active:
 		_draw_active_ball(board_rect, accent)
@@ -198,9 +207,9 @@ func _draw_launch_slots(board_rect: Rect2) -> void:
 
 func _draw_tuning_slots(board_rect: Rect2) -> void:
 	var labels: Array[String] = ["Gate", "Prime", "Echo", "Surge"]
-	_draw_result_slots(board_rect, labels, COLOR_TUNING, last_tuning_result)
+	_draw_result_slots(board_rect, labels, COLOR_TUNING, last_tuning_result, "Echo" if _targets_echo() else "")
 
-func _draw_result_slots(board_rect: Rect2, labels: Array[String], accent: Color, active_label: String) -> void:
+func _draw_result_slots(board_rect: Rect2, labels: Array[String], accent: Color, active_label: String, counter_target_label: String = "") -> void:
 	var font := get_theme_default_font()
 	var gap := 6.0
 	var slot_width := (board_rect.size.x - 20.0 - gap * 3.0) / 4.0
@@ -209,8 +218,9 @@ func _draw_result_slots(board_rect: Rect2, labels: Array[String], accent: Color,
 		var label := labels[index]
 		var slot_rect := Rect2(board_rect.position.x + 10.0 + float(index) * (slot_width + gap), slot_y, slot_width, 16.0)
 		var is_active := active_label == label or (label == "Tuning" and active_label == "Tuning")
+		var is_counter_target := counter_target_label == label
 		draw_rect(slot_rect, accent.darkened(0.25) if is_active else COLOR_BG, true)
-		draw_rect(slot_rect, accent if is_active else COLOR_TRIM, false, 1.0)
+		draw_rect(slot_rect, COLOR_COUNTER_TARGET if is_counter_target else (accent if is_active else COLOR_TRIM), false, 2.0 if is_counter_target else 1.0)
 		_draw_text(font, slot_rect.position + Vector2(4.0, 12.0), label, 10, COLOR_TEXT)
 
 func _draw_unit_slots(board_rect: Rect2) -> void:
@@ -242,6 +252,17 @@ func _draw_queue_preview(rect: Rect2) -> void:
 		_draw_text(font, item_rect.position + Vector2(8.0, 16.0), "单位" if filled else "空", 10, COLOR_TEXT if filled else COLOR_MUTED)
 	if not last_queue_unit.is_empty():
 		_draw_text(font, Vector2(left + width - 150.0, bottom + 1.0), "最近入队：%s" % _unit_name(last_queue_unit), 11, COLOR_TEXT)
+	if _targets_unit_or_queue():
+		draw_rect(Rect2(left + 74.0, bottom - 19.0, 180.0, 32.0), COLOR_COUNTER_TARGET, false, 2.0)
+
+func _targets_pool() -> bool:
+	return counter_target_component.contains("Pool")
+
+func _targets_echo() -> bool:
+	return counter_target_component.contains("Echo")
+
+func _targets_unit_or_queue() -> bool:
+	return counter_target_component.contains("Unit") or counter_target_component.contains("Queue")
 
 func _draw_bar(bar_rect: Rect2, ratio: float, fill_color: Color) -> void:
 	draw_rect(bar_rect, COLOR_PANEL, true)
