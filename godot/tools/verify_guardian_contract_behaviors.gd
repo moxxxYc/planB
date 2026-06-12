@@ -108,10 +108,7 @@ func _verify_acid_crown_strategic_record(battle: Node, record: Dictionary) -> vo
 	_expect_no_cross_axis(record, "酸冠母 Gate strategic")
 	_expect_layer(record, ["Guardian.StrategicSkill", "strategic_machine"], "酸冠母 Gate strategic")
 	_expect_gate_result_sequence(record, "酸冠母 Gate strategic")
-	_expect_log_text_either(battle, record, [
-		["酸冠"],
-		["Gate", "转为", "Prime"],
-	], "酸冠母 Gate strategic")
+	_expect_acid_gate_conversion_evidence(battle, record, "酸冠母 Gate strategic")
 
 func _verify_vein_mother_tactical_record(record: Dictionary) -> void:
 	_expect_bool(record, "triggered", true, "巢脉牵缚 tactical")
@@ -247,6 +244,28 @@ func _expect_gate_result_sequence(record: Dictionary, label: String) -> void:
 		failures.append("%s result sequence must show at least six Gate observations." % label)
 	if not saw_converted_prime:
 		failures.append("%s result sequence must show final Gate converted to Prime." % label)
+
+func _expect_acid_gate_conversion_evidence(battle: Node, record: Dictionary, label: String) -> void:
+	var text: String = _evidence_text(battle, record)
+	if _text_contains_all(text, ["酸冠", "Gate", "Prime"]):
+		return
+	if _result_sequence_shows_gate_to_prime(record):
+		return
+	failures.append("%s missing conversion evidence: require 酸冠 + Gate + Prime in the same machine evidence, or structured result_sequence/before_after showing Gate -> Prime." % label)
+
+func _result_sequence_shows_gate_to_prime(record: Dictionary) -> bool:
+	var sequence_variant: Variant = record.get("result_sequence", record.get("before_after", []))
+	if not (sequence_variant is Array):
+		return false
+	var sequence: Array = sequence_variant as Array
+	for entry_variant: Variant in sequence:
+		if entry_variant is Dictionary:
+			var entry: Dictionary = entry_variant as Dictionary
+			var original: String = String(entry.get("original_result", entry.get("before", entry.get("result", ""))))
+			var final: String = String(entry.get("final_result", entry.get("after", "")))
+			if original == "Gate" and final == "Prime":
+				return true
+	return false
 
 func _expect_log_text(battle: Node, record: Dictionary, needles: Array[String], label: String) -> void:
 	var text: String = _evidence_text(battle, record)

@@ -46,6 +46,59 @@ const REQUIRED_KEYS: Array[String] = [
 	"session.consecutive_no_explained_decision_battles",
 ]
 
+const NON_EMPTY_STRING_KEYS: Array[String] = [
+	"guardian.choice_id",
+	"guardian.choice_read",
+	"guardian.outcome",
+	"reward1.choice_id",
+	"reward1.axis",
+	"reward1.component_operation",
+	"reward1.battlefield_expectation",
+	"reward1.battlefield_result",
+	"shop1.purchase_id",
+	"shop1.purchase_role",
+	"rest.endpoint_relevance",
+	"counter1.family",
+	"counter1.target_component",
+	"counter1.visible_effect",
+	"counter1.response_link",
+	"second_offer.current_axis",
+	"second_offer.choice_id",
+	"second_offer.choice_role",
+	"endpoint.outcome",
+	"endpoint.primary_axis_payoff",
+	"endpoint.main_break_reason",
+	"endpoint.next_run_watch_tag",
+	"endpoint.deploy_lane_impact",
+	"endpoint.guardian_hp",
+]
+
+const NON_EMPTY_ARRAY_KEYS: Array[String] = [
+	"guardian.hp_pressure_events",
+	"second_offer.candidates",
+	"session.decision_windows",
+]
+
+const NON_NEGATIVE_NUMBER_KEYS: Array[String] = [
+	"shop1.gold_before",
+	"shop1.gold_after",
+	"rest.total_purchases",
+	"rest.total_gold_spent",
+	"rest.total_hp_restored",
+	"session.consecutive_no_explained_decision_battles",
+]
+
+const SPECIAL_SHAPE_KEYS: Array[String] = [
+	"battle1.machine_chain_sample",
+	"battle1.exposure_gate_snapshot",
+	"battle1.deploy_lane_selection",
+	"battle1.lane_danger_snapshot",
+	"unit.visible_contribution_slots",
+	"unit.key_queue_entries_by_slot",
+	"unit.dominant_slot_share",
+	"rest_windows",
+]
+
 var failures: Array[String] = []
 
 func _initialize() -> void:
@@ -120,34 +173,35 @@ func _verify_required_learning_keys(run: Node) -> void:
 	for key: String in REQUIRED_KEYS:
 		if not record.has(key):
 			failures.append("Final Result learning record missing required field: %s" % key)
+	_verify_shape_rules_cover_required_keys()
 	_verify_learning_field_shapes(record)
 
 func _verify_learning_field_shapes(record: Dictionary) -> void:
 	_verify_machine_chain_sample(record)
 	_verify_exposure_gate_snapshot(record)
-	_verify_non_empty_string_fields(record, [
-		"guardian.choice_read",
-		"reward1.axis",
-		"reward1.component_operation",
-		"reward1.battlefield_expectation",
-		"reward1.battlefield_result",
-		"shop1.purchase_role",
-		"counter1.family",
-		"counter1.target_component",
-		"counter1.visible_effect",
-		"counter1.response_link",
-		"endpoint.main_break_reason",
-		"endpoint.next_run_watch_tag",
-	])
+	_verify_non_empty_string_fields(record, NON_EMPTY_STRING_KEYS)
+	_verify_non_empty_array_fields(record, NON_EMPTY_ARRAY_KEYS)
+	_verify_non_negative_number_fields(record, NON_NEGATIVE_NUMBER_KEYS)
 	_verify_non_empty_selection_field(record, "battle1.deploy_lane_selection")
-	_verify_non_empty_dictionary_field(record, "battle1.lane_danger_snapshot")
-	_verify_non_empty_dictionary_field(record, "unit.key_queue_entries_by_slot")
+	_verify_lane_danger_snapshot(record)
+	_verify_visible_contribution_slots(record)
+	_verify_key_queue_entries_by_slot(record)
+	_verify_dominant_slot_share(record)
 	_verify_non_empty_array_or_dictionary_field(record, "rest_windows")
-	_verify_non_empty_field(record, "endpoint.outcome")
-	_verify_non_empty_field(record, "endpoint.guardian_hp")
-	_verify_non_empty_field(record, "endpoint.next_run_watch_tag")
-	_verify_non_empty_array_field(record, "second_offer.candidates")
-	_verify_non_empty_array_field(record, "session.decision_windows")
+
+func _verify_shape_rules_cover_required_keys() -> void:
+	var covered: Dictionary = {}
+	for key: String in NON_EMPTY_STRING_KEYS:
+		covered[key] = true
+	for key: String in NON_EMPTY_ARRAY_KEYS:
+		covered[key] = true
+	for key: String in NON_NEGATIVE_NUMBER_KEYS:
+		covered[key] = true
+	for key: String in SPECIAL_SHAPE_KEYS:
+		covered[key] = true
+	for key: String in REQUIRED_KEYS:
+		if not covered.has(key):
+			failures.append("Verifier internal error: %s has no typed learning-record validation rule." % key)
 
 func _verify_machine_chain_sample(record: Dictionary) -> void:
 	if not record.has("battle1.machine_chain_sample"):
@@ -212,20 +266,13 @@ func _has_snapshot_time(snapshot: Dictionary, required_time: float) -> bool:
 					return true
 	return false
 
-func _verify_non_empty_dictionary_field(record: Dictionary, key: String) -> void:
-	if not record.has(key):
-		return
-	var value: Variant = record.get(key)
-	if not (value is Dictionary) or (value as Dictionary).is_empty():
-		failures.append("%s must be a non-empty Dictionary." % key)
-
 func _verify_non_empty_string_fields(record: Dictionary, keys: Array[String]) -> void:
 	for key: String in keys:
 		if not record.has(key):
 			continue
 		var value: Variant = record.get(key)
 		if not (value is String) or String(value).strip_edges().is_empty():
-			failures.append("%s must be a non-empty String." % key)
+			failures.append("%s must be a non-empty String; use an explicit none marker such as 无/none when no choice was made." % key)
 
 func _verify_non_empty_selection_field(record: Dictionary, key: String) -> void:
 	if not record.has(key):
@@ -249,25 +296,119 @@ func _verify_non_empty_array_or_dictionary_field(record: Dictionary, key: String
 		return
 	failures.append("%s must be a non-empty Array or Dictionary." % key)
 
-func _verify_non_empty_array_field(record: Dictionary, key: String) -> void:
-	if not record.has(key):
-		return
-	var value: Variant = record.get(key)
-	if not (value is Array) or (value as Array).is_empty():
-		failures.append("%s must be a non-empty Array." % key)
+func _verify_non_empty_array_fields(record: Dictionary, keys: Array[String]) -> void:
+	for key: String in keys:
+		if not record.has(key):
+			continue
+		var value: Variant = record.get(key)
+		if not (value is Array) or (value as Array).is_empty():
+			failures.append("%s must be a non-empty Array." % key)
 
-func _verify_non_empty_field(record: Dictionary, key: String) -> void:
-	if not record.has(key):
+func _verify_non_negative_number_fields(record: Dictionary, keys: Array[String]) -> void:
+	for key: String in keys:
+		if not record.has(key):
+			continue
+		var value: Variant = record.get(key)
+		if not (value is int or value is float):
+			failures.append("%s must be a Number >= 0." % key)
+			continue
+		if float(value) < 0.0:
+			failures.append("%s must be >= 0." % key)
+
+func _verify_lane_danger_snapshot(record: Dictionary) -> void:
+	if not record.has("battle1.lane_danger_snapshot"):
 		return
-	var value: Variant = record.get(key)
-	if value == null:
-		failures.append("%s must be non-empty." % key)
-	elif value is String and String(value).strip_edges().is_empty():
-		failures.append("%s must be non-empty." % key)
-	elif value is Array and (value as Array).is_empty():
-		failures.append("%s must be non-empty." % key)
-	elif value is Dictionary and (value as Dictionary).is_empty():
-		failures.append("%s must be non-empty." % key)
+	var value: Variant = record.get("battle1.lane_danger_snapshot")
+	if not (value is Dictionary):
+		failures.append("battle1.lane_danger_snapshot must be a non-empty Dictionary.")
+		return
+	var snapshot: Dictionary = value as Dictionary
+	if snapshot.is_empty():
+		failures.append("battle1.lane_danger_snapshot must be a non-empty Dictionary.")
+		return
+	for lane_key: Variant in snapshot.keys():
+		var entry: Variant = snapshot.get(lane_key)
+		var danger_value: Variant = entry
+		if entry is Dictionary:
+			var entry_dictionary: Dictionary = entry as Dictionary
+			danger_value = entry_dictionary.get("danger", entry_dictionary.get("danger_level", entry_dictionary.get("level", null)))
+		if not (danger_value is int or danger_value is float):
+			failures.append("battle1.lane_danger_snapshot[%s] must expose numeric danger level 0-3." % String(lane_key))
+			continue
+		var danger: float = float(danger_value)
+		if danger < 0.0 or danger > 3.0:
+			failures.append("battle1.lane_danger_snapshot[%s] danger level must be in range 0-3." % String(lane_key))
+
+func _verify_visible_contribution_slots(record: Dictionary) -> void:
+	if not record.has("unit.visible_contribution_slots"):
+		return
+	var value: Variant = record.get("unit.visible_contribution_slots")
+	if value is Dictionary:
+		if (value as Dictionary).is_empty():
+			failures.append("unit.visible_contribution_slots Dictionary must be non-empty.")
+		return
+	if not (value is Array):
+		failures.append("unit.visible_contribution_slots must be a non-empty Array or Dictionary.")
+		return
+	var slots: Array = value as Array
+	if slots.is_empty():
+		failures.append("unit.visible_contribution_slots must be non-empty.")
+		return
+	for slot_variant: Variant in slots:
+		if not (slot_variant is int or slot_variant is float):
+			failures.append("unit.visible_contribution_slots entries must be numeric slot ids.")
+			continue
+		var slot_id: int = int(slot_variant)
+		if slot_id < 1 or slot_id > 4:
+			failures.append("unit.visible_contribution_slots slot ids must be in range 1-4.")
+
+func _verify_key_queue_entries_by_slot(record: Dictionary) -> void:
+	if not record.has("unit.key_queue_entries_by_slot"):
+		return
+	var value: Variant = record.get("unit.key_queue_entries_by_slot")
+	if not (value is Dictionary):
+		failures.append("unit.key_queue_entries_by_slot must be a non-empty Dictionary.")
+		return
+	var by_slot: Dictionary = value as Dictionary
+	if by_slot.is_empty():
+		failures.append("unit.key_queue_entries_by_slot must be a non-empty Dictionary.")
+		return
+	for slot_key: Variant in by_slot.keys():
+		var entries_variant: Variant = by_slot.get(slot_key)
+		if entries_variant is Array:
+			if (entries_variant as Array).is_empty():
+				failures.append("unit.key_queue_entries_by_slot[%s] must contain at least one queue entry." % String(slot_key))
+		elif entries_variant is Dictionary:
+			if (entries_variant as Dictionary).is_empty():
+				failures.append("unit.key_queue_entries_by_slot[%s] must contain non-empty queue entry evidence." % String(slot_key))
+		else:
+			failures.append("unit.key_queue_entries_by_slot[%s] must be an Array or Dictionary." % String(slot_key))
+
+func _verify_dominant_slot_share(record: Dictionary) -> void:
+	if not record.has("unit.dominant_slot_share"):
+		return
+	var value: Variant = record.get("unit.dominant_slot_share")
+	if value is Dictionary:
+		var share_record: Dictionary = value as Dictionary
+		if share_record.is_empty():
+			failures.append("unit.dominant_slot_share Dictionary must be non-empty.")
+			return
+		if not _has_any_key(share_record, ["slot_id", "slot", "dominant_slot"]):
+			failures.append("unit.dominant_slot_share Dictionary must include slot_id/slot/dominant_slot.")
+		var share_variant: Variant = share_record.get("share", share_record.get("ratio", share_record.get("dominant_share", null)))
+		if not (share_variant is int or share_variant is float):
+			failures.append("unit.dominant_slot_share Dictionary must include numeric share/ratio.")
+			return
+		_verify_ratio(float(share_variant), "unit.dominant_slot_share.share")
+		return
+	if value is int or value is float:
+		_verify_ratio(float(value), "unit.dominant_slot_share")
+		return
+	failures.append("unit.dominant_slot_share must be a Dictionary with slot/share evidence or numeric ratio.")
+
+func _verify_ratio(value: float, label: String) -> void:
+	if value < 0.0 or value > 1.0:
+		failures.append("%s must be in range 0.0-1.0." % label)
 
 func _has_any_key(record: Dictionary, keys: Array[String]) -> bool:
 	for key: String in keys:
