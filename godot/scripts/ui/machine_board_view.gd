@@ -370,7 +370,10 @@ func _draw_unit_slots(board_rect: Rect2) -> void:
 	if not last_blocked_bounce.is_empty():
 		var blocked_slot_id: int = int(last_blocked_bounce.get("slot_id", 0))
 		var target_slot_id: int = int(last_blocked_bounce.get("target_slot_id", 0))
-		_draw_text(font, board_rect.position + Vector2(10.0, 39.0), "闸门挡开：S%d 转向 S%d" % [blocked_slot_id, target_slot_id], 10, COLOR_COUNTER_TARGET)
+		var bounce_message: String = String(last_blocked_bounce.get("message", ""))
+		if bounce_message.is_empty():
+			bounce_message = "Unit：S%d 暴露闸门挡开，球转向 S%d" % [blocked_slot_id, target_slot_id]
+		_draw_text(font, board_rect.position + Vector2(10.0, 39.0), bounce_message, 10, COLOR_COUNTER_TARGET)
 	for slot_id: int in range(1, 5):
 		var progress: int = int(slot_progress.get(slot_id, 0))
 		var required: int = int(SLOT_REQUIREMENTS[slot_id])
