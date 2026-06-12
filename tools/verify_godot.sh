@@ -49,4 +49,11 @@ fi
 
 run_godot_verifier "res://tools/verify_m1_machine_to_lane.gd"
 
+if [[ ! -f "$PROJECT_DIR/tools/verify_m2_run_flow.gd" ]]; then
+  echo "Missing required M2 verifier at $PROJECT_DIR/tools/verify_m2_run_flow.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_m2_run_flow.gd"
+
 echo "verify_godot: PASS"

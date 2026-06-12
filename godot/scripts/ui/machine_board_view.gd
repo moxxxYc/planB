@@ -3,7 +3,6 @@ extends Control
 
 const FORGE_CYCLE_SECONDS: float = 2.2
 const LAUNCHER_CYCLE_SECONDS: float = 1.3
-const MAX_POOL_SIZE: int = 5
 const QUEUE_PREVIEW_COUNT: int = 3
 const SLOT_REQUIREMENTS: Dictionary = {1: 3, 2: 5, 3: 8, 4: 12}
 
@@ -28,6 +27,7 @@ const ACTIVE_BALL_RING_RADIUS: float = 19.0
 var forge_ratio: float = 0.0
 var launcher_ratio: float = 0.0
 var pool_count: int = 0
+var pool_capacity: int = 5
 var queue_count: int = 0
 var slot_progress: Dictionary = {1: 0, 2: 0, 3: 0, 4: 0}
 var last_launch_result: String = ""
@@ -45,6 +45,7 @@ func render(machine) -> void:
 	forge_ratio = clampf(machine.forge_progress / FORGE_CYCLE_SECONDS, 0.0, 1.0)
 	launcher_ratio = clampf(machine.launcher_progress / LAUNCHER_CYCLE_SECONDS, 0.0, 1.0)
 	pool_count = machine.pool.size()
+	pool_capacity = _machine_pool_capacity(machine)
 	queue_count = machine.queue.size()
 	slot_progress = {
 		1: int(machine.slot_progress.get(1, 0)),
@@ -59,22 +60,22 @@ func render(machine) -> void:
 func get_visual_contract_summary() -> Dictionary:
 	return {
 		"board_count": 3,
-		"pool_slot_count": MAX_POOL_SIZE,
+		"pool_slot_count": pool_capacity,
 		"queue_preview_count": QUEUE_PREVIEW_COUNT,
-			"unit_slot_count": 4,
-			"has_active_ball": true,
-			"pool_count": pool_count,
-			"queue_count": queue_count,
-			"active_board_index": active_board_index,
-			"last_launch_result": last_launch_result,
-			"last_tuning_result": last_tuning_result,
-			"machine_board_min_height": MIN_VIEW_SIZE.y,
-			"supply_strip_height": SUPPLY_STRIP_HEIGHT,
-			"pool_ball_radius": POOL_BALL_RADIUS,
-			"pool_ball_ring_radius": POOL_BALL_RING_RADIUS,
-			"active_ball_radius": ACTIVE_BALL_RADIUS,
-			"active_ball_ring_radius": ACTIVE_BALL_RING_RADIUS,
-		}
+		"unit_slot_count": 4,
+		"has_active_ball": true,
+		"pool_count": pool_count,
+		"queue_count": queue_count,
+		"active_board_index": active_board_index,
+		"last_launch_result": last_launch_result,
+		"last_tuning_result": last_tuning_result,
+		"machine_board_min_height": MIN_VIEW_SIZE.y,
+		"supply_strip_height": SUPPLY_STRIP_HEIGHT,
+		"pool_ball_radius": POOL_BALL_RADIUS,
+		"pool_ball_ring_radius": POOL_BALL_RING_RADIUS,
+		"active_ball_radius": ACTIVE_BALL_RADIUS,
+		"active_ball_ring_radius": ACTIVE_BALL_RING_RADIUS,
+	}
 
 func _on_resized() -> void:
 	queue_redraw()
@@ -99,7 +100,7 @@ func _draw_supply_strip(rect: Rect2) -> void:
 
 	_draw_text(font, Vector2(left + 12.0, top + 22.0), "供给球仓", 15, COLOR_TEXT)
 	_draw_text(font, Vector2(left + 96.0, top + 22.0), "Forge / Pool / Launcher", 12, COLOR_MUTED)
-	_draw_text(font, Vector2(left + width - 92.0, top + 22.0), "Pool %d / %d" % [pool_count, MAX_POOL_SIZE], 13, COLOR_ACTIVE)
+	_draw_text(font, Vector2(left + width - 92.0, top + 22.0), "Pool %d / %d" % [pool_count, pool_capacity], 13, COLOR_ACTIVE)
 
 	var bar_width := maxf(88.0, width * 0.34)
 	_draw_text(font, Vector2(left + 12.0, top + 46.0), "Forge 造球 %.0f%%" % (forge_ratio * 100.0), 11, COLOR_MUTED)
@@ -113,15 +114,16 @@ func _draw_supply_strip(rect: Rect2) -> void:
 	_draw_text(font, pool_rect.position + Vector2(12.0, 22.0), "Pool 球仓", 13, COLOR_TEXT)
 
 	var slot_gap := 12.0
-	var total_slot_width := float(MAX_POOL_SIZE) * POOL_BALL_RADIUS * 2.0 + float(MAX_POOL_SIZE - 1) * slot_gap
-	var pool_left := pool_rect.position.x + maxf(78.0, (pool_rect.size.x - total_slot_width) * 0.5)
+	var visible_capacity: int = maxi(1, pool_capacity)
+	var total_slot_width := float(visible_capacity) * POOL_BALL_RADIUS * 2.0 + float(visible_capacity - 1) * slot_gap
+	var pool_left := pool_rect.position.x + maxf(0.0, (pool_rect.size.x - total_slot_width) * 0.5)
 	var pool_y := pool_rect.position.y + 52.0
 	var first_ball_x := pool_left + POOL_BALL_RADIUS
-	var last_ball_x := first_ball_x + float(MAX_POOL_SIZE - 1) * (POOL_BALL_RADIUS * 2.0 + slot_gap)
+	var last_ball_x := first_ball_x + float(visible_capacity - 1) * (POOL_BALL_RADIUS * 2.0 + slot_gap)
 
 	draw_line(Vector2(pool_rect.position.x + 18.0, pool_y), Vector2(first_ball_x - POOL_BALL_RING_RADIUS - 10.0, pool_y), COLOR_LAUNCH, 3.0, true)
 	draw_line(Vector2(last_ball_x + POOL_BALL_RING_RADIUS + 10.0, pool_y), Vector2(pool_rect.end.x - 18.0, pool_y), COLOR_TUNING, 3.0, true)
-	for index: int in range(MAX_POOL_SIZE):
+	for index: int in range(visible_capacity):
 		var center := Vector2(first_ball_x + float(index) * (POOL_BALL_RADIUS * 2.0 + slot_gap), pool_y)
 		var filled := index < pool_count
 		draw_circle(center, POOL_BALL_RING_RADIUS, COLOR_TRIM)
@@ -249,6 +251,15 @@ func _active_board_from_ratio(ratio: float) -> int:
 	if ratio < 0.67:
 		return 1
 	return 2
+
+func _machine_pool_capacity(machine) -> int:
+	if machine.has_method("get_pool_capacity"):
+		return maxi(1, int(machine.call("get_pool_capacity")))
+
+	var capacity_value: Variant = machine.get("pool_capacity")
+	if capacity_value != null:
+		return maxi(1, int(capacity_value))
+	return 5
 
 func _update_recent_results(event_log: Array[String]) -> void:
 	last_launch_result = ""

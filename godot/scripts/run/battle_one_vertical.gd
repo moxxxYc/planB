@@ -19,6 +19,9 @@ var lanes: BattleLaneState = BattleLaneState.new()
 var deploy_timer: float = 0.0
 var elapsed: float = 0.0
 var bridge_transfer_timer: float = 0.0
+var battle_number: int = 1
+var run_session: RunSessionModel = null
+var run_payload: Dictionary = {}
 
 func _ready() -> void:
 	_ensure_views()
@@ -87,7 +90,17 @@ func get_battle_result() -> String:
 	return lanes.get_battle_result()
 
 func get_battle_result_text() -> String:
-	return lanes.get_result_text()
+	return _battle_result_text()
+
+func configure_for_run(p_battle_number: int, p_session: RunSessionModel, payload: Dictionary = {}) -> void:
+	battle_number = maxi(1, p_battle_number)
+	run_session = p_session
+	run_payload = payload.duplicate(true)
+	_apply_run_modifiers()
+	_render()
+
+func get_battle_modifier_marker_text() -> String:
+	return machine.get_modifier_marker_text()
 
 func advance_simulation(delta: float) -> void:
 	elapsed += delta
@@ -118,9 +131,35 @@ func _render() -> void:
 	bridge_view.render(machine, deploy)
 	battlefield_view.render(deploy, lanes)
 	if lanes.get_battle_result() == BattleLaneState.RESULT_RUNNING:
-		status_label.text = "战斗 1 | %.1fs | Queue 从当前出兵口部署，不从 Guardian 出兵。" % elapsed
+		status_label.text = "%s | %.1fs | Queue 从当前出兵口部署，不从 Guardian 出兵。 | %s" % [
+			_battle_label(),
+			elapsed,
+			get_battle_modifier_marker_text(),
+		]
 	else:
-		status_label.text = "战斗 1 | %.1fs | %s" % [elapsed, lanes.get_result_text()]
+		status_label.text = "%s | %.1fs | %s" % [_battle_label(), elapsed, _battle_result_text()]
+
+func _apply_run_modifiers() -> void:
+	if run_session == null:
+		return
+
+	if battle_number >= 2 and not run_session.reward_one_id.is_empty():
+		machine.apply_modifier(run_session.reward_one_id, _modifier_payload(run_session.reward_one_id))
+	if battle_number >= 3 and not run_session.shop_purchase_id.is_empty():
+		machine.apply_modifier(run_session.shop_purchase_id, _modifier_payload(run_session.shop_purchase_id))
+
+func _modifier_payload(modifier_id: String) -> Dictionary:
+	if run_payload.has(modifier_id):
+		var modifier_payload: Variant = run_payload[modifier_id]
+		if modifier_payload is Dictionary:
+			return modifier_payload
+	return {}
+
+func _battle_label() -> String:
+	return "战斗 %d" % battle_number
+
+func _battle_result_text() -> String:
+	return lanes.get_result_text().replace("战斗 1", _battle_label())
 
 func _advance_bridge_transfer(delta: float) -> void:
 	if bridge_transfer_timer <= 0.0:

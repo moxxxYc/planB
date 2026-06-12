@@ -5,7 +5,6 @@ const MachineBoardViewScript := preload("res://scripts/ui/machine_board_view.gd"
 
 const FORGE_CYCLE_SECONDS: float = 2.2
 const LAUNCHER_CYCLE_SECONDS: float = 1.3
-const MAX_POOL_SIZE: int = 5
 const LOG_LINE_COUNT: int = 3
 
 @onready var machine_board: MachineBoardViewScript = %MachineBoardView
@@ -31,11 +30,12 @@ func render(machine) -> void:
 	var launcher_ratio: float = clampf(machine.launcher_progress / LAUNCHER_CYCLE_SECONDS, 0.0, 1.0)
 
 	machine_board.render(machine)
+	var pool_capacity: int = _machine_pool_capacity(machine)
 	forge_bar.value = forge_ratio * 100.0
 	launcher_bar.value = launcher_ratio * 100.0
 	forge_label.text = "Forge 造球 %.0f%% -> Pool" % (forge_ratio * 100.0)
 	launcher_label.text = "Launcher 发射 %.0f%% -> Tuning" % (launcher_ratio * 100.0)
-	pool_label.text = "Pool 球池 %d / %d 颗净球" % [machine.pool.size(), MAX_POOL_SIZE]
+	pool_label.text = "Pool 球池 %d / %d 颗净球" % [machine.pool.size(), pool_capacity]
 	tuning_label.text = "Tuning 槽：Gate / Prime / Echo / Surge"
 	unit_label.text = "Unit 槽：S1 %d/3 | S2 %d/5 | S3 %d/8 | S4 %d/12" % [
 		int(machine.slot_progress.get(1, 0)),
@@ -53,6 +53,15 @@ func get_visual_contract_summary() -> Dictionary:
 func get_readable_log_text() -> String:
 	_ensure_nodes()
 	return log_label.text
+
+func _machine_pool_capacity(machine) -> int:
+	if machine.has_method("get_pool_capacity"):
+		return maxi(1, int(machine.call("get_pool_capacity")))
+
+	var capacity_value: Variant = machine.get("pool_capacity")
+	if capacity_value != null:
+		return maxi(1, int(capacity_value))
+	return 5
 
 func _recent_log_text(event_log: Array[String]) -> String:
 	if event_log.is_empty():

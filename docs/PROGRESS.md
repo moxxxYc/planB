@@ -1,7 +1,7 @@
 # 进度与决策日志
 
-**最后更新：** 2026-06-11
-**仓库状态：** 文档主导；原 `mvp/` Godot MVP v0 实现已归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`，当前活动 Godot 实现目录为 `godot/`，M0-M1 已进入活动实现。本文记录设计状态和决策日志，不作为代码状态证明。
+**最后更新：** 2026-06-12
+**仓库状态：** 文档主导；原 `mvp/` Godot MVP v0 实现已归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`，当前活动 Godot 实现目录为 `godot/`，M0-M2 已进入活动实现。本文记录设计状态和决策日志，不作为代码状态证明。
 
 ## 当前正式文档
 
@@ -33,8 +33,8 @@
 
 ## 当前总状态
 
-- 仓库当前处于“文档主导 + MVP v0 M0-M1 活动实现”阶段；原 `mvp/` Godot MVP v0 实现已归档，当前活动实现目录为 `godot/`。
-- M0-M1 之外的新里程碑、范围扩展或玩法 canon 变更，必须从当前正式文档重新写有范围约束的实现计划，并等待用户明确确认后再开始。
+- 仓库当前处于“文档主导 + MVP v0 M0-M2 活动实现”阶段；原 `mvp/` Godot MVP v0 实现已归档，当前活动实现目录为 `godot/`。
+- M0-M2 之外的新里程碑、范围扩展或玩法 canon 变更，必须从当前正式文档重新写有范围约束的实现计划，并等待用户明确确认后再开始。
 - 当前可运行的 Godot MVP 主验证命令是 `bash tools/verify_godot.sh`；归档目录里的旧验证脚本只作历史背景，不作为当前验收入口。
 - 旧 Web MVP、旧脚本、旧验证命令和旧实现假设都不再作为当前设计依据。
 - 旧 Godot prototype 已归档到 `docs/archive/prototypes/`，完全过期，不再作为 build、验证、评审或路由信号。
@@ -191,6 +191,7 @@
 - 经用户确认后，MVP v0 M0-M1 重新实现从新的 `godot/` 活动工程开始，不从归档 `mvp/` 恢复。
 - M0 当前验证入口为 `bash tools/verify_godot.sh`，工程目标为 Godot 4.6、GDScript、Compatibility / `gl_compatibility`。
 - M1 当前范围为 Battle 1 vertical：三板机器显示、Ball result -> Unit progress -> Queue、Queue Bridge -> selected spawn port、直接点击路线、Battle 1 胜 / 败路径。
+- 经用户确认后，M2 已在新的 `godot/` 活动工程内实现：Guardian Contract、Battle 1 -> Reward 1 -> Battle 2 -> First Shop / Rest -> Battle 3 -> Result Routing 的短局骨架，Gold faucet，第一次奖励三轴锚点，第一次商店补洞项，休息消耗，以及 M2 verifier。当前验证入口仍为 `bash tools/verify_godot.sh`。
 
 ## 2026-06-05
 
