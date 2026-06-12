@@ -23,6 +23,8 @@ var first_shop_rest_count: int = 0
 var battle_three_rest_count: int = 0
 var last_battle: String = ""
 var last_battle_result: String = ""
+var planned_counter_id: String = ""
+var counter_record: Dictionary = {}
 var result_record: Dictionary = {}
 
 func select_guardian(guardian_id: String) -> void:
@@ -78,6 +80,12 @@ func choose_reward_one(reward_id: String) -> void:
 
 	reward_one_id = reward_id
 	current_node_id = NODE_BATTLE_2
+
+func set_planned_counter(counter_id: String) -> void:
+	planned_counter_id = counter_id
+
+func set_counter_record(record: Dictionary) -> void:
+	counter_record = record.duplicate(true)
 
 func buy_shop_item(modifier_id: String, cost: int) -> bool:
 	if current_node_id != NODE_SHOP_1:
@@ -159,3 +167,5 @@ func _route_to_result() -> void:
 		"last_battle": last_battle,
 		"battle_result": last_battle_result,
 	}
+	for key: String in counter_record.keys():
+		result_record["counter1.%s" % key] = counter_record[key]

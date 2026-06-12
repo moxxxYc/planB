@@ -14,14 +14,22 @@ const SHOP_ORDER: Array[String] = [
 var shop_defs: Dictionary = {}
 var session: RunSessionModel = null
 var hide_shop: bool = false
+var visible_shop_item_ids: Array[String] = []
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 12)
 
-func render(p_shop_defs: Dictionary, p_session: RunSessionModel, p_hide_shop: bool = false) -> void:
+func render(
+	p_shop_defs: Dictionary,
+	p_session: RunSessionModel,
+	p_hide_shop: bool = false,
+	p_visible_ids: Array[String] = [],
+	p_counter_scout_text: String = ""
+) -> void:
 	shop_defs = p_shop_defs
 	session = p_session
 	hide_shop = p_hide_shop
+	visible_shop_item_ids = p_visible_ids.duplicate()
 	_clear_children()
 
 	add_child(_make_label("休整", 26))
@@ -29,6 +37,8 @@ func render(p_shop_defs: Dictionary, p_session: RunSessionModel, p_hide_shop: bo
 		add_child(_make_label("战斗 3 后只开放守护者休息，然后进入本次 M2 结果。", 16))
 	else:
 		add_child(_make_label("第一次商店：最多购买 1 个中立机器修正。休息独立计算，不占商店购买名额。", 16))
+		if not p_counter_scout_text.is_empty():
+			add_child(_make_label("反制侦测：%s" % p_counter_scout_text, 15))
 		_render_shop_items()
 
 	_render_rest()
@@ -43,7 +53,8 @@ func get_card_text(modifier_id: String) -> String:
 	return definition.to_card_text()
 
 func _render_shop_items() -> void:
-	for modifier_id: String in SHOP_ORDER:
+	var ordered_ids: Array[String] = visible_shop_item_ids if not visible_shop_item_ids.is_empty() else SHOP_ORDER
+	for modifier_id: String in ordered_ids:
 		if not shop_defs.has(modifier_id):
 			continue
 		var definition: ModifierDefinition = shop_defs[modifier_id] as ModifierDefinition

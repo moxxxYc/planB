@@ -15,11 +15,12 @@ func render(
 	shop_defs: Dictionary
 ) -> void:
 	_ensure_label()
-	summary_label.text = "守护者：%s | Gold：%d | 第一次奖励：%s | 第一次商店：%s" % [
+	summary_label.text = "守护者：%s | Gold：%d | 第一次奖励：%s | 第一次商店：%s | 侦测反制：%s" % [
 		_guardian_name(session.selected_guardian_id, guardian_defs),
 		session.gold,
 		_modifier_name(session.reward_one_id, reward_defs),
 		_modifier_name(session.shop_purchase_id, shop_defs),
+		_counter_name(session.planned_counter_id),
 	]
 
 func get_text() -> String:
@@ -73,3 +74,14 @@ func _modifier_name(modifier_id: String, modifier_defs: Dictionary) -> String:
 	if definition == null:
 		return modifier_id
 	return definition.display_name
+
+func _counter_name(counter_id: String) -> String:
+	match counter_id:
+		"pool_polluter":
+			return "Pool Polluter"
+		"echo_breaker":
+			return "Echo Breaker"
+		"stagger_punisher":
+			return "Stagger Punisher"
+		_:
+			return "未侦测"

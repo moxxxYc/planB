@@ -21,6 +21,7 @@ var shop_defs: Dictionary = {}
 var counter_defs: Dictionary = {}
 var next_counter_override: String = ""
 var planned_counter_id: String = ""
+var visible_shop_item_ids: Array[String] = []
 var hud_view = null
 var active_battle: BattleOneVertical = null
 var active_result_view = null
@@ -86,6 +87,7 @@ func choose_reward_one(modifier_id: String) -> void:
 		push_error("Unknown Reward 1 modifier: %s" % modifier_id)
 		return
 	session.choose_reward_one(modifier_id)
+	_ensure_planned_counter()
 	_render_current_node()
 
 func get_reward_one_id() -> String:
@@ -152,6 +154,8 @@ func set_next_counter_for_verifier(counter_id: String) -> void:
 		return
 	next_counter_override = counter_id
 	planned_counter_id = counter_id
+	visible_shop_item_ids = []
+	session.set_planned_counter(counter_id)
 
 func get_counter_scout_text() -> String:
 	_ensure_catalogs()
@@ -160,6 +164,36 @@ func get_counter_scout_text() -> String:
 	if definition == null:
 		return "反制侦测：暂无"
 	return String(definition.call("to_scout_text"))
+
+func get_visible_shop_item_ids() -> Array[String]:
+	_ensure_visible_shop_item_ids()
+	return visible_shop_item_ids.duplicate()
+
+func get_counter_record() -> Dictionary:
+	if active_battle != null and active_battle.has_method("get_active_counter_record"):
+		var active_record: Dictionary = active_battle.call("get_active_counter_record") as Dictionary
+		if not active_record.is_empty():
+			return active_record.duplicate(true)
+	return session.counter_record.duplicate(true)
+
+func get_active_counter_banner_text() -> String:
+	if active_battle != null and active_battle.has_method("get_active_counter_banner_text"):
+		return String(active_battle.call("get_active_counter_banner_text"))
+	return "反制：无"
+
+func get_active_machine_log_text() -> String:
+	if active_battle != null and active_battle.has_method("get_active_machine_log_text"):
+		return String(active_battle.call("get_active_machine_log_text"))
+	return ""
+
+func get_lane_button_text(lane: String) -> String:
+	if active_battle != null and active_battle.has_method("get_lane_button_text"):
+		return String(active_battle.call("get_lane_button_text", lane))
+	return ""
+
+func advance_active_battle_for_verifier(seconds: float) -> void:
+	if active_battle != null and active_battle.has_method("advance_for_verifier"):
+		active_battle.call("advance_for_verifier", seconds)
 
 func get_result_summary_text() -> String:
 	if active_result_view != null:
@@ -215,7 +249,12 @@ func _show_shop_rest(p_hide_shop: bool) -> void:
 	view.shop_item_bought.connect(_on_shop_item_bought)
 	view.rest_bought.connect(_on_rest_bought)
 	view.confirmed.connect(_on_shop_rest_confirmed)
-	view.render(shop_defs, session, p_hide_shop)
+	var visible_ids: Array[String] = []
+	var scout_text: String = ""
+	if not p_hide_shop:
+		visible_ids = get_visible_shop_item_ids()
+		scout_text = get_counter_scout_text()
+	view.render(shop_defs, session, p_hide_shop, visible_ids, scout_text)
 
 func _show_result() -> void:
 	var view = RunResultViewScript.new()
@@ -264,6 +303,10 @@ func _complete_active_battle(battle_result: String) -> void:
 	if not _is_battle_node(session.current_node_id):
 		push_error("Cannot complete non-battle run node: %s" % session.current_node_id)
 		return
+	if active_battle != null and active_battle.has_method("get_active_counter_record"):
+		var record: Dictionary = active_battle.call("get_active_counter_record") as Dictionary
+		if not record.is_empty():
+			session.set_counter_record(record)
 	session.complete_battle(battle_result)
 	_render_current_node()
 
@@ -450,6 +493,28 @@ func _build_catalogs() -> void:
 			4,
 			"Queue 空档有补强读法，让部署节奏更容易被看懂。"
 		),
+		"junk_sieve": _make_modifier(
+			"junk_sieve",
+			"Junk Sieve",
+			ModifierDefinition.SourceType.SHOP,
+			"Launch",
+			"Launch.Pool.junk_filter",
+			"过滤 Pool 头部 Junk",
+			"补洞",
+			4,
+			"回应 Pool 污染：Junk 发射前被筛掉，减少无效结算。"
+		),
+		"muster_pair": _make_modifier(
+			"muster_pair",
+			"Muster Pair",
+			ModifierDefinition.SourceType.SHOP,
+			"Unit",
+			"Unit.Queue.same_slot_pair",
+			"同槽成对出兵",
+			"转向",
+			5,
+			"让 Unit 轴从单个队列条目转向成对释放。"
+		),
 	}
 
 	counter_defs = {
@@ -542,12 +607,39 @@ func _make_counter(
 	return definition
 
 func _ensure_planned_counter() -> void:
-	if not planned_counter_id.is_empty() and counter_defs.has(planned_counter_id):
-		return
+	if not planned_counter_id.is_empty():
+		if counter_defs.has(planned_counter_id):
+			session.set_planned_counter(planned_counter_id)
+			return
+		planned_counter_id = ""
 	if not next_counter_override.is_empty() and counter_defs.has(next_counter_override):
 		planned_counter_id = next_counter_override
+	elif session.reward_one_id == "pool_pocket":
+		planned_counter_id = "pool_polluter"
+	elif session.reward_one_id == "slot_primer":
+		planned_counter_id = "stagger_punisher"
+	else:
+		planned_counter_id = "echo_breaker"
+	session.set_planned_counter(planned_counter_id)
+
+func _ensure_visible_shop_item_ids() -> void:
+	if not visible_shop_item_ids.is_empty():
 		return
-	planned_counter_id = "pool_polluter"
+	_ensure_planned_counter()
+	var ids: Array[String] = []
+	var counter: Resource = counter_defs.get(planned_counter_id, null) as Resource
+	if counter != null:
+		var patch_ids: Array = counter.get("patch_ids") as Array
+		for patch_id_variant: Variant in patch_ids:
+			var patch_id: String = String(patch_id_variant)
+			if shop_defs.has(patch_id) and not ids.has(patch_id):
+				ids.append(patch_id)
+	for fallback_id: String in ["front_recycle", "surge_buffer", "queue_brace", "muster_pair", "junk_sieve"]:
+		if ids.size() >= 3:
+			break
+		if shop_defs.has(fallback_id) and not ids.has(fallback_id):
+			ids.append(fallback_id)
+	visible_shop_item_ids = ids.slice(0, 3)
 
 func _selected_modifier_marker_text() -> String:
 	var markers := PackedStringArray()
@@ -564,11 +656,22 @@ func _selected_modifier_marker_text() -> String:
 	return "本局机器修正：%s" % ", ".join(markers)
 
 func _battle_modifier_payload() -> Dictionary:
-	return {
+	var payload: Dictionary = {
 		"slot_primer": {
 			"slot_id": 1,
 		},
 	}
+	if not session.reward_one_id.is_empty():
+		_ensure_planned_counter()
+	if not planned_counter_id.is_empty() and counter_defs.has(planned_counter_id):
+		payload["counter_definition"] = counter_defs[planned_counter_id]
+		payload["counter_response_link"] = _counter_response_link()
+	return payload
+
+func _counter_response_link() -> String:
+	if session.shop_purchase_id.is_empty():
+		return "无"
+	return _modifier_name(session.shop_purchase_id, shop_defs)
 
 func _build_result_summary_text() -> String:
 	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次\n最后战斗：%s\n结果：%s\n下一步：M2 到此结束，等待后续里程碑确认。" % [

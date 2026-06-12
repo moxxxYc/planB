@@ -27,6 +27,7 @@ var counter_state = null
 var counter_definition: Resource = null
 var counter_effect_applied: bool = false
 var no_deploy_timer: float = 0.0
+var last_deploy_elapsed: float = 0.0
 var stagger_warning_timer: float = 0.0
 var pool_polluter_insert_timer: float = 0.0
 var active_counter_record: Dictionary = {}
@@ -159,7 +160,9 @@ func _deploy_queue_head() -> void:
 
 	var entry: Dictionary = machine.pop_queue_entry()
 	lanes.apply_player_deploy(deploy.current_lane, entry)
-	no_deploy_timer = 0.0
+	if deploy.current_lane == "Left":
+		no_deploy_timer = 0.0
+		last_deploy_elapsed = elapsed
 	bridge_transfer_timer = BRIDGE_TRANSFER_DWELL_SECONDS
 	bridge_view.show_deploy_transfer(deploy.current_lane, entry)
 
@@ -200,6 +203,7 @@ func _configure_counter_runtime(payload: Dictionary) -> void:
 	counter_definition = null
 	counter_effect_applied = false
 	no_deploy_timer = 0.0
+	last_deploy_elapsed = 0.0
 	stagger_warning_timer = 0.0
 	pool_polluter_insert_timer = 0.0
 	active_counter_record = {}
@@ -254,7 +258,7 @@ func _advance_stagger_punisher(delta: float) -> void:
 		return
 	if int(counter_state.get("trigger_count")) >= 2:
 		return
-	no_deploy_timer += delta
+	no_deploy_timer = maxf(0.0, elapsed - last_deploy_elapsed)
 	if no_deploy_timer >= 3.0 and stagger_warning_timer <= 0.0:
 		stagger_warning_timer = 3.0
 		lanes.set_lane_danger("Left", 2, "Stagger Punisher 队列空档预警")
@@ -265,6 +269,7 @@ func _advance_stagger_punisher(delta: float) -> void:
 			counter_state.set("visible_effect", "Raider 因 Queue 空档出现")
 			counter_state.set("trigger_count", int(counter_state.get("trigger_count")) + 1)
 			no_deploy_timer = 0.0
+			last_deploy_elapsed = elapsed
 
 func _counter_definition_id() -> String:
 	if counter_definition == null:
