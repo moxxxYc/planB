@@ -101,7 +101,7 @@ func deploy_player_queue_entry(lane: String, queue_entry: Dictionary) -> void:
 		_spawn_unit(unit_id, lane, BattleUnitDefinition.SIDE_PLAYER)
 	player_units[lane] = int(player_units.get(lane, 0)) + count
 	deploy_log.append("%s:%s x%d" % [lane, unit_id, count])
-	telemetry.record_deploy(lane, queue_entry)
+	telemetry.record_deploy(lane, queue_entry, battle_elapsed)
 	clear_lane_danger(lane, "Queue 已恢复部署")
 	_update_battle_result()
 
@@ -114,6 +114,7 @@ func advance(delta: float) -> void:
 	battle_elapsed += delta
 	if guardian_contract != null:
 		guardian_contract.call("advance", delta)
+	telemetry.record_lane_danger_snapshot(lane_danger_level, enemy_raiders, player_units, battle_elapsed)
 	player_guardian_attack_cooldown = maxf(0.0, player_guardian_attack_cooldown - delta)
 	_spawn_due_enemies()
 	_advance_sweep(delta)

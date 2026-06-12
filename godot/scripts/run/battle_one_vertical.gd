@@ -64,6 +64,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func select_deploy_lane(lane: String) -> void:
 	deploy.select_lane(lane)
+	if lanes != null and lanes.telemetry != null:
+		lanes.telemetry.record_lane_change(deploy.current_lane, elapsed)
 	_render()
 
 func get_selected_lane() -> String:
@@ -130,7 +132,14 @@ func get_active_counter_record() -> Dictionary:
 func get_battlefield_record() -> Dictionary:
 	var record: Dictionary = lanes.get_telemetry_record()
 	if battle_number == 1:
+		if machine_view != null and machine_view.has_method("get_visual_contract_summary"):
+			var machine_contract: Dictionary = machine_view.call("get_visual_contract_summary") as Dictionary
+			var machine_chain_sample: Dictionary = machine_contract.get("machine_chain_sample", {}) as Dictionary
+			if not machine_chain_sample.is_empty():
+				record["battle1.machine_chain_sample"] = _build_machine_chain_learning_sample(machine_chain_sample)
 		record["battle1.exposure_gate_snapshot"] = _build_battle_one_exposure_snapshot()
+		if not record.has("battle1.lane_danger_snapshot") or (record["battle1.lane_danger_snapshot"] is Dictionary and (record["battle1.lane_danger_snapshot"] as Dictionary).is_empty()):
+			record["battle1.lane_danger_snapshot"] = _build_lane_danger_snapshot()
 	if guardian_contract != null and guardian_contract.has_method("telemetry_snapshot"):
 		record["guardian.contract_snapshot"] = guardian_contract.call("telemetry_snapshot")
 	return record
@@ -161,6 +170,7 @@ func configure_for_run(p_battle_number: int, p_session: RunSessionModel, payload
 	run_session = p_session
 	run_payload = payload.duplicate(true)
 	lanes.configure(battle_number, battle_number >= 6, run_session.guardian_hp if run_session != null else 100)
+	lanes.telemetry.record_lane_change(deploy.current_lane, elapsed)
 	_configure_guardian_contract()
 	_configure_counter_runtime(payload)
 	_sync_exposure_runtime()
@@ -534,6 +544,33 @@ func _build_battle_one_exposure_snapshot() -> Dictionary:
 		record["t_%d" % int(sample_time)] = sample
 		snapshots.append(sample)
 	return record
+
+func _build_lane_danger_snapshot() -> Dictionary:
+	var snapshot: Dictionary = {}
+	for lane: String in ["Left", "Mid", "Right"]:
+		snapshot[lane] = {
+			"danger": lanes.get_lane_danger_level(lane),
+			"enemy_raiders": lanes.get_enemy_raiders(lane),
+			"player_units": lanes.get_player_units(lane),
+		}
+	return snapshot
+
+func _build_machine_chain_learning_sample(raw_chain: Dictionary) -> Dictionary:
+	return {
+		"Pool": raw_chain.get("pool", {}),
+		"Tuning": _first_chain_result(raw_chain, "Tuning"),
+		"Unit": _first_chain_result(raw_chain, "Unit"),
+		"Queue": raw_chain.get("queue_entries", []),
+	}
+
+func _first_chain_result(raw_chain: Dictionary, component: String) -> Dictionary:
+	for result_variant: Variant in raw_chain.get("results", []):
+		if not (result_variant is Dictionary):
+			continue
+		var result: Dictionary = result_variant as Dictionary
+		if String(result.get("component", "")) == component:
+			return result
+	return {}
 
 func _configure_guardian_contract() -> void:
 	if guardian_contract == null:

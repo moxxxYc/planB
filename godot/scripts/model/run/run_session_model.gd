@@ -1,6 +1,8 @@
 class_name RunSessionModel
 extends RefCounted
 
+const RunLearningRecordScript := preload("res://scripts/model/run/run_learning_record.gd")
+
 const NODE_GUARDIAN_CONTRACT: String = "guardian_contract"
 const NODE_BATTLE_1: String = "battle_1"
 const NODE_REWARD_1: String = "reward_1"
@@ -22,6 +24,8 @@ var current_node_id: String = NODE_GUARDIAN_CONTRACT
 var selected_guardian_id: String = ""
 var reward_one_id: String = ""
 var shop_purchase_id: String = ""
+var shop_gold_before: int = -1
+var shop_gold_after: int = -1
 var second_reward_id: String = ""
 var second_offer_current_axis: String = ""
 var second_offer_candidates: Array[Dictionary] = []
@@ -34,6 +38,8 @@ var endpoint_guardian_hp: int = 180
 var first_shop_rest_count: int = 0
 var battle_three_rest_count: int = 0
 var endpoint_prep_rest_count: int = 0
+var rest_total_hp_restored: int = 0
+var rest_window_records: Array[Dictionary] = []
 var last_battle: String = ""
 var last_battle_result: String = ""
 var planned_counter_id: String = ""
@@ -144,8 +150,10 @@ func buy_shop_item(modifier_id: String, cost: int) -> bool:
 		return false
 	if gold < cost:
 		return false
+	shop_gold_before = gold
 	shop_purchase_id = modifier_id
 	gold -= cost
+	shop_gold_after = gold
 	return true
 
 func damage_guardian(amount: int) -> void:
@@ -160,10 +168,15 @@ func can_buy_rest() -> bool:
 func buy_rest() -> bool:
 	if not can_buy_rest():
 		return false
+	var window_id: String = current_node_id
+	var before_gold: int = gold
 	gold -= 3
 	var before_hp: int = guardian_hp
 	guardian_hp = mini(guardian_max_hp, guardian_hp + 20)
-	_record_guardian_pressure_event("休整：花费 3 Gold，守护者 HP %d -> %d" % [before_hp, guardian_hp])
+	var restored_hp: int = guardian_hp - before_hp
+	rest_total_hp_restored += restored_hp
+	_record_rest_window(window_id, before_gold, gold, before_hp, guardian_hp, restored_hp)
+	_record_guardian_pressure_event("休整：花费 3 Gold，恢复 %d HP，守护者 HP %d -> %d" % [restored_hp, before_hp, guardian_hp])
 	match current_node_id:
 		NODE_SHOP_1:
 			first_shop_rest_count += 1
@@ -228,23 +241,66 @@ func build_final_result_record() -> Dictionary:
 	result_record["reward1.choice_id"] = reward_one_id
 	result_record["reward1.axis"] = _axis_for_reward_one()
 	result_record["reward1.component_operation"] = _operation_for_reward_one()
+	result_record["reward1.battlefield_expectation"] = _battlefield_expectation_for_reward_one()
 	result_record["reward1.battlefield_result"] = _battlefield_result_for_reward_one()
+	result_record["shop1.gold_before"] = maxi(0, shop_gold_before)
 	result_record["shop1.purchase_id"] = shop_purchase_id
 	result_record["shop1.purchase_role"] = _role_for_shop_purchase()
+	result_record["shop1.gold_after"] = maxi(0, shop_gold_after)
 	result_record["rest.windows_used"] = _rest_windows_used()
 	result_record["rest.total_purchases"] = first_shop_rest_count + battle_three_rest_count + endpoint_prep_rest_count
 	result_record["rest.gold_spent"] = 3 * int(result_record["rest.total_purchases"])
+	result_record["rest.total_gold_spent"] = int(result_record["rest.gold_spent"])
+	result_record["rest.total_hp_restored"] = rest_total_hp_restored
 	result_record["rest.endpoint_relevance"] = _rest_endpoint_relevance()
 	result_record["session.decision_windows"] = _decision_windows()
 	_merge_counter_records()
 	_merge_battle_records()
 	_ensure_endpoint_fields()
+	result_record = RunLearningRecordScript.build(self, result_record)
 	return result_record.duplicate(true)
 
 func _record_guardian_pressure_event(text: String) -> void:
 	if text.strip_edges().is_empty():
 		return
 	guardian_hp_pressure_events.append(text)
+
+func _record_rest_window(window_id: String, gold_before: int, gold_after: int, hp_before: int, hp_after: int, hp_restored: int) -> void:
+	rest_window_records.append({
+		"id": _rest_window_record_id(window_id),
+		"name": _rest_window_record_name(window_id),
+		"appeared": true,
+		"purchased": true,
+		"gold_before": gold_before,
+		"gold_after": gold_after,
+		"gold_spent": gold_before - gold_after,
+		"hp_before": hp_before,
+		"hp_after": hp_after,
+		"hp_restored": hp_restored,
+		"guardian_hp": "%d -> %d" % [hp_before, hp_after],
+	})
+
+func _rest_window_record_id(window_id: String) -> String:
+	match window_id:
+		NODE_SHOP_1:
+			return "first_shop"
+		NODE_REST_AFTER_BATTLE_3:
+			return "after_battle_3"
+		NODE_ENDPOINT_PREP:
+			return "endpoint_prep"
+		_:
+			return window_id
+
+func _rest_window_record_name(window_id: String) -> String:
+	match window_id:
+		NODE_SHOP_1:
+			return "第一次商店休整"
+		NODE_REST_AFTER_BATTLE_3:
+			return "战斗 3 后休整"
+		NODE_ENDPOINT_PREP:
+			return "Endpoint 前整备"
+		_:
+			return "未知休整"
 
 func _append_guardian_pressure_events(events_variant: Variant) -> void:
 	if not (events_variant is Array):
@@ -336,7 +392,7 @@ func _ensure_endpoint_fields() -> void:
 	])
 	result_record["guardian.hp_pressure_events"] = result_record.get("guardian.hp_pressure_events", [])
 	result_record["battle1.machine_chain_sample"] = result_record.get("battle1.machine_chain_sample", "Pool 入槽 -> fired ball -> Tuning 命中 -> Unit progress -> Queue entry")
-	result_record["unit.visible_contribution_slots"] = result_record.get("unit.visible_contribution_slots", [1])
+	result_record["unit.visible_contribution_slots"] = result_record.get("unit.visible_contribution_slots", [])
 	result_record["unit.key_queue_entries_by_slot"] = result_record.get("unit.key_queue_entries_by_slot", {})
 
 func _guardian_outcome() -> String:
@@ -368,7 +424,7 @@ func _operation_for_reward_one() -> String:
 		_:
 			return "无"
 
-func _battlefield_result_for_reward_one() -> String:
+func _battlefield_expectation_for_reward_one() -> String:
 	match reward_one_id:
 		"pool_pocket":
 			return "Launch sustained flow"
@@ -378,6 +434,70 @@ func _battlefield_result_for_reward_one() -> String:
 			return "Unit anchor slot"
 		_:
 			return "未明显兑现"
+
+func _battlefield_result_for_reward_one() -> String:
+	if reward_one_id.is_empty():
+		return "未明显兑现"
+	var evidence: String = _first_reward_runtime_evidence()
+	if evidence.is_empty():
+		return "未明显兑现"
+	return "%s：%s" % [_battlefield_expectation_for_reward_one(), evidence]
+
+func _first_reward_runtime_evidence() -> String:
+	for battle_id: String in [NODE_BATTLE_2, NODE_BATTLE_3, NODE_BATTLE_4, NODE_BATTLE_5, NODE_ENDPOINT]:
+		if not battle_records.has(battle_id):
+			continue
+		var record: Dictionary = battle_records[battle_id] as Dictionary
+		var queue_evidence: String = _queue_evidence_from_battle_record(battle_id, record)
+		if not queue_evidence.is_empty():
+			return queue_evidence
+		var payoff: String = String(record.get("endpoint.primary_axis_payoff", ""))
+		if not payoff.is_empty() and payoff != "未明显兑现":
+			return "%s 记录到 %s" % [_battle_label(battle_id), payoff]
+	return ""
+
+func _queue_evidence_from_battle_record(battle_id: String, record: Dictionary) -> String:
+	var entries_by_slot: Dictionary = record.get("unit.key_queue_entries_by_slot", {}) as Dictionary
+	for slot_key: Variant in entries_by_slot.keys():
+		var entries: Array = entries_by_slot[slot_key] as Array
+		if entries.is_empty():
+			continue
+		var entry: Dictionary = entries[0] as Dictionary
+		var lane: String = String(entry.get("lane", "Mid"))
+		var time_text: String = "%.1fs" % float(entry.get("time", 0.0))
+		return "%s，%s 于 %s 投到%s" % [
+			_battle_label(battle_id),
+			String(slot_key),
+			time_text,
+			_lane_label(lane),
+		]
+	return ""
+
+func _battle_label(battle_id: String) -> String:
+	match battle_id:
+		NODE_BATTLE_2:
+			return "战斗 2"
+		NODE_BATTLE_3:
+			return "战斗 3"
+		NODE_BATTLE_4:
+			return "战斗 4"
+		NODE_BATTLE_5:
+			return "战斗 5"
+		NODE_ENDPOINT:
+			return "Endpoint"
+		_:
+			return battle_id
+
+func _lane_label(lane: String) -> String:
+	match lane:
+		"Left":
+			return "左路"
+		"Mid":
+			return "中路"
+		"Right":
+			return "右路"
+		_:
+			return lane
 
 func _role_for_shop_purchase() -> String:
 	match shop_purchase_id:
