@@ -87,9 +87,9 @@ func _draw_guardians(font: Font, rect: Rect2) -> void:
 	draw_arc(left_center, 38.0, 0.0, TAU, 40, PLAYER_BLUE, 3.0, true)
 	draw_circle(right_center, 34.0, Color("#332525"))
 	draw_arc(right_center, 38.0, 0.0, TAU, 40, ENEMY_RED, 3.0, true)
-	_draw_text(font, left_center + Vector2(-44.0, 56.0), "Player Guardian", 12, TEXT_PRIMARY)
+	_draw_text(font, left_center + Vector2(-44.0, 56.0), "玩家守护者", 12, TEXT_PRIMARY)
 	_draw_text(font, left_center + Vector2(-36.0, 74.0), "HP %d / 100" % player_guardian_hp, 12, PLAYER_BLUE)
-	_draw_text(font, right_center + Vector2(-50.0, 56.0), "Endpoint Guardian", 12, TEXT_PRIMARY)
+	_draw_text(font, right_center + Vector2(-50.0, 56.0), "终点守护者", 12, TEXT_PRIMARY)
 	_draw_text(font, right_center + Vector2(-38.0, 74.0), "HP %d / %d" % [endpoint_guardian_hp, endpoint_guardian_max_hp], 12, ENEMY_RED)
 
 func _draw_lanes(font: Font, rect: Rect2) -> void:

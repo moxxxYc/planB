@@ -8,6 +8,9 @@ var side: String = BattleUnitDefinition.SIDE_PLAYER
 var hp: int = 1
 var position: float = 0.0
 var attack_cooldown: float = 0.0
+var root_timer: float = 0.0
+var slow_timer: float = 0.0
+var slow_multiplier: float = 1.0
 var alive: bool = true
 var entered_from: String = ""
 
@@ -30,15 +33,33 @@ func take_damage(amount: int) -> void:
 
 func advance_cooldown(delta: float) -> void:
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
+	root_timer = maxf(0.0, root_timer - delta)
+	slow_timer = maxf(0.0, slow_timer - delta)
+	if slow_timer <= 0.0:
+		slow_multiplier = 1.0
 
 func can_attack() -> bool:
-	return alive and attack_cooldown <= 0.0
+	return alive and attack_cooldown <= 0.0 and root_timer <= 0.0
 
 func reset_attack_cooldown() -> void:
 	if definition == null:
 		attack_cooldown = 1.0
 	else:
 		attack_cooldown = definition.attack_interval
+
+func apply_root(seconds: float) -> void:
+	root_timer = maxf(root_timer, seconds)
+
+func apply_slow(multiplier: float, seconds: float) -> void:
+	slow_multiplier = clampf(multiplier, 0.0, 1.0)
+	slow_timer = maxf(slow_timer, seconds)
+
+func movement_multiplier() -> float:
+	if root_timer > 0.0:
+		return 0.0
+	if slow_timer > 0.0:
+		return slow_multiplier
+	return 1.0
 
 func snapshot() -> Dictionary:
 	return {
@@ -50,4 +71,7 @@ func snapshot() -> Dictionary:
 		"hp": hp,
 		"position": position,
 		"alive": alive,
+		"root_timer": root_timer,
+		"slow_timer": slow_timer,
+		"slow_multiplier": slow_multiplier,
 	}

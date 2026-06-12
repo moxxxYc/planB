@@ -6,6 +6,7 @@ const QueueBridgeViewScript := preload("res://scripts/ui/queue_bridge_view.gd")
 const BattlefieldViewScript := preload("res://scripts/ui/battlefield_view.gd")
 const CounterStateScript := preload("res://scripts/model/counter/counter_state.gd")
 const MachineSlotExposureStateScript := preload("res://scripts/model/machine/machine_slot_exposure_state.gd")
+const GuardianContractStateScript := preload("res://scripts/model/guardian/guardian_contract_state.gd")
 
 const DEPLOY_TICK_SECONDS: float = 0.5
 const BRIDGE_TRANSFER_DWELL_SECONDS: float = 1.5
@@ -34,6 +35,7 @@ var stagger_warning_timer: float = 0.0
 var pool_polluter_insert_timer: float = 0.0
 var active_counter_record: Dictionary = {}
 var exposure_state: RefCounted = MachineSlotExposureStateScript.new()
+var guardian_contract: RefCounted = GuardianContractStateScript.new()
 
 func _ready() -> void:
 	_ensure_views()
@@ -126,6 +128,8 @@ func get_battlefield_record() -> Dictionary:
 	var record: Dictionary = lanes.get_telemetry_record()
 	if battle_number == 1:
 		record["battle1.exposure_gate_snapshot"] = _build_battle_one_exposure_snapshot()
+	if guardian_contract != null and guardian_contract.has_method("telemetry_snapshot"):
+		record["guardian.contract_snapshot"] = guardian_contract.call("telemetry_snapshot")
 	return record
 
 func get_exposure_gate_snapshot_for_verifier() -> Dictionary:
@@ -154,6 +158,7 @@ func configure_for_run(p_battle_number: int, p_session: RunSessionModel, payload
 	run_session = p_session
 	run_payload = payload.duplicate(true)
 	lanes.configure(battle_number, battle_number >= 6, run_session.guardian_hp if run_session != null else 100)
+	_configure_guardian_contract()
 	_configure_counter_runtime(payload)
 	_sync_exposure_runtime()
 	_apply_run_modifiers()
@@ -184,6 +189,76 @@ func advance_for_verifier(seconds: float) -> void:
 	var steps: int = maxi(1, int(ceil(seconds / 0.25)))
 	for _i: int in range(steps):
 		advance_simulation(seconds / float(steps), true)
+
+func force_guardian_recycle_sequence_for_verifier(count: int) -> Dictionary:
+	_configure_guardian_contract()
+	machine.pool.clear()
+	var record: Dictionary
+	if guardian_contract.has_method("force_recycle_sequence_for_verifier"):
+		record = guardian_contract.call("force_recycle_sequence_for_verifier", machine, count) as Dictionary
+	else:
+		record = {}
+	_drain_guardian_logs_to_machine()
+	record["reset_per_battle"] = true
+	record["source"] = "Guardian.StrategicSkill"
+	record["contract_layer"] = "strategic_machine"
+	record["machine_event_log"] = machine.event_log.duplicate()
+	return record
+
+func force_guardian_gate_sequence_for_verifier(count: int) -> Dictionary:
+	_configure_guardian_contract()
+	guardian_contract.call("reset_for_battle")
+	machine.event_log.clear()
+	var sequence: Array[Dictionary] = []
+	for index: int in range(maxi(0, count)):
+		var result := MachinePhysicsResult.make(
+			"Tuning",
+			"Gate",
+			1,
+			1,
+			"clean",
+			"guardian_verifier",
+			"guardian_gate_%02d" % index,
+			elapsed
+		)
+		machine.apply_physics_result(result)
+		sequence.append({
+			"original_result": "Gate",
+			"final_result": result.result_id,
+		})
+	var snapshot: Dictionary = guardian_contract.call("telemetry_snapshot") as Dictionary
+	var record: Dictionary = snapshot.get("last_gate_record", {}) as Dictionary
+	record["converted"] = String(sequence[sequence.size() - 1].get("final_result", "")) == "Prime" if not sequence.is_empty() else false
+	record["gate_count"] = count
+	record["original_result"] = "Gate"
+	record["final_result"] = String(sequence[sequence.size() - 1].get("final_result", "Gate")) if not sequence.is_empty() else "Gate"
+	record["reset"] = bool(record.get("reset", false))
+	record["reset_per_battle"] = true
+	record["no_cross_axis"] = true
+	record["counted_only_gate"] = true
+	record["source"] = "Guardian.StrategicSkill"
+	record["contract_layer"] = "strategic_machine"
+	record["result_sequence"] = sequence
+	record["machine_event_log"] = machine.event_log.duplicate()
+	return record
+
+func force_guardian_tether_intruder_for_verifier() -> Dictionary:
+	_configure_guardian_contract()
+	guardian_contract.call("reset_for_battle")
+	var intruder: BattleEntityState = lanes.spawn_base_intruder_for_verifier("enemy_raider", "Left", 1.5)
+	guardian_contract.call("on_base_zone_intruder", intruder, lanes)
+	var snapshot: Dictionary = guardian_contract.call("telemetry_snapshot") as Dictionary
+	return (snapshot.get("last_tether_record", {}) as Dictionary).duplicate(true)
+
+func force_guardian_acid_counterattack_for_verifier() -> Dictionary:
+	_configure_guardian_contract()
+	guardian_contract.call("reset_for_battle")
+	var attacker: BattleEntityState = lanes.spawn_base_intruder_for_verifier("enemy_raider", "Left", 1.0)
+	lanes.spawn_base_intruder_for_verifier("enemy_grunt", "Mid", 2.0)
+	lanes.spawn_base_intruder_for_verifier("enemy_grunt", "Right", 3.5)
+	lanes.damage_player_guardian_for_verifier(attacker, 1)
+	var snapshot: Dictionary = guardian_contract.call("telemetry_snapshot") as Dictionary
+	return (snapshot.get("last_acid_counter_record", {}) as Dictionary).duplicate(true)
 
 func _on_machine_landing_resolved(result: MachinePhysicsResult) -> void:
 	if result != null:
@@ -410,6 +485,9 @@ func _sync_exposure_runtime() -> void:
 	if machine != null:
 		machine.set_exposure_state(exposure_state)
 		machine.set_battle_elapsed(elapsed)
+		machine.set_guardian_contract(guardian_contract)
+	if lanes != null:
+		lanes.set_guardian_contract(guardian_contract)
 	if machine_view != null:
 		machine_view.set_exposure_state(exposure_state)
 		if machine_view.has_method("set_battle_elapsed"):
@@ -428,3 +506,26 @@ func _build_battle_one_exposure_snapshot() -> Dictionary:
 		record["t_%d" % int(sample_time)] = sample
 		snapshots.append(sample)
 	return record
+
+func _configure_guardian_contract() -> void:
+	if guardian_contract == null:
+		guardian_contract = GuardianContractStateScript.new()
+	var selected_guardian_id: String = run_session.selected_guardian_id if run_session != null else ""
+	guardian_contract.call("configure", selected_guardian_id, _guardian_seed())
+	machine.set_guardian_contract(guardian_contract)
+	lanes.set_guardian_contract(guardian_contract)
+
+func _drain_guardian_logs_to_machine() -> void:
+	if guardian_contract == null or not guardian_contract.has_method("consume_machine_event_log"):
+		return
+	var drained_variant: Variant = guardian_contract.call("consume_machine_event_log")
+	if not (drained_variant is Array):
+		return
+	for log_variant: Variant in drained_variant:
+		machine.event_log.append(String(log_variant))
+
+func _guardian_seed() -> int:
+	var guardian_hash: int = 0
+	if run_session != null:
+		guardian_hash = run_session.selected_guardian_id.hash()
+	return int(abs(guardian_hash) + battle_number * 1009)

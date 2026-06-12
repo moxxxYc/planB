@@ -39,6 +39,7 @@ var active_modifier_ids: Array[String] = []
 var active_modifier_markers: Array[String] = []
 var battle_elapsed: float = 0.0
 var exposure_state: RefCounted = MachineSlotExposureStateScript.new()
+var guardian_contract: RefCounted = null
 var _step_index: int = 0
 var _next_chain_index: int = 0
 var _pending_physics_chains: Dictionary = {}
@@ -50,6 +51,19 @@ func set_exposure_state(p_exposure_state: RefCounted) -> void:
 	if not _has_exposure_state_contract(p_exposure_state):
 		return
 	exposure_state = p_exposure_state
+
+func set_guardian_contract(p_guardian_contract: RefCounted) -> void:
+	if p_guardian_contract == null:
+		guardian_contract = null
+		return
+	for method_name: String in [
+		"on_launch_recycle",
+		"on_tuning_result",
+		"consume_machine_event_log",
+	]:
+		if not p_guardian_contract.has_method(method_name):
+			return
+	guardian_contract = p_guardian_contract
 
 func get_exposure_state() -> RefCounted:
 	return exposure_state
@@ -177,6 +191,9 @@ func apply_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
 			event_log.append("Unit：S%d 暴露闸门未开启，球被挡开" % guarded_slot_id)
 			_commit_queue_chain_if_needed(blocked_result, [])
 			return []
+	if result.component == "Tuning" and guardian_contract != null:
+		result.result_id = String(guardian_contract.call("on_tuning_result", result.result_id))
+		_drain_guardian_machine_logs()
 	_register_physics_result(result)
 	var produced_entries: Array[Dictionary] = []
 	match result.component:
@@ -256,19 +273,24 @@ func pop_queue_entry() -> Dictionary:
 		return {}
 	return queue.pop_front()
 
-func _add_pool_ball(kind: String) -> void:
+func add_guardian_clean_pool_ball() -> bool:
+	return _add_pool_ball("clean")
+
+func _add_pool_ball(kind: String) -> bool:
 	if pool.size() >= pool_capacity:
 		event_log.append("Launch.Pool full rejected %s" % kind)
-		return
+		return false
 	pool.append({"kind": kind, "value": 1})
 	event_log.append("Launch.Forge added %s ball" % kind)
+	return true
 
-func _add_pool_ball_front(kind: String, source: String) -> void:
+func _add_pool_ball_front(kind: String, source: String) -> bool:
 	if pool.size() >= pool_capacity:
 		event_log.append("Modifier:%s front recycle rejected %s ball pool full" % [source, kind])
-		return
+		return false
 	pool.push_front({"kind": kind, "value": 1})
 	event_log.append("Modifier:%s returned %s ball to Pool front" % [source, kind])
+	return true
 
 func _apply_unit_hit(
 	slot_id: int,
@@ -389,6 +411,9 @@ func _apply_launch_physics_result(result: MachinePhysicsResult) -> Array[Diction
 				_add_pool_ball_front("clean", "Front Recycle")
 			else:
 				_add_pool_ball("clean")
+			if guardian_contract != null:
+				guardian_contract.call("on_launch_recycle", self)
+				_drain_guardian_machine_logs()
 			return _finalize_queue_output([], 0, 0, result.chain_id, [result.source])
 		"Waste":
 			event_log.append("Launch.Waste consumed physics ball")
@@ -474,6 +499,15 @@ func _append_counter_event(log_line: String) -> void:
 	counter_log.append(log_line)
 	while counter_log.size() > 8:
 		counter_log.pop_front()
+
+func _drain_guardian_machine_logs() -> void:
+	if guardian_contract == null or not guardian_contract.has_method("consume_machine_event_log"):
+		return
+	var drained_variant: Variant = guardian_contract.call("consume_machine_event_log")
+	if not (drained_variant is Array):
+		return
+	for log_variant: Variant in drained_variant:
+		event_log.append(String(log_variant))
 
 func _modifier_display_name(modifier_id: String) -> String:
 	match modifier_id:

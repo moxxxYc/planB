@@ -42,6 +42,7 @@ var counter_two_record: Dictionary = {}
 var battle_records: Dictionary = {}
 var result_record: Dictionary = {}
 var endpoint_reached: bool = false
+var guardian_hp_pressure_events: Array[String] = []
 
 func has_run_node(node_id: String) -> bool:
 	return [
@@ -131,6 +132,7 @@ func set_battle_record(battle_id: String, record: Dictionary) -> void:
 	if battle_id.is_empty():
 		return
 	battle_records[battle_id] = record.duplicate(true)
+	_append_guardian_pressure_events(record.get("guardian.hp_pressure_events", []))
 	if battle_id == NODE_ENDPOINT and record.has("endpoint.guardian_hp"):
 		endpoint_guardian_hp = _extract_endpoint_hp(String(record.get("endpoint.guardian_hp", "")), endpoint_guardian_hp)
 
@@ -147,7 +149,10 @@ func buy_shop_item(modifier_id: String, cost: int) -> bool:
 	return true
 
 func damage_guardian(amount: int) -> void:
+	var before: int = guardian_hp
 	guardian_hp = maxi(0, guardian_hp - amount)
+	if before > guardian_hp:
+		_record_guardian_pressure_event("守护者受伤：HP %d -> %d" % [before, guardian_hp])
 
 func can_buy_rest() -> bool:
 	return gold >= 3 and guardian_hp < guardian_max_hp and _rest_limit_remaining() > 0
@@ -156,7 +161,9 @@ func buy_rest() -> bool:
 	if not can_buy_rest():
 		return false
 	gold -= 3
+	var before_hp: int = guardian_hp
 	guardian_hp = mini(guardian_max_hp, guardian_hp + 20)
+	_record_guardian_pressure_event("休整：花费 3 Gold，守护者 HP %d -> %d" % [before_hp, guardian_hp])
 	match current_node_id:
 		NODE_SHOP_1:
 			first_shop_rest_count += 1
@@ -215,7 +222,9 @@ func get_endpoint_prep_rest_limit_remaining() -> int:
 func build_final_result_record() -> Dictionary:
 	result_record = _base_result_record()
 	result_record["guardian.choice_id"] = selected_guardian_id
+	result_record["guardian.choice_read"] = _guardian_choice_read()
 	result_record["guardian.outcome"] = _guardian_outcome()
+	result_record["guardian.hp_pressure_events"] = guardian_hp_pressure_events.duplicate()
 	result_record["reward1.choice_id"] = reward_one_id
 	result_record["reward1.axis"] = _axis_for_reward_one()
 	result_record["reward1.component_operation"] = _operation_for_reward_one()
@@ -231,6 +240,27 @@ func build_final_result_record() -> Dictionary:
 	_merge_battle_records()
 	_ensure_endpoint_fields()
 	return result_record.duplicate(true)
+
+func _record_guardian_pressure_event(text: String) -> void:
+	if text.strip_edges().is_empty():
+		return
+	guardian_hp_pressure_events.append(text)
+
+func _append_guardian_pressure_events(events_variant: Variant) -> void:
+	if not (events_variant is Array):
+		return
+	var events: Array = events_variant as Array
+	for event_variant: Variant in events:
+		_record_guardian_pressure_event(String(event_variant))
+
+func _guardian_choice_read() -> String:
+	match selected_guardian_id:
+		"hive_vein_mother":
+			return "Launch 契约：巢脉回流 / 守家牵缚"
+		"hive_acid_crown_mother":
+			return "Tuning 契约：Gate 转 Prime / 受击反喷"
+		_:
+			return "未选择"
 
 func _battle_nodes() -> Array[String]:
 	return [NODE_BATTLE_1, NODE_BATTLE_2, NODE_BATTLE_3, NODE_BATTLE_4, NODE_BATTLE_5, NODE_ENDPOINT]
@@ -393,7 +423,7 @@ func _main_break_reason() -> String:
 	if last_battle_result == RESULT_WIN:
 		return "未断裂"
 	if guardian_hp <= 0:
-		return "Guardian HP 被打穿"
+		return "守护者 HP 被打穿"
 	if planned_counter_id == "pool_polluter":
 		return "Pool 卡住"
 	if planned_counter_id == "echo_breaker":
@@ -410,7 +440,7 @@ func _next_run_watch_tag() -> String:
 			return "Tuning repeated hit"
 		"queue gap":
 			return "Unit gap patch"
-		"Guardian HP 被打穿":
+		"守护者 HP 被打穿":
 			return "Guardian HP pressure"
 		_:
 			return "lane leak watch"

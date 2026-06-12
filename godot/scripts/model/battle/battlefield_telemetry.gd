@@ -10,6 +10,7 @@ var endpoint_primary_axis_payoff: String = "未明显兑现"
 var endpoint_main_break_reason: String = "未定"
 var endpoint_next_run_watch_tag: String = "lane leak watch"
 var endpoint_deploy_lane_impact: String = "未记录关键路线选择"
+var guardian_break_recorded: bool = false
 
 func record_lane_change(lane: String) -> void:
 	if deploy_lane_changes.is_empty() or deploy_lane_changes[deploy_lane_changes.size() - 1] != lane:
@@ -40,11 +41,15 @@ func record_deploy(lane: String, queue_entry: Dictionary) -> void:
 		endpoint_deploy_lane_impact = "Queue 投到%s，路线选择改变了后续落点。" % _lane_name(lane)
 
 func record_guardian_pressure(text: String) -> void:
-	if not guardian_hp_pressure_events.has(text):
-		guardian_hp_pressure_events.append(text)
-	if text.contains("Guardian"):
-		endpoint_main_break_reason = "Guardian HP 被打穿"
-		endpoint_next_run_watch_tag = "Guardian HP pressure"
+	guardian_hp_pressure_events.append(text)
+
+func record_guardian_break(text: String) -> void:
+	if guardian_break_recorded:
+		return
+	guardian_break_recorded = true
+	record_guardian_pressure(text)
+	endpoint_main_break_reason = "守护者 HP 被打穿"
+	endpoint_next_run_watch_tag = "Guardian HP pressure"
 
 func record_axis_payoff(tag: String) -> void:
 	if tag.is_empty():
