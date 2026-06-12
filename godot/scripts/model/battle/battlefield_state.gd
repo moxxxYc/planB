@@ -302,8 +302,65 @@ func _nearest_opposing_entity(entity: BattleEntityState) -> BattleEntityState:
 func _attack_entity(entity: BattleEntityState, target: BattleEntityState) -> void:
 	if not entity.can_attack():
 		return
-	target.take_damage(entity.definition.attack_damage)
+	match entity.definition.attack_profile:
+		"acid_projectile":
+			_apply_acid_projectile_attack(entity, target)
+		"lane_sweep":
+			_apply_lane_sweep_attack(entity, target)
+		_:
+			target.take_damage(entity.definition.attack_damage)
 	entity.reset_attack_cooldown()
+
+func _apply_acid_projectile_attack(entity: BattleEntityState, target: BattleEntityState) -> void:
+	target.take_damage(entity.definition.attack_damage)
+	var splash_targets: Array[BattleEntityState] = _nearby_opposing_entities(
+		entity,
+		target.position,
+		entity.definition.splash_radius,
+		entity.definition.max_splash_targets,
+		target
+	)
+	for splash_target: BattleEntityState in splash_targets:
+		splash_target.take_damage(1)
+
+func _apply_lane_sweep_attack(entity: BattleEntityState, target: BattleEntityState) -> void:
+	var sweep_targets: Array[BattleEntityState] = _nearby_opposing_entities(
+		entity,
+		target.position,
+		entity.definition.sweep_radius,
+		entity.definition.max_sweep_targets
+	)
+	for sweep_target: BattleEntityState in sweep_targets:
+		sweep_target.take_damage(entity.definition.attack_damage)
+
+func _nearby_opposing_entities(
+	entity: BattleEntityState,
+	center_position: float,
+	radius: float,
+	max_count: int,
+	excluded: BattleEntityState = null
+) -> Array[BattleEntityState]:
+	if max_count <= 0:
+		return []
+	var candidates: Array[BattleEntityState] = []
+	for other: BattleEntityState in entities:
+		if other == excluded or not other.alive or other.lane != entity.lane or other.side == entity.side:
+			continue
+		if absf(other.position - center_position) <= radius:
+			candidates.append(other)
+	candidates.sort_custom(func(a: BattleEntityState, b: BattleEntityState) -> bool:
+		var distance_a: float = absf(a.position - center_position)
+		var distance_b: float = absf(b.position - center_position)
+		if is_equal_approx(distance_a, distance_b):
+			return a.hp < b.hp
+		return distance_a < distance_b
+	)
+	var limited: Array[BattleEntityState] = []
+	for other: BattleEntityState in candidates:
+		limited.append(other)
+		if limited.size() >= max_count:
+			break
+	return limited
 
 func _attack_gate(entity: BattleEntityState, gates: Dictionary, lane: String, is_player_gate: bool) -> void:
 	if not entity.can_attack():
@@ -508,11 +565,16 @@ func _most_populated_player_lane() -> String:
 	return best_lane
 
 func _cleanup_dead() -> void:
+	var live_entities: Array[BattleEntityState] = []
+	var live_raiders: Dictionary = {"Left": 0, "Mid": 0, "Right": 0}
 	for entity: BattleEntityState in entities:
-		if entity.alive:
+		if not entity.alive:
 			continue
+		live_entities.append(entity)
 		if entity.side == BattleUnitDefinition.SIDE_ENEMY and entity.definition != null and entity.definition.id == "enemy_raider":
-			enemy_raiders[entity.lane] = maxi(0, int(enemy_raiders.get(entity.lane, 0)) - 1)
+			live_raiders[entity.lane] = int(live_raiders.get(entity.lane, 0)) + 1
+	entities = live_entities
+	enemy_raiders = live_raiders
 
 func _update_pressure_loss() -> void:
 	if is_endpoint:

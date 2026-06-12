@@ -494,6 +494,13 @@ func arm_echo_breaker() -> void:
 	echo_breaker_charges = 1
 	_append_counter_event("Counter:Echo Breaker 已锁定 Echo 槽")
 
+func disarm_echo_breaker() -> void:
+	if not echo_breaker_active and echo_breaker_charges <= 0:
+		return
+	echo_breaker_active = false
+	echo_breaker_charges = 0
+	_append_counter_event("Counter:Echo Breaker 活跃期结束，未触发")
+
 func _append_counter_event(log_line: String) -> void:
 	event_log.append(log_line)
 	counter_log.append(log_line)

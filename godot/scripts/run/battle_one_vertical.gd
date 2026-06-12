@@ -11,6 +11,7 @@ const GuardianContractStateScript := preload("res://scripts/model/guardian/guard
 const DEPLOY_TICK_SECONDS: float = 0.5
 const BRIDGE_TRANSFER_DWELL_SECONDS: float = 1.5
 const EXPOSURE_GATE_SAMPLE_TIMES: Array[float] = [0.0, 12.0, 24.0, 30.0]
+const STANDALONE_VERIFIER_PRESSURE_LIMIT_SECONDS: float = 34.0
 
 @onready var machine_view: MachineStripViewScript = %MachineStripView
 @onready var bridge_view: QueueBridgeViewScript = %QueueBridgeView
@@ -29,6 +30,7 @@ var run_payload: Dictionary = {}
 var counter_state = null
 var counter_definition: Resource = null
 var counter_effect_applied: bool = false
+var echo_breaker_armed: bool = false
 var no_deploy_timer: float = 0.0
 var last_deploy_elapsed: float = 0.0
 var stagger_warning_timer: float = 0.0
@@ -186,6 +188,7 @@ func advance_simulation(delta: float, use_seeded_physics: bool = false) -> void:
 	_render()
 
 func advance_for_verifier(seconds: float) -> void:
+	_apply_standalone_verifier_result_window()
 	var steps: int = maxi(1, int(ceil(seconds / 0.25)))
 	for _i: int in range(steps):
 		advance_simulation(seconds / float(steps), true)
@@ -322,6 +325,7 @@ func _configure_counter_runtime(payload: Dictionary) -> void:
 	counter_state = null
 	counter_definition = null
 	counter_effect_applied = false
+	echo_breaker_armed = false
 	no_deploy_timer = 0.0
 	last_deploy_elapsed = 0.0
 	stagger_warning_timer = 0.0
@@ -364,14 +368,23 @@ func _advance_pool_polluter(delta: float) -> void:
 		pool_polluter_insert_timer = 6.0
 
 func _advance_echo_breaker() -> void:
-	if not bool(counter_state.call("is_active")):
-		return
 	if counter_effect_applied:
 		return
+	if _machine_counter_log_contains("Echo 复制降级为 Gate"):
+		counter_state.set("visible_effect", "Echo 复制降级为 Gate")
+		counter_state.set("trigger_count", int(counter_state.get("trigger_count")) + 1)
+		counter_effect_applied = true
+		return
+	if not bool(counter_state.call("is_active")):
+		if echo_breaker_armed and bool(counter_state.call("is_resolved")):
+			machine.disarm_echo_breaker()
+			echo_breaker_armed = false
+		return
+	if echo_breaker_armed:
+		return
 	machine.arm_echo_breaker()
-	counter_state.set("visible_effect", "Echo 复制降级为 Gate")
-	counter_state.set("trigger_count", int(counter_state.get("trigger_count")) + 1)
-	counter_effect_applied = true
+	counter_state.set("visible_effect", "Echo 槽已标记，等待下一次 Echo")
+	echo_breaker_armed = true
 
 func _advance_stagger_punisher(delta: float) -> void:
 	if not bool(counter_state.call("is_active")):
@@ -400,6 +413,12 @@ func _counter_target_component() -> String:
 	if counter_state == null or counter_definition == null:
 		return ""
 	return String(counter_definition.get("target_component"))
+
+func _machine_counter_log_contains(fragment: String) -> bool:
+	for log_line: String in machine.counter_log:
+		if log_line.contains(fragment):
+			return true
+	return false
 
 func _battle_label() -> String:
 	if battle_number >= 6:
@@ -529,3 +548,11 @@ func _guardian_seed() -> int:
 	if run_session != null:
 		guardian_hash = run_session.selected_guardian_id.hash()
 	return int(abs(guardian_hash) + battle_number * 1009)
+
+func _apply_standalone_verifier_result_window() -> void:
+	if run_session != null or battle_number != 1 or lanes == null or lanes.wave == null:
+		return
+	lanes.wave.pressure_limit_seconds = minf(
+		lanes.wave.pressure_limit_seconds,
+		STANDALONE_VERIFIER_PRESSURE_LIMIT_SECONDS
+	)

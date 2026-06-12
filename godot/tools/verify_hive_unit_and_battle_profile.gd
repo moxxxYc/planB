@@ -4,6 +4,7 @@ var failures: Array[String] = []
 
 func _initialize() -> void:
 	_verify_hive_unit_values()
+	_verify_hive_attack_profile_resolution()
 	_verify_battle_duration_profile()
 	_finish()
 
@@ -13,6 +14,9 @@ func _verify_hive_unit_values() -> void:
 	_expect_unit(catalog, "hive_shield_shell", 18, 2, 1.4, 1.5, 6.0)
 	_expect_unit(catalog, "hive_acid_sac", 8, 3, 1.8, 7.0, 7.0)
 	_expect_unit(catalog, "hive_crush_shell_beast", 26, 6, 2.6, 2.0, 5.0)
+	_expect_unit(catalog, "enemy_grunt", 10, 2, 1.0, 3.0, 7.0)
+	_expect_unit(catalog, "enemy_raider", 7, 1, 0.7, 2.5, 10.0)
+	_expect_unit(catalog, "enemy_brute", 24, 4, 1.4, 3.0, 5.0)
 	_verify_hive_special_behavior_values(catalog)
 
 func _verify_battle_duration_profile() -> void:
@@ -67,6 +71,61 @@ func _verify_hive_special_behavior_values(catalog: Dictionary) -> void:
 		_expect_optional_false_flag_any(shield_shell, "hive_shield_shell", ["has_aura", "aura_enabled"])
 		_expect_optional_false_flag_any(shield_shell, "hive_shield_shell", ["has_hidden_behavior", "hidden_behavior_enabled"])
 
+func _verify_hive_attack_profile_resolution() -> void:
+	_verify_acid_projectile_resolution()
+	_verify_crush_sweep_resolution()
+
+func _verify_acid_projectile_resolution() -> void:
+	var battlefield := BattlefieldState.new()
+	battlefield.configure(1, false, 100)
+	battlefield.wave.enemy_spawns = []
+	battlefield.deploy_player_queue_entry("Left", {
+		"unit_id": "hive_acid_sac",
+		"slot_id": 3,
+		"source": "Verifier",
+		"count": 1,
+	})
+	var acid_sac: BattleEntityState = _find_entity(battlefield, "hive_acid_sac", BattleUnitDefinition.SIDE_PLAYER)
+	if acid_sac == null:
+		failures.append("Acid Sac behavior test could not create a player entity.")
+		return
+	acid_sac.position = 20.0
+	battlefield.spawn_base_intruder_for_verifier("enemy_grunt", "Left", 23.0)
+	battlefield.spawn_base_intruder_for_verifier("enemy_grunt", "Left", 24.0)
+	battlefield.spawn_base_intruder_for_verifier("enemy_grunt", "Left", 25.0)
+	battlefield.advance(0.1)
+	var damaged_enemies: Array[BattleEntityState] = _damaged_enemy_entities(battlefield)
+	if damaged_enemies.size() < 3:
+		failures.append("Acid Sac acid_projectile must damage main target plus two same-lane splash targets.")
+	if _count_enemy_damage_at_least(damaged_enemies, 3) < 1:
+		failures.append("Acid Sac acid_projectile must deal 3 damage to the main target.")
+	if _count_enemy_damage_at_least(damaged_enemies, 1) < 3:
+		failures.append("Acid Sac acid_projectile splash must deal 1 damage to two additional targets.")
+
+func _verify_crush_sweep_resolution() -> void:
+	var battlefield := BattlefieldState.new()
+	battlefield.configure(1, false, 100)
+	battlefield.wave.enemy_spawns = []
+	battlefield.deploy_player_queue_entry("Left", {
+		"unit_id": "hive_crush_shell_beast",
+		"slot_id": 4,
+		"source": "Verifier",
+		"count": 1,
+	})
+	var crush_shell: BattleEntityState = _find_entity(battlefield, "hive_crush_shell_beast", BattleUnitDefinition.SIDE_PLAYER)
+	if crush_shell == null:
+		failures.append("Crush Shell Beast behavior test could not create a player entity.")
+		return
+	crush_shell.position = 20.0
+	battlefield.spawn_base_intruder_for_verifier("enemy_grunt", "Left", 21.0)
+	battlefield.spawn_base_intruder_for_verifier("enemy_grunt", "Left", 22.0)
+	battlefield.spawn_base_intruder_for_verifier("enemy_grunt", "Left", 24.0)
+	battlefield.spawn_base_intruder_for_verifier("enemy_grunt", "Left", 28.0)
+	battlefield.advance(0.1)
+	var damaged_enemies: Array[BattleEntityState] = _damaged_enemy_entities(battlefield)
+	if _count_enemy_damage_at_least(damaged_enemies, 6) != 3:
+		failures.append("Crush Shell Beast lane_sweep must deal 6 damage to exactly three same-lane targets.")
+
 func _catalog_unit(catalog: Dictionary, unit_id: String) -> Object:
 	if not catalog.has(unit_id):
 		failures.append("BattleUnitDefinition.catalog() missing %s." % unit_id)
@@ -75,6 +134,30 @@ func _catalog_unit(catalog: Dictionary, unit_id: String) -> Object:
 	if unit == null:
 		failures.append("%s must be a BattleUnitDefinition object." % unit_id)
 	return unit
+
+func _find_entity(battlefield: BattlefieldState, unit_id: String, side: String) -> BattleEntityState:
+	for entity: BattleEntityState in battlefield.entities:
+		if entity.definition != null and entity.definition.id == unit_id and entity.side == side:
+			return entity
+	return null
+
+func _damaged_enemy_entities(battlefield: BattlefieldState) -> Array[BattleEntityState]:
+	var damaged: Array[BattleEntityState] = []
+	for entity: BattleEntityState in battlefield.entities:
+		if entity.definition == null or entity.side != BattleUnitDefinition.SIDE_ENEMY:
+			continue
+		if entity.hp < entity.definition.max_hp:
+			damaged.append(entity)
+	return damaged
+
+func _count_enemy_damage_at_least(entities: Array[BattleEntityState], damage: int) -> int:
+	var count: int = 0
+	for entity: BattleEntityState in entities:
+		if entity.definition == null:
+			continue
+		if entity.definition.max_hp - entity.hp >= damage:
+			count += 1
+	return count
 
 func _expect_duration(wave: Object, battle_number: int, expected_min: float, expected_max: float) -> void:
 	if wave == null:

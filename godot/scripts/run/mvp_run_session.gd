@@ -745,12 +745,14 @@ func _make_counter(
 	warning_seconds: float,
 	active_seconds: float,
 	visible_effect: String,
-	patch_ids: Array[String]
+	patch_ids: Array[String],
+	first_warning_start_seconds: float = 30.0
 ) -> Resource:
 	var definition = CounterDefinitionScript.new()
 	definition.id = id
 	definition.display_name = display_name
 	definition.target_component = target_component
+	definition.first_warning_start_seconds = first_warning_start_seconds
 	definition.warning_seconds = warning_seconds
 	definition.active_seconds = active_seconds
 	definition.visible_effect = visible_effect

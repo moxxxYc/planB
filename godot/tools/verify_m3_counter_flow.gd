@@ -58,9 +58,19 @@ func _verify_pool_polluter_path(scene: PackedScene) -> bool:
 	run.call("confirm_shop_and_rest")
 	run.call("advance_active_battle_for_verifier", 5.0)
 
+	var early_banner_text: String = String(run.call("get_active_counter_banner_text"))
+	if not early_banner_text.contains("待命") or early_banner_text.contains("生效："):
+		push_error("Pool Polluter should not warn or apply before the 25-40s first counter window.")
+		passed = false
+
+	run.call("advance_active_battle_for_verifier", 25.5)
+
 	var banner_text: String = String(run.call("get_active_counter_banner_text"))
 	if not banner_text.contains("Pool Polluter") or not banner_text.contains("预警") or not banner_text.contains("Junk"):
-		push_error("Pool Polluter warning should be visible during Battle 3.")
+		push_error("Pool Polluter warning should be visible during Battle 3. banner=%s record=%s" % [
+			banner_text,
+			str(run.call("get_counter_record")),
+		])
 		passed = false
 
 	run.call("advance_active_battle_for_verifier", 20.0)
@@ -158,9 +168,18 @@ func _verify_echo_breaker_path(scene: PackedScene) -> bool:
 
 	run.call("confirm_shop_and_rest")
 	run.call("advance_active_battle_for_verifier", 24.0)
+	var early_machine_log: String = String(run.call("get_active_machine_log_text"))
+	if early_machine_log.contains("Echo Breaker 已锁定 Echo 槽") or early_machine_log.contains("Echo 复制降级为 Gate"):
+		push_error("Echo Breaker should not apply before the first counter warning window.")
+		passed = false
+
+	run.call("advance_active_battle_for_verifier", 20.0)
 	var machine_log: String = String(run.call("get_active_machine_log_text"))
 	if not machine_log.contains("Echo Breaker") or not machine_log.contains("Echo 复制降级为 Gate"):
-		push_error("Echo Breaker should visibly downgrade one Echo copy.")
+		push_error("Echo Breaker should visibly downgrade one Echo copy. record=%s log=%s" % [
+			str(run.call("get_counter_record")),
+			machine_log,
+		])
 		passed = false
 	if String(_active_machine_visual_contract(run).get("counter_target_component", "")) != "Echo / Surge 价值":
 		push_error("Echo Breaker should pass Echo target to machine board visuals.")
@@ -190,6 +209,12 @@ func _verify_stagger_punisher_path(scene: PackedScene) -> bool:
 		_dispose(run)
 		return false
 	run.call("advance_active_battle_for_verifier", 12.0)
+	var early_lane_text: String = String(run.call("get_lane_button_text", "Left"))
+	if early_lane_text.contains("突袭") or early_lane_text.contains("危险 2"):
+		push_error("Stagger Punisher should not raise danger before the first counter window.")
+		passed = false
+
+	run.call("advance_active_battle_for_verifier", 30.0)
 	var banner_text: String = String(run.call("get_active_counter_banner_text"))
 	var lane_text: String = String(run.call("get_lane_button_text", "Left"))
 	if not banner_text.contains("Stagger Punisher") or not banner_text.contains("队列空档"):
