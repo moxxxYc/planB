@@ -28,6 +28,7 @@ var forge_ratio: float = 0.0
 var launcher_ratio: float = 0.0
 var pool_count: int = 0
 var pool_capacity: int = 5
+var pool_balls: Array[String] = []
 var queue_count: int = 0
 var slot_progress: Dictionary = {1: 0, 2: 0, 3: 0, 4: 0}
 var last_launch_result: String = ""
@@ -45,6 +46,9 @@ func render(machine) -> void:
 	forge_ratio = clampf(machine.forge_progress / FORGE_CYCLE_SECONDS, 0.0, 1.0)
 	launcher_ratio = clampf(machine.launcher_progress / LAUNCHER_CYCLE_SECONDS, 0.0, 1.0)
 	pool_count = machine.pool.size()
+	pool_balls = []
+	for ball: Dictionary in machine.pool:
+		pool_balls.append(String(ball.get("kind", "clean")))
 	pool_capacity = _machine_pool_capacity(machine)
 	queue_count = machine.queue.size()
 	slot_progress = {
@@ -126,8 +130,14 @@ func _draw_supply_strip(rect: Rect2) -> void:
 	for index: int in range(visible_capacity):
 		var center := Vector2(first_ball_x + float(index) * (POOL_BALL_RADIUS * 2.0 + slot_gap), pool_y)
 		var filled := index < pool_count
+		var kind := String(pool_balls[index]) if index < pool_balls.size() else ""
 		draw_circle(center, POOL_BALL_RING_RADIUS, COLOR_TRIM)
-		draw_circle(center, POOL_BALL_RADIUS, COLOR_LAUNCH if filled else COLOR_PANEL)
+		if filled and kind == "junk":
+			draw_circle(center, POOL_BALL_RADIUS, Color("#6f5f35"))
+			draw_line(center + Vector2(-9.0, -9.0), center + Vector2(9.0, 9.0), COLOR_ACTIVE, 2.0, true)
+			draw_line(center + Vector2(9.0, -9.0), center + Vector2(-9.0, 9.0), COLOR_ACTIVE, 2.0, true)
+		else:
+			draw_circle(center, POOL_BALL_RADIUS, COLOR_LAUNCH if filled else COLOR_PANEL)
 		if filled:
 			draw_arc(center, POOL_BALL_RING_RADIUS + 3.0, 0.0, TAU, 24, COLOR_ACTIVE, 2.0, true)
 

@@ -24,6 +24,12 @@ var event_log: Array[String] = []
 var front_recycle_enabled: bool = false
 var surge_buffer_enabled: bool = false
 var queue_brace_enabled: bool = false
+var junk_sieve_enabled: bool = false
+var muster_pair_enabled: bool = false
+var echo_breaker_active: bool = false
+var echo_breaker_charges: int = 0
+var pool_polluter_junk_count: int = 0
+var counter_log: Array[String] = []
 var active_modifier_ids: Array[String] = []
 var active_modifier_markers: Array[String] = []
 var _step_index: int = 0
@@ -57,6 +63,12 @@ func apply_modifier(modifier_id: String, payload: Dictionary = {}) -> void:
 		"queue_brace":
 			queue_brace_enabled = true
 			effect_marker = "queue_brace_enabled=true threshold=%d S1+1" % QUEUE_BRACE_MISS_THRESHOLD
+		"junk_sieve":
+			junk_sieve_enabled = true
+			effect_marker = "junk_sieve_enabled=true"
+		"muster_pair":
+			muster_pair_enabled = true
+			effect_marker = "muster_pair_enabled=true same_slot_pair=true"
 		_:
 			push_error("Unknown machine modifier: %s" % modifier_id)
 			return
@@ -112,6 +124,17 @@ func _add_pool_ball_front(kind: String, source: String) -> void:
 
 func _route_ball(ball: Dictionary) -> void:
 	_step_index += 1
+
+	if String(ball.get("kind", "clean")) == "junk":
+		if junk_sieve_enabled:
+			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
+			event_log.append("Modifier:Junk Sieve 过滤 Junk，Pool 污染被清理")
+		else:
+			pool_polluter_junk_count = maxi(0, pool_polluter_junk_count - 1)
+			event_log.append("Counter:Pool Polluter Junk 发射后无有效 Unit 结算")
+		_finalize_queue_output([], 0, 0)
+		return
+
 	var launch_result: String = _launch_result_for_step(_step_index)
 	event_log.append(MachineResult.new("Launch", launch_result, 0, 0, {}).to_log_line())
 
@@ -148,7 +171,12 @@ func _route_ball(ball: Dictionary) -> void:
 	event_log.append(MachineResult.new("Tuning", tuning_result, slot_id, value, {}).to_log_line())
 
 	if tuning_result == "Echo":
-		added_entries.append_array(_apply_unit_hit(slot_id, value, "EchoCopy"))
+		if echo_breaker_active and echo_breaker_charges > 0:
+			echo_breaker_charges -= 1
+			echo_breaker_active = false
+			event_log.append("Counter:Echo Breaker Echo 复制降级为 Gate")
+		else:
+			added_entries.append_array(_apply_unit_hit(slot_id, value, "EchoCopy"))
 
 	if surge_buffer_enabled and tuning_result == "Surge" and added_entries.is_empty():
 		surge_buffer_charge = mini(1, surge_buffer_charge + 1)
@@ -182,6 +210,13 @@ func _finalize_queue_output(added_entries: Array[Dictionary], natural_slot_id: i
 	else:
 		queue_brace_gap_count = 0
 
+	if muster_pair_enabled:
+		for entry: Dictionary in output_entries:
+			if String(entry.get("source", "")) != "QueueBrace":
+				entry["count"] = int(entry.get("count", 1)) + 1
+				event_log.append("Modifier:Muster Pair 同槽成对出兵")
+				break
+
 	for entry: Dictionary in output_entries:
 		queue.append(entry)
 		var entry_slot_id: int = int(entry.get("slot_id", natural_slot_id))
@@ -213,6 +248,23 @@ func get_modifier_marker_text() -> String:
 func get_pool_capacity() -> int:
 	return pool_capacity
 
+func apply_pool_polluter_junk() -> bool:
+	if pool_polluter_junk_count >= 2:
+		event_log.append("Counter:Pool Polluter 上限已满，未继续插入 Junk")
+		return false
+	if pool.size() >= pool_capacity:
+		event_log.append("Counter:Pool Polluter 因 Pool 已满未插入 Junk")
+		return false
+	pool.append({"kind": "junk", "value": 0, "source": "Pool Polluter"})
+	pool_polluter_junk_count += 1
+	event_log.append("Counter:Pool Polluter Junk 插入 Pool 槽 %d" % pool.size())
+	return true
+
+func arm_echo_breaker() -> void:
+	echo_breaker_active = true
+	echo_breaker_charges = 1
+	event_log.append("Counter:Echo Breaker 已锁定 Echo 槽")
+
 func _modifier_display_name(modifier_id: String) -> String:
 	match modifier_id:
 		"pool_pocket":
@@ -227,16 +279,20 @@ func _modifier_display_name(modifier_id: String) -> String:
 			return "Surge Buffer"
 		"queue_brace":
 			return "Queue Brace"
+		"junk_sieve":
+			return "Junk Sieve"
+		"muster_pair":
+			return "Muster Pair"
 		_:
 			return modifier_id
 
 func _modifier_axis(modifier_id: String) -> String:
 	match modifier_id:
-		"pool_pocket", "front_recycle":
+		"pool_pocket", "front_recycle", "junk_sieve":
 			return "Launch"
 		"prime_charge", "surge_buffer":
 			return "Tuning"
-		"slot_primer", "queue_brace":
+		"slot_primer", "queue_brace", "muster_pair":
 			return "Unit"
 		_:
 			return "Unknown"
@@ -248,7 +304,7 @@ func _modifier_active_key(modifier_id: String, slot_id: int) -> String:
 				push_error("Unknown Slot Primer slot_id: %d" % slot_id)
 				return ""
 			return "%s:%d" % [modifier_id, slot_id]
-		"pool_pocket", "prime_charge", "front_recycle", "surge_buffer", "queue_brace":
+		"pool_pocket", "prime_charge", "front_recycle", "surge_buffer", "queue_brace", "junk_sieve", "muster_pair":
 			return modifier_id
 		_:
 			push_error("Unknown machine modifier: %s" % modifier_id)

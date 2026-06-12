@@ -74,6 +74,16 @@ func _recent_log_text(event_log: Array[String]) -> String:
 	return "\n".join(lines)
 
 func _localized_log_line(log_line: String) -> String:
+	if log_line.contains("Pool Polluter Junk 插入"):
+		return "反制：Pool Polluter 将 Junk 插入 Pool"
+	if log_line.contains("Junk Sieve 过滤 Junk"):
+		return "补洞：Junk Sieve 过滤 Junk，Pool 污染被清理"
+	if log_line.contains("Junk 发射后无有效 Unit"):
+		return "反制：Junk 发射，未产生有效 Unit 结算"
+	if log_line.contains("Echo Breaker Echo 复制降级"):
+		return "反制：Echo Breaker 让 Echo 复制降级为 Gate"
+	if log_line.contains("Muster Pair 同槽成对"):
+		return "Unit：Muster Pair 让同槽成对出兵"
 	if log_line.begins_with("Launch.Forge added"):
 		return "Launch：Forge 加入 1 颗净球"
 	if log_line.begins_with("Launch.Pool full rejected"):
