@@ -187,7 +187,7 @@ func _verify_learning_field_shapes(record: Dictionary) -> void:
 	_verify_visible_contribution_slots(record)
 	_verify_key_queue_entries_by_slot(record)
 	_verify_dominant_slot_share(record)
-	_verify_non_empty_array_or_dictionary_field(record, "rest_windows")
+	_verify_rest_windows(record)
 
 func _verify_shape_rules_cover_required_keys() -> void:
 	var covered: Dictionary = {}
@@ -286,16 +286,6 @@ func _verify_non_empty_selection_field(record: Dictionary, key: String) -> void:
 		return
 	failures.append("%s must be a non-empty String, Array, or Dictionary." % key)
 
-func _verify_non_empty_array_or_dictionary_field(record: Dictionary, key: String) -> void:
-	if not record.has(key):
-		return
-	var value: Variant = record.get(key)
-	if value is Array and not (value as Array).is_empty():
-		return
-	if value is Dictionary and not (value as Dictionary).is_empty():
-		return
-	failures.append("%s must be a non-empty Array or Dictionary." % key)
-
 func _verify_non_empty_array_fields(record: Dictionary, keys: Array[String]) -> void:
 	for key: String in keys:
 		if not record.has(key):
@@ -344,23 +334,65 @@ func _verify_visible_contribution_slots(record: Dictionary) -> void:
 		return
 	var value: Variant = record.get("unit.visible_contribution_slots")
 	if value is Dictionary:
-		if (value as Dictionary).is_empty():
+		var by_slot: Dictionary = value as Dictionary
+		if by_slot.is_empty():
 			failures.append("unit.visible_contribution_slots Dictionary must be non-empty.")
+			return
+		for slot_key: Variant in by_slot.keys():
+			var slot_id: int = _slot_id_from_variant(slot_key)
+			if not _is_valid_slot_id(slot_id):
+				failures.append("unit.visible_contribution_slots has invalid slot key: %s." % String(slot_key))
+				continue
+			_verify_visible_contribution_slot_record(by_slot.get(slot_key), slot_id, "unit.visible_contribution_slots[%s]" % String(slot_key))
 		return
 	if not (value is Array):
-		failures.append("unit.visible_contribution_slots must be a non-empty Array or Dictionary.")
+		failures.append("unit.visible_contribution_slots must be a non-empty Array of slot records or Dictionary keyed by slots.")
 		return
-	var slots: Array = value as Array
-	if slots.is_empty():
+	var slot_records: Array = value as Array
+	if slot_records.is_empty():
 		failures.append("unit.visible_contribution_slots must be non-empty.")
 		return
-	for slot_variant: Variant in slots:
-		if not (slot_variant is int or slot_variant is float):
-			failures.append("unit.visible_contribution_slots entries must be numeric slot ids.")
+	for index: int in range(slot_records.size()):
+		var entry_variant: Variant = slot_records[index]
+		if not (entry_variant is Dictionary):
+			failures.append("unit.visible_contribution_slots[%d] must be a Dictionary with slot and visible contribution evidence." % index)
 			continue
-		var slot_id: int = int(slot_variant)
-		if slot_id < 1 or slot_id > 4:
-			failures.append("unit.visible_contribution_slots slot ids must be in range 1-4.")
+		var entry: Dictionary = entry_variant as Dictionary
+		var slot_id: int = _slot_id_from_record(entry, ["slot_id", "slot", "unit_slot", "unit_slot_id"])
+		if not _is_valid_slot_id(slot_id):
+			failures.append("unit.visible_contribution_slots[%d] must include slot_id 1-4 or S1-S4." % index)
+			continue
+		_verify_visible_contribution_slot_record(entry, slot_id, "unit.visible_contribution_slots[%d]" % index)
+
+func _verify_visible_contribution_slot_record(value: Variant, expected_slot_id: int, label: String) -> void:
+	if not (value is Dictionary):
+		failures.append("%s must be a Dictionary with per-slot visible/count/unit/contribution evidence." % label)
+		return
+	var entry: Dictionary = value as Dictionary
+	if entry.is_empty():
+		failures.append("%s must be non-empty." % label)
+		return
+	var entry_slot_id: int = _slot_id_from_record(entry, ["slot_id", "slot", "unit_slot", "unit_slot_id"])
+	if _is_valid_slot_id(entry_slot_id) and entry_slot_id != expected_slot_id:
+		failures.append("%s slot evidence must match slot %d." % [label, expected_slot_id])
+	if not _has_any_meaningful_value(entry, [
+		"visible",
+		"visible_result",
+		"visible_contribution",
+		"count",
+		"visible_count",
+		"contribution_count",
+		"unit",
+		"unit_id",
+		"unit_name",
+		"unit_label",
+		"contribution",
+		"contribution_type",
+		"contribution_role",
+		"result",
+		"impact",
+	]):
+		failures.append("%s must include non-empty visible/count/unit/contribution evidence." % label)
 
 func _verify_key_queue_entries_by_slot(record: Dictionary) -> void:
 	if not record.has("unit.key_queue_entries_by_slot"):
@@ -374,15 +406,72 @@ func _verify_key_queue_entries_by_slot(record: Dictionary) -> void:
 		failures.append("unit.key_queue_entries_by_slot must be a non-empty Dictionary.")
 		return
 	for slot_key: Variant in by_slot.keys():
+		var slot_id: int = _slot_id_from_variant(slot_key)
+		if not _is_valid_slot_id(slot_id):
+			failures.append("unit.key_queue_entries_by_slot has invalid slot key: %s." % String(slot_key))
+			continue
 		var entries_variant: Variant = by_slot.get(slot_key)
-		if entries_variant is Array:
-			if (entries_variant as Array).is_empty():
-				failures.append("unit.key_queue_entries_by_slot[%s] must contain at least one queue entry." % String(slot_key))
-		elif entries_variant is Dictionary:
-			if (entries_variant as Dictionary).is_empty():
-				failures.append("unit.key_queue_entries_by_slot[%s] must contain non-empty queue entry evidence." % String(slot_key))
-		else:
-			failures.append("unit.key_queue_entries_by_slot[%s] must be an Array or Dictionary." % String(slot_key))
+		_verify_queue_entries_for_slot(entries_variant, slot_id, "unit.key_queue_entries_by_slot[%s]" % String(slot_key))
+
+func _verify_queue_entries_for_slot(value: Variant, expected_slot_id: int, label: String) -> void:
+	if value is Array:
+		var entries: Array = value as Array
+		if entries.is_empty():
+			failures.append("%s must contain at least one queue entry." % label)
+			return
+		for index: int in range(entries.size()):
+			_verify_queue_entry_shape(entries[index], expected_slot_id, "%s[%d]" % [label, index])
+		return
+	if value is Dictionary:
+		var entry_or_group: Dictionary = value as Dictionary
+		if entry_or_group.is_empty():
+			failures.append("%s must contain non-empty queue entry evidence." % label)
+			return
+		if _looks_like_queue_entry(entry_or_group):
+			_verify_queue_entry_shape(entry_or_group, expected_slot_id, label)
+			return
+		for nested_key: String in ["entries", "queue_entries", "key_entries", "records"]:
+			if entry_or_group.has(nested_key):
+				_verify_queue_entries_for_slot(entry_or_group.get(nested_key), expected_slot_id, "%s.%s" % [label, nested_key])
+				return
+		for entry_key: Variant in entry_or_group.keys():
+			var nested_entry: Variant = entry_or_group.get(entry_key)
+			if not (nested_entry is Dictionary):
+				failures.append("%s.%s must be a queue entry Dictionary." % [label, String(entry_key)])
+				continue
+			_verify_queue_entry_shape(nested_entry, expected_slot_id, "%s.%s" % [label, String(entry_key)])
+		return
+	failures.append("%s must be an Array or Dictionary of queue entry records." % label)
+
+func _looks_like_queue_entry(entry: Dictionary) -> bool:
+	return (
+		_has_any_key(entry, ["unit_id", "unit_name", "unit"])
+		or _has_any_key(entry, ["lane", "route", "deploy_lane", "deploy_target", "target_lane"])
+		or _has_any_key(entry, ["time", "battle_time", "elapsed_seconds", "result", "reason"])
+	)
+
+func _verify_queue_entry_shape(value: Variant, expected_slot_id: int, label: String) -> void:
+	if not (value is Dictionary):
+		failures.append("%s must be a Dictionary." % label)
+		return
+	var entry: Dictionary = value as Dictionary
+	if entry.is_empty():
+		failures.append("%s must be non-empty." % label)
+		return
+	var entry_slot_id: int = _slot_id_from_record(entry, ["slot_id", "slot", "unit_slot", "unit_slot_id"])
+	if not _is_valid_slot_id(entry_slot_id):
+		failures.append("%s must include slot evidence 1-4 or S1-S4." % label)
+	elif entry_slot_id != expected_slot_id:
+		failures.append("%s slot evidence must match slot %d." % [label, expected_slot_id])
+	if not _has_any_meaningful_value(entry, ["unit_id", "unit_name", "unit", "unit_label"]):
+		failures.append("%s must include unit id/name evidence." % label)
+	if not _has_any_meaningful_value(entry, ["lane", "route", "deploy_lane", "deploy_target", "target_lane", "target_route"]):
+		failures.append("%s must include lane/route/deploy target evidence." % label)
+	if not (
+		_has_any_meaningful_value(entry, ["result", "reason", "contribution_reason", "visible_result", "impact"])
+		or _has_any_non_negative_number(entry, ["time", "battle_time", "elapsed_seconds", "timestamp"])
+	):
+		failures.append("%s must include time/result/reason evidence." % label)
 
 func _verify_dominant_slot_share(record: Dictionary) -> void:
 	if not record.has("unit.dominant_slot_share"):
@@ -409,6 +498,143 @@ func _verify_dominant_slot_share(record: Dictionary) -> void:
 func _verify_ratio(value: float, label: String) -> void:
 	if value < 0.0 or value > 1.0:
 		failures.append("%s must be in range 0.0-1.0." % label)
+
+func _verify_rest_windows(record: Dictionary) -> void:
+	if not record.has("rest_windows"):
+		return
+	_verify_rest_windows_value(record.get("rest_windows"), "rest_windows")
+
+func _verify_rest_windows_value(value: Variant, label: String) -> void:
+	if value is Array:
+		var windows: Array = value as Array
+		if windows.is_empty():
+			failures.append("%s must be a non-empty Array or Dictionary of rest window records." % label)
+			return
+		for index: int in range(windows.size()):
+			_verify_rest_window_record(windows[index], "", "%s[%d]" % [label, index])
+		return
+	if value is Dictionary:
+		var windows_by_key: Dictionary = value as Dictionary
+		if windows_by_key.is_empty():
+			failures.append("%s must be a non-empty Array or Dictionary of rest window records." % label)
+			return
+		for nested_key: String in ["windows", "entries", "records"]:
+			if windows_by_key.has(nested_key):
+				_verify_rest_windows_value(windows_by_key.get(nested_key), "%s.%s" % [label, nested_key])
+				return
+		for window_key: Variant in windows_by_key.keys():
+			_verify_rest_window_record(windows_by_key.get(window_key), String(window_key), "%s[%s]" % [label, String(window_key)])
+		return
+	failures.append("%s must be a non-empty Array or Dictionary of rest window records." % label)
+
+func _verify_rest_window_record(value: Variant, fallback_label: String, label: String) -> void:
+	if not (value is Dictionary):
+		failures.append("%s must be a Dictionary rest window record." % label)
+		return
+	var window: Dictionary = value as Dictionary
+	if window.is_empty():
+		failures.append("%s must be non-empty." % label)
+		return
+	if not _has_any_meaningful_value(window, ["id", "name", "window", "label", "window_id", "window_label", "title"]) and fallback_label.strip_edges().is_empty():
+		failures.append("%s must include name/id/window label evidence." % label)
+	if not (
+		_has_true_bool(window, ["appeared", "offered", "available", "present"])
+		or _has_any_non_empty_container(window, ["choices", "options", "offers"])
+	):
+		failures.append("%s must include appeared/offered flag or non-empty choices/options evidence." % label)
+	if not (
+		_has_bool_key(window, ["purchased", "purchase", "bought", "restored"])
+		or _has_any_meaningful_value(window, ["purchase_id", "purchase_role", "purchase_result", "rest_action", "restored_info"])
+		or _has_any_non_negative_number(window, ["hp_restored", "restored_hp", "heal_amount"])
+	):
+		failures.append("%s must include explicit purchase/bought/restored info." % label)
+	if not _has_any_non_negative_number(window, ["gold_before", "before_gold"]):
+		failures.append("%s must include gold_before evidence >= 0." % label)
+	if not _has_any_non_negative_number(window, ["gold_after", "after_gold"]):
+		failures.append("%s must include gold_after evidence >= 0." % label)
+	if not _has_any_non_negative_number(window, ["gold_spent", "spent_gold", "cost", "gold_cost"]):
+		failures.append("%s must include gold spent/cost evidence >= 0." % label)
+	if not _has_rest_hp_evidence(window):
+		failures.append("%s must include hp_restored or Guardian HP before/after evidence." % label)
+
+func _has_rest_hp_evidence(record: Dictionary) -> bool:
+	if _has_any_non_negative_number(record, ["hp_restored", "restored_hp", "heal_amount"]):
+		return true
+	if _has_any_meaningful_value(record, ["guardian_hp", "guardian_hp_result"]):
+		return true
+	return _has_any_meaningful_value(record, ["guardian_hp_before", "hp_before"]) and _has_any_meaningful_value(record, ["guardian_hp_after", "hp_after"])
+
+func _slot_id_from_record(record: Dictionary, keys: Array[String]) -> int:
+	for key: String in keys:
+		if record.has(key):
+			return _slot_id_from_variant(record.get(key))
+	return 0
+
+func _slot_id_from_variant(value: Variant) -> int:
+	if value is int or value is float:
+		var numeric_slot_id: int = int(value)
+		return numeric_slot_id if _is_valid_slot_id(numeric_slot_id) else 0
+	var text: String = String(value).strip_edges().to_upper()
+	for slot_id: int in [1, 2, 3, 4]:
+		if text == str(slot_id) or text == "S%d" % slot_id:
+			return slot_id
+	return 0
+
+func _is_valid_slot_id(slot_id: int) -> bool:
+	return slot_id >= 1 and slot_id <= 4
+
+func _has_any_meaningful_value(record: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if record.has(key) and _is_meaningful_value(record.get(key)):
+			return true
+	return false
+
+func _has_any_non_empty_container(record: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if not record.has(key):
+			continue
+		var value: Variant = record.get(key)
+		if value is Array and not (value as Array).is_empty():
+			return true
+		if value is Dictionary and not (value as Dictionary).is_empty():
+			return true
+	return false
+
+func _has_any_non_negative_number(record: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if not record.has(key):
+			continue
+		var value: Variant = record.get(key)
+		if (value is int or value is float) and float(value) >= 0.0:
+			return true
+	return false
+
+func _has_true_bool(record: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if record.has(key) and record.get(key) is bool and bool(record.get(key)):
+			return true
+	return false
+
+func _has_bool_key(record: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if record.has(key) and record.get(key) is bool:
+			return true
+	return false
+
+func _is_meaningful_value(value: Variant) -> bool:
+	if value == null:
+		return false
+	if value is bool:
+		return bool(value)
+	if value is int or value is float:
+		return float(value) > 0.0
+	if value is String:
+		return not String(value).strip_edges().is_empty()
+	if value is Array:
+		return not (value as Array).is_empty()
+	if value is Dictionary:
+		return not (value as Dictionary).is_empty()
+	return true
 
 func _has_any_key(record: Dictionary, keys: Array[String]) -> bool:
 	for key: String in keys:
