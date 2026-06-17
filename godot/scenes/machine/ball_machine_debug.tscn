@@ -1,0 +1,132 @@
+[gd_scene load_steps=3 format=3 uid="uid://planb_ball_machine_debug_scene"]
+
+[ext_resource type="Script" path="res://scripts/debug/ball_machine_debug_scene.gd" id="1_debug_script"]
+[ext_resource type="Script" path="res://scripts/ui/machine_board_view.gd" id="2_machine_board"]
+
+[node name="BallMachineDebug" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_debug_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0901961, 0.101961, 0.0941176, 1)
+
+[node name="SafeArea" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 18
+
+[node name="RootRows" type="VBoxContainer" parent="SafeArea"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="HBoxContainer" parent="SafeArea/RootRows"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleLabel" type="Label" parent="SafeArea/RootRows/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "球机单独调试 | Launch / Tuning / Unit"
+
+[node name="StatusLabel" type="Label" parent="SafeArea/RootRows/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "初始化"
+horizontal_alignment = 2
+
+[node name="MainColumns" type="HBoxContainer" parent="SafeArea/RootRows"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="MachinePanel" type="PanelContainer" parent="SafeArea/RootRows/MainColumns"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 70.0
+custom_minimum_size = Vector2(720, 0)
+
+[node name="MachineBoardView" type="Control" parent="SafeArea/RootRows/MainColumns/MachinePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+custom_minimum_size = Vector2(720, 760)
+script = ExtResource("2_machine_board")
+
+[node name="DebugPanel" type="PanelContainer" parent="SafeArea/RootRows/MainColumns"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 30.0
+custom_minimum_size = Vector2(420, 0)
+
+[node name="DebugRows" type="VBoxContainer" parent="SafeArea/RootRows/MainColumns/DebugPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ControlTitle" type="Label" parent="SafeArea/RootRows/MainColumns/DebugPanel/DebugRows"]
+layout_mode = 2
+text = "控制"
+
+[node name="ControlScroll" type="ScrollContainer" parent="SafeArea/RootRows/MainColumns/DebugPanel/DebugRows"]
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 300)
+horizontal_scroll_mode = 0
+
+[node name="ControlRows" type="VBoxContainer" parent="SafeArea/RootRows/MainColumns/DebugPanel/DebugRows/ControlScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="LogTitle" type="Label" parent="SafeArea/RootRows/MainColumns/DebugPanel/DebugRows"]
+layout_mode = 2
+text = "事件日志"
+
+[node name="LogScroll" type="ScrollContainer" parent="SafeArea/RootRows/MainColumns/DebugPanel/DebugRows"]
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 180)
+horizontal_scroll_mode = 0
+
+[node name="LogLabel" type="Label" parent="SafeArea/RootRows/MainColumns/DebugPanel/DebugRows/LogScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+autowrap_mode = 3
+text = ""
+
+[node name="ContractTitle" type="Label" parent="SafeArea/RootRows/MainColumns/DebugPanel/DebugRows"]
+layout_mode = 2
+text = "球机合同"
+
+[node name="ContractScroll" type="ScrollContainer" parent="SafeArea/RootRows/MainColumns/DebugPanel/DebugRows"]
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 160)
+horizontal_scroll_mode = 0
+
+[node name="ContractLabel" type="Label" parent="SafeArea/RootRows/MainColumns/DebugPanel/DebugRows/ContractScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+autowrap_mode = 3
+text = ""
