@@ -48,9 +48,13 @@ func _sample_scene(scene: Node, samples: Dictionary) -> void:
 		"SafeArea/RootRows/MainColumns",
 		"SafeArea/RootRows/MainColumns/MachinePanel",
 		"SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView",
-		"SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView/MachineBoardView",
+		"SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView/BallMachineView",
+		"SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView/BallMachineView/MachineBoardView",
+		"SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView/BallMachineView/MachineBoardView/PhysicsStageClip",
 		"SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView/MachineLogScroll",
-		"SafeArea/RootRows/MainColumns/MachinePanel/MachineBoardView",
+		"SafeArea/RootRows/MainColumns/MachinePanel/BallMachineView",
+		"SafeArea/RootRows/MainColumns/MachinePanel/BallMachineView/MachineBoardView",
+		"SafeArea/RootRows/MainColumns/MachinePanel/BallMachineView/MachineBoardView/PhysicsStageClip",
 		"SafeArea/RootRows/MainColumns/DebugPanel",
 		"SafeArea/RootRows/MainColumns/DebugPanel/DebugRows/LogScroll",
 		"SafeArea/RootRows/MainColumns/DebugPanel/DebugRows/ContractScroll",
@@ -61,19 +65,54 @@ func _sample_scene(scene: Node, samples: Dictionary) -> void:
 		if node is Control:
 			_sample_height(samples, path, (node as Control).size.y)
 
+	var ball_machine_view: Control = scene.find_child("BallMachineView", true, false) as Control
+	if ball_machine_view != null:
+		_sample_height(samples, "BallMachineView.find", ball_machine_view.size.y)
+		var shared_contract_variant: Variant = ball_machine_view.call("get_visual_contract_summary") if ball_machine_view.has_method("get_visual_contract_summary") else {}
+		if shared_contract_variant is Dictionary:
+			var shared_contract: Dictionary = shared_contract_variant as Dictionary
+			if String(shared_contract.get("shared_component", "")) != "BallMachineView":
+				failures.append("BallMachineView.find must expose shared_component contract.")
+			_sample_contract_rect_heights(samples, shared_contract, "shared")
+
 	var machine_board: Control = scene.find_child("MachineBoardView", true, false) as Control
 	if machine_board != null:
 		_sample_height(samples, "MachineBoardView.find", machine_board.size.y)
 		var contract_variant: Variant = machine_board.call("get_visual_contract_summary") if machine_board.has_method("get_visual_contract_summary") else {}
 		if contract_variant is Dictionary:
-			var contract: Dictionary = contract_variant as Dictionary
-			var rects_variant: Variant = contract.get("stage_rects", {})
-			if rects_variant is Dictionary:
-				var rects: Dictionary = rects_variant as Dictionary
-				for stage_name: String in ["Launch", "Tuning", "Unit"]:
-					var rect_variant: Variant = rects.get(stage_name, Rect2())
-					if rect_variant is Rect2:
-						_sample_height(samples, "stage_rect.%s" % stage_name, (rect_variant as Rect2).size.y)
+			_sample_contract_rect_heights(samples, contract_variant as Dictionary, "board")
+
+func _sample_contract_rect_heights(samples: Dictionary, contract: Dictionary, prefix: String) -> void:
+	var rect_sets: Dictionary = {
+		"stage_rect": contract.get("stage_rects", {}),
+		"visible_stage_rect": contract.get("visible_stage_rects", {}),
+	}
+	for rect_set_name_variant: Variant in rect_sets.keys():
+		var rect_set_name: String = String(rect_set_name_variant)
+		var rects_variant: Variant = rect_sets[rect_set_name]
+		if not (rects_variant is Dictionary):
+			continue
+		var rects: Dictionary = rects_variant as Dictionary
+		for stage_name: String in ["Launch", "Tuning", "Unit"]:
+			var rect_variant: Variant = rects.get(stage_name, Rect2())
+			var rect: Rect2 = _rect_from_contract_value(rect_variant)
+			if rect.size.y > 0.0:
+				_sample_height(samples, "%s.%s.%s" % [prefix, rect_set_name, stage_name], rect.size.y)
+	var clip_variant: Variant = contract.get("physics_clip_rect", Rect2())
+	if clip_variant is Rect2:
+		_sample_height(samples, "%s.physics_clip_rect" % prefix, (clip_variant as Rect2).size.y)
+
+func _rect_from_contract_value(value: Variant) -> Rect2:
+	if value is Rect2:
+		return value as Rect2
+	if not (value is Dictionary):
+		return Rect2()
+	var info: Dictionary = value as Dictionary
+	var position_variant: Variant = info.get("position", Vector2.ZERO)
+	var size_variant: Variant = info.get("size", Vector2.ZERO)
+	if position_variant is Vector2 and size_variant is Vector2:
+		return Rect2(position_variant as Vector2, size_variant as Vector2)
+	return Rect2()
 
 func _sample_height(samples: Dictionary, key: String, value: float) -> void:
 	if not samples.has(key):

@@ -26,8 +26,10 @@ func _verify_debug_scene_exists_and_runs() -> void:
 		failures.append("Standalone ball machine debug scene must not include BattlefieldView.")
 	if scene.find_child("QueueBridgeView", true, false) != null:
 		failures.append("Standalone ball machine debug scene must not include QueueBridgeView.")
+	if scene.find_child("BallMachineView", true, false) == null:
+		failures.append("Standalone ball machine debug scene must include shared BallMachineView.")
 	if scene.find_child("MachineBoardView", true, false) == null:
-		failures.append("Standalone ball machine debug scene must include MachineBoardView.")
+		failures.append("Standalone ball machine debug scene must include nested MachineBoardView.")
 
 	if not scene.has_method("get_debug_contract"):
 		failures.append("Standalone ball machine debug scene must expose get_debug_contract().")
@@ -78,6 +80,8 @@ func _expect_debug_contract(contract: Dictionary, label: String) -> void:
 	if int(contract.get("launcher_turret_visual_source_count", 0)) != 1:
 		failures.append("%s debug scene must expose one launcher turret visual source." % label)
 	var machine_contract: Dictionary = _expect_dictionary(contract.get("machine_contract", {}), "%s machine_contract" % label)
+	if String(machine_contract.get("shared_component", "")) != "BallMachineView":
+		failures.append("%s debug scene must use shared BallMachineView." % label)
 	_expect_machine_render_container(machine_contract, label)
 
 func _expect_machine_render_container(machine_contract: Dictionary, label: String) -> void:
@@ -103,10 +107,23 @@ func _expect_machine_render_container(machine_contract: Dictionary, label: Strin
 	var physics_board_position_variant: Variant = machine_contract.get("physics_board_position", Vector2.INF)
 	if not (physics_board_position_variant is Vector2) or ((physics_board_position_variant as Vector2) + clip_rect.position).distance_to(Vector2.ZERO) > 0.5:
 		failures.append("%s MachineBoardView physics board must be offset by negative PhysicsStageClip position." % label)
-	var mechanisms: Dictionary = _expect_dictionary(machine_contract.get("moving_mechanisms", {}), "%s moving_mechanisms" % label)
-	_expect_visible_mechanism(mechanisms, "LaunchDiverterPaddle", "Launch", label)
-	_expect_visible_mechanism(mechanisms, "LaunchReturnFlap", "Launch", label)
-	_expect_visible_mechanism(mechanisms, "TuningQualityCam", "Tuning", label)
+		var mechanisms: Dictionary = _expect_dictionary(machine_contract.get("moving_mechanisms", {}), "%s moving_mechanisms" % label)
+		var counts: Dictionary = _expect_dictionary(machine_contract.get("moving_mechanism_counts", {}), "%s moving_mechanism_counts" % label)
+		if int(counts.get("Launch", 0)) != 1:
+			failures.append("%s Launch must expose exactly one moving peg row." % label)
+		if int(counts.get("Tuning", 0)) != 1:
+			failures.append("%s Tuning must expose exactly one moving peg band." % label)
+		if int(counts.get("Unit", 0)) != 0:
+			failures.append("%s Unit must not expose moving peg mechanisms yet." % label)
+		_expect_visible_mechanism(mechanisms, "LaunchMovingPegRow", "Launch", label)
+		_expect_visible_mechanism(mechanisms, "TuningMovingPegBand", "Tuning", label)
+		if not bool(machine_contract.get("draws_moving_mechanism_overlay", false)):
+			failures.append("%s MachineBoardView must draw a top-level moving mechanism overlay." % label)
+		var overlay: Dictionary = _expect_dictionary(machine_contract.get("moving_mechanism_overlay", {}), "%s moving_mechanism_overlay" % label)
+		if String(overlay.get("source", "")) != "MachineBoardView":
+			failures.append("%s moving mechanism overlay must be sourced from MachineBoardView." % label)
+		if int(overlay.get("drawable_count", 0)) != 2 or not bool(overlay.get("all_required_drawable", false)):
+			failures.append("%s moving mechanism overlay must draw LaunchMovingPegRow and TuningMovingPegBand." % label)
 
 func _expect_visible_mechanism(mechanisms: Dictionary, mechanism_name: String, stage: String, label: String) -> void:
 	var mechanism: Dictionary = _expect_dictionary(mechanisms.get(mechanism_name, {}), "%s %s" % [label, mechanism_name])
@@ -114,16 +131,20 @@ func _expect_visible_mechanism(mechanisms: Dictionary, mechanism_name: String, s
 		failures.append("%s %s must belong to %s." % [label, mechanism_name, stage])
 	if not bool(mechanism.get("visible", false)):
 		failures.append("%s %s must be visible." % [label, mechanism_name])
-	if not bool(mechanism.get("plate_visible", false)):
-		failures.append("%s %s must expose a visible plate." % [label, mechanism_name])
-	if not bool(mechanism.get("highlight_visible", false)):
-		failures.append("%s %s must expose a visible highlight." % [label, mechanism_name])
+	if bool(mechanism.get("has_large_plate", true)):
+		failures.append("%s %s must not be implemented as a large moving plate." % [label, mechanism_name])
+	if not bool(mechanism.get("peg_visuals_visible", false)):
+		failures.append("%s %s must expose visible moving peg visuals." % [label, mechanism_name])
+	if not bool(mechanism.get("has_physical_peg_bodies", false)):
+		failures.append("%s %s must expose physical moving peg bodies." % [label, mechanism_name])
 	if not bool(mechanism.get("stage_rect_contains_center", false)):
 		failures.append("%s %s center must stay inside the stage." % [label, mechanism_name])
 	if not bool(mechanism.get("stage_rect_intersects_bounds", false)):
 		failures.append("%s %s visual bounds must intersect the stage." % [label, mechanism_name])
-	if float(mechanism.get("minimum_visible_thickness", 0.0)) < 10.0:
-		failures.append("%s %s must be thick enough to read." % [label, mechanism_name])
+	if not bool(mechanism.get("all_pegs_inside_stage", false)):
+		failures.append("%s %s pegs must stay inside the stage." % [label, mechanism_name])
+	if int(mechanism.get("peg_count", 0)) <= 0:
+		failures.append("%s %s must expose moving peg_count." % [label, mechanism_name])
 
 func _expect_dictionary(value: Variant, label: String) -> Dictionary:
 	if not (value is Dictionary):

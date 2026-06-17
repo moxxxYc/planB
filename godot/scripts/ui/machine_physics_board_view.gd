@@ -15,21 +15,24 @@ const BALL_RADIUS: float = 7.5
 const PEG_RADIUS: float = 4.0
 const PEG_LAYOUTS: Dictionary = {
 	"Launch": [
-		Vector2(0.18, 0.25), Vector2(0.38, 0.25), Vector2(0.58, 0.25), Vector2(0.78, 0.25),
-		Vector2(0.28, 0.36), Vector2(0.48, 0.36), Vector2(0.68, 0.36), Vector2(0.86, 0.36),
-		Vector2(0.16, 0.47), Vector2(0.36, 0.47), Vector2(0.56, 0.47), Vector2(0.76, 0.47),
-		Vector2(0.25, 0.58), Vector2(0.45, 0.58), Vector2(0.65, 0.58), Vector2(0.85, 0.58),
+		Vector2(0.10, 0.22), Vector2(0.25, 0.22), Vector2(0.40, 0.22), Vector2(0.55, 0.22), Vector2(0.70, 0.22), Vector2(0.85, 0.22),
+		Vector2(0.17, 0.32), Vector2(0.32, 0.32), Vector2(0.47, 0.32), Vector2(0.62, 0.32), Vector2(0.77, 0.32), Vector2(0.92, 0.32),
+		Vector2(0.10, 0.42), Vector2(0.25, 0.42), Vector2(0.40, 0.42), Vector2(0.55, 0.42), Vector2(0.70, 0.42), Vector2(0.85, 0.42),
+		Vector2(0.17, 0.52), Vector2(0.32, 0.52), Vector2(0.47, 0.52), Vector2(0.62, 0.52), Vector2(0.77, 0.52), Vector2(0.92, 0.52),
+		Vector2(0.10, 0.62), Vector2(0.25, 0.62), Vector2(0.40, 0.62), Vector2(0.55, 0.62), Vector2(0.70, 0.62), Vector2(0.85, 0.62),
 	],
 	"Tuning": [
-		Vector2(0.18, 0.27), Vector2(0.38, 0.27), Vector2(0.58, 0.27), Vector2(0.78, 0.27),
-		Vector2(0.27, 0.38), Vector2(0.47, 0.38), Vector2(0.67, 0.38),
-		Vector2(0.16, 0.49), Vector2(0.36, 0.49), Vector2(0.56, 0.49), Vector2(0.76, 0.49),
-		Vector2(0.26, 0.60), Vector2(0.50, 0.60), Vector2(0.74, 0.60),
+		Vector2(0.10, 0.22), Vector2(0.25, 0.22), Vector2(0.40, 0.22), Vector2(0.55, 0.22), Vector2(0.70, 0.22), Vector2(0.85, 0.22),
+		Vector2(0.17, 0.32), Vector2(0.32, 0.32), Vector2(0.47, 0.32), Vector2(0.62, 0.32), Vector2(0.77, 0.32), Vector2(0.92, 0.32),
+		Vector2(0.10, 0.42), Vector2(0.25, 0.42), Vector2(0.40, 0.42), Vector2(0.55, 0.42), Vector2(0.70, 0.42), Vector2(0.85, 0.42),
+		Vector2(0.17, 0.52), Vector2(0.32, 0.52), Vector2(0.47, 0.52), Vector2(0.62, 0.52), Vector2(0.77, 0.52), Vector2(0.92, 0.52),
+		Vector2(0.10, 0.62), Vector2(0.25, 0.62), Vector2(0.40, 0.62), Vector2(0.55, 0.62), Vector2(0.70, 0.62), Vector2(0.85, 0.62),
 	],
 	"Unit": [
-		Vector2(0.20, 0.28), Vector2(0.40, 0.28), Vector2(0.60, 0.28), Vector2(0.80, 0.28),
-		Vector2(0.28, 0.39), Vector2(0.48, 0.39), Vector2(0.68, 0.39), Vector2(0.88, 0.39),
-		Vector2(0.18, 0.50), Vector2(0.38, 0.50), Vector2(0.58, 0.50), Vector2(0.78, 0.50),
+		Vector2(0.12, 0.20), Vector2(0.30, 0.20), Vector2(0.48, 0.20), Vector2(0.66, 0.20), Vector2(0.84, 0.20),
+		Vector2(0.21, 0.30), Vector2(0.39, 0.30), Vector2(0.57, 0.30), Vector2(0.75, 0.30), Vector2(0.93, 0.30),
+		Vector2(0.12, 0.40), Vector2(0.30, 0.40), Vector2(0.48, 0.40), Vector2(0.66, 0.40), Vector2(0.84, 0.40),
+		Vector2(0.21, 0.50), Vector2(0.39, 0.50), Vector2(0.57, 0.50), Vector2(0.75, 0.50), Vector2(0.93, 0.50),
 	],
 }
 const STAGE_BIN_LABELS: Dictionary = {
@@ -42,11 +45,11 @@ const STAGE_TOP_GUARD_THICKNESS: float = 18.0
 const STAGE_TOP_GUARD_CLEARANCE: float = 8.0
 const STAGE_BOTTOM_CATCHER_HEIGHT: float = 34.0
 const MECHANISM_THICKNESS: float = 12.0
+const MOVING_PEG_RADIUS: float = 5.5
 const MECHANISM_BOUNCE: float = 0.86
 const MECHANISM_FRICTION: float = 0.015
-const LAUNCH_DIVERTER_CYCLE_SECONDS: float = 2.1
-const LAUNCH_RETURN_FLAP_CYCLE_SECONDS: float = 3.2
-const TUNING_QUALITY_CAM_CYCLE_SECONDS: float = 2.8
+const LAUNCH_MOVING_PEG_ROW_CYCLE_SECONDS: float = 3.0
+const TUNING_MOVING_PEG_BAND_CYCLE_SECONDS: float = 3.6
 const DEFAULT_STAGE_WIDTH: float = 340.0
 const DEFAULT_STAGE_HEIGHT: float = 112.0
 const VERIFIER_SOURCE: String = "verifier_seed"
@@ -74,7 +77,11 @@ const STAGE_BACKFLOW_REBOUND_SPEED: float = 240.0
 const BALL_FRICTION: float = 0.03
 const BALL_BOUNCE: float = 0.68
 const PEG_FRICTION: float = 0.02
-const PEG_BOUNCE: float = 0.78
+const PEG_BOUNCE: float = 0.92
+const FIXED_PEG_REBOUND_MIN_SPEED: float = 235.0
+const FIXED_PEG_REBOUND_MIN_UP_SPEED: float = 145.0
+const FIXED_PEG_REBOUND_SPEED_MULTIPLIER: float = 0.96
+const FIXED_PEG_REBOUND_INTERVAL_SECONDS: float = 0.045
 const WALL_FRICTION: float = 0.05
 const WALL_BOUNCE: float = 0.55
 const UNIT_GATE_FRICTION: float = 0.0
@@ -92,6 +99,8 @@ var blocked_bounce_count: int = 0
 var last_blocked_bounce: Dictionary = {}
 var unit_gate_contact_rebound_count: int = 0
 var last_unit_gate_contact_rebound: Dictionary = {}
+var fixed_peg_rebound_count: int = 0
+var last_fixed_peg_rebound: Dictionary = {}
 var stage_backflow_guard_count: int = 0
 var last_stage_backflow_guard: Dictionary = {}
 var _stage_rects: Dictionary = {}
@@ -107,6 +116,7 @@ var _last_launch_origin: Vector2 = Vector2.ZERO
 var _last_launch_velocity: Vector2 = Vector2.ZERO
 var _last_launch_angle: float = 0.0
 var _physics_tick_count: int = 0
+var _layout_physics_scale: float = 1.0
 
 func _ready() -> void:
 	_ensure_default_stage_rects()
@@ -146,8 +156,17 @@ func set_battle_elapsed(seconds: float) -> void:
 func set_redirect_resolver(resolver: Callable) -> void:
 	_redirect_resolver = resolver
 
+func set_layout_physics_scale(value: float) -> void:
+	var next_scale: float = clampf(value, 0.5, 2.0)
+	if is_equal_approx(_layout_physics_scale, next_scale):
+		return
+	_layout_physics_scale = next_scale
+	_clear_board_geometry()
+	_rebuild_board()
+
 func get_runtime_contract() -> Dictionary:
 	_rebuild_board()
+	_update_moving_mechanisms()
 	_ensure_preview_ball()
 	return {
 		"runtime_uses_preselected_target_labels": false,
@@ -156,6 +175,10 @@ func get_runtime_contract() -> Dictionary:
 		"bin_orders": _bin_order_snapshot(),
 		"has_visible_rigidbody_ball": _has_visible_rigidbody_ball(),
 		"has_physics_contract_nodes": has_physics_contract_nodes(),
+		"layout_physics_scale": _layout_physics_scale,
+		"scaled_ball_radius": _scaled(BALL_RADIUS),
+		"scaled_peg_radius": _scaled(PEG_RADIUS),
+		"scaled_mechanism_thickness": _scaled(MECHANISM_THICKNESS, 10.0),
 		"has_moving_mechanism_nodes": has_moving_mechanism_nodes(),
 		"physics_landing_count": physics_landing_count,
 		"last_physics_result": last_physics_result.duplicate(true),
@@ -167,6 +190,8 @@ func get_runtime_contract() -> Dictionary:
 		"last_blocked_bounce": last_blocked_bounce.duplicate(true),
 		"unit_gate_contact_rebound_count": unit_gate_contact_rebound_count,
 		"last_unit_gate_contact_rebound": last_unit_gate_contact_rebound.duplicate(true),
+		"fixed_peg_rebound_count": fixed_peg_rebound_count,
+		"last_fixed_peg_rebound": last_fixed_peg_rebound.duplicate(true),
 		"stage_backflow_guard_count": stage_backflow_guard_count,
 		"last_stage_backflow_guard": last_stage_backflow_guard.duplicate(true),
 		"has_unit_gate_blockers": _has_unit_gate_blockers(),
@@ -220,7 +245,7 @@ func simulate_unit_gate_contact_rebound_for_verifier(slot_id: int = 2) -> Dictio
 	body.set_meta("stage", "Unit")
 	body.set_meta("battle_elapsed", _battle_elapsed)
 	body.set_meta("last_unit_gate_contact_rebound_seconds", -999.0)
-	body.position = blocker.position + Vector2(0.0, -BALL_RADIUS - 2.0)
+	body.position = blocker.position + Vector2(0.0, -_ball_radius() - 2.0)
 	body.linear_velocity = Vector2.ZERO
 	active_ball = body
 	add_child(body)
@@ -234,6 +259,27 @@ func simulate_unit_gate_contact_rebound_for_verifier(slot_id: int = 2) -> Dictio
 		"last_rebound": last_unit_gate_contact_rebound.duplicate(true),
 	}
 
+func simulate_fixed_peg_rebound_for_verifier(stage: String = "Launch") -> Dictionary:
+	_ensure_default_stage_rects()
+	_rebuild_board()
+	set_battle_elapsed(0.0)
+	var peg: StaticBody2D = _first_peg_body_for_stage(stage)
+	if peg == null:
+		return {}
+	_remove_preview_ball()
+	var body := _make_ball(MachineBallPayloadScript.clean("fixed_peg_rebound_verifier"))
+	body.name = "FixedPegReboundVerifierBall"
+	body.set_meta("stage", stage)
+	body.set_meta("last_fixed_peg_rebound_seconds", -999.0)
+	body.position = peg.position + Vector2(0.0, -_ball_radius() - _peg_radius() + 1.0)
+	body.linear_velocity = Vector2(42.0, 230.0)
+	add_child(body)
+	_bounce_body_from_fixed_peg_contact(body, peg)
+	var record: Dictionary = last_fixed_peg_rebound.duplicate(true)
+	remove_child(body)
+	body.free()
+	return record
+
 func simulate_stage_backflow_guard_for_verifier(stage: String = "Unit") -> Dictionary:
 	_ensure_default_stage_rects()
 	_rebuild_board()
@@ -243,8 +289,8 @@ func simulate_stage_backflow_guard_for_verifier(stage: String = "Unit") -> Dicti
 	var guard: StaticBody2D = _stage_top_guard(stage)
 	var guard_size: Vector2 = _static_rectangle_size(guard)
 	var guard_bottom_y: float = guard.position.y + guard_size.y * 0.5 if guard != null else -INF
-	var contact_limit_y: float = guard_bottom_y + BALL_RADIUS
-	var start_position := Vector2(rect.get_center().x, rect.position.y - BALL_RADIUS)
+	var contact_limit_y: float = guard_bottom_y + _ball_radius()
+	var start_position := Vector2(rect.get_center().x, rect.position.y - _ball_radius())
 	var upward_velocity := Vector2(0.0, -260.0)
 	_remove_preview_ball()
 	var body := _make_ball(MachineBallPayloadScript.clean("stage_backflow_guard_verifier"))
@@ -349,6 +395,7 @@ func _rebuild_board() -> void:
 	_ensure_default_stage_rects()
 	if get_node_or_null("StaticGeometry") != null:
 		_update_launcher_turret()
+		_update_moving_mechanisms()
 		_update_unit_gate_blockers()
 		return
 
@@ -386,8 +433,9 @@ func _clear_board_geometry() -> void:
 
 func _build_stage_geometry(stage: String, labels: Array[String], color: Color) -> void:
 	var rect: Rect2 = _stage_rect(stage)
-	_add_wall(stage + "LeftWall", rect.position + Vector2(WALL_THICKNESS * 0.5, rect.size.y * 0.5), Vector2(WALL_THICKNESS, rect.size.y), color.darkened(0.35))
-	_add_wall(stage + "RightWall", rect.position + Vector2(rect.size.x - WALL_THICKNESS * 0.5, rect.size.y * 0.5), Vector2(WALL_THICKNESS, rect.size.y), color.darkened(0.35))
+	var wall_thickness: float = _wall_thickness()
+	_add_wall(stage + "LeftWall", rect.position + Vector2(wall_thickness * 0.5, rect.size.y * 0.5), Vector2(wall_thickness, rect.size.y), color.darkened(0.35))
+	_add_wall(stage + "RightWall", rect.position + Vector2(rect.size.x - wall_thickness * 0.5, rect.size.y * 0.5), Vector2(wall_thickness, rect.size.y), color.darkened(0.35))
 	_add_stage_top_guard(stage, rect, color)
 	_build_stage_pegs(stage, rect, color)
 	_build_stage_mechanisms(stage, rect, color)
@@ -418,63 +466,158 @@ func _build_stage_pegs(stage: String, rect: Rect2, color: Color) -> void:
 func _build_stage_mechanisms(stage: String, rect: Rect2, color: Color) -> void:
 	match stage:
 		"Launch":
-			_add_moving_mechanism(
+			var launch_motion_range: float = _moving_peg_motion_range(rect, 0.02)
+			var launch_edge_x: float = _moving_peg_edge_margin_ratio(rect, launch_motion_range)
+			var launch_right_edge_x: float = 1.0 - launch_edge_x
+			_add_moving_peg_group(
 				stage,
-				"LaunchDiverterPaddle",
-				"launch_diverter",
-				rect.position + Vector2(rect.size.x * 0.46, rect.size.y * 0.34),
-				Vector2(rect.size.x * 0.24, MECHANISM_THICKNESS),
-				deg_to_rad(-7.0),
-				deg_to_rad(22.0),
-				LAUNCH_DIVERTER_CYCLE_SECONDS,
-				0.0,
-				color
-			)
-			_add_moving_mechanism(
-				stage,
-				"LaunchReturnFlap",
-				"launch_return_flap",
-				rect.position + Vector2(rect.size.x * 0.68, rect.size.y * 0.52),
-				Vector2(rect.size.x * 0.17, MECHANISM_THICKNESS),
-				deg_to_rad(14.0),
-				deg_to_rad(17.0),
-				LAUNCH_RETURN_FLAP_CYCLE_SECONDS,
-				PI * 0.5,
+				"LaunchMovingPegRow",
+				"launch_moving_peg_row",
+				"moving_peg_row",
+				[
+					{
+						"phase_offset": 0.0,
+						"points": _moving_peg_full_width_points(launch_edge_x, launch_right_edge_x, 0.36, 15, 0.0),
+					},
+				],
+				rect,
+				Vector2.RIGHT,
+				launch_motion_range,
+				LAUNCH_MOVING_PEG_ROW_CYCLE_SECONDS,
 				color
 			)
 		"Tuning":
-			_add_moving_mechanism(
+			var tuning_motion_range: float = _moving_peg_motion_range(rect, 0.02)
+			var tuning_edge_x: float = _moving_peg_edge_margin_ratio(rect, tuning_motion_range)
+			var tuning_right_edge_x: float = 1.0 - tuning_edge_x
+			_add_moving_peg_group(
 				stage,
-				"TuningQualityCam",
-				"tuning_quality_cam",
-				rect.position + Vector2(rect.size.x * 0.28, rect.size.y * 0.42),
-				Vector2(rect.size.x * 0.22, MECHANISM_THICKNESS),
-				deg_to_rad(12.0),
-				deg_to_rad(24.0),
-				TUNING_QUALITY_CAM_CYCLE_SECONDS,
-				PI * 0.25,
+				"TuningMovingPegBand",
+				"tuning_moving_peg_band",
+				"moving_peg_band",
+				[
+					{
+						"phase_offset": 0.0,
+						"points": _moving_peg_full_width_points(tuning_edge_x, tuning_right_edge_x, 0.35, 13, 0.0),
+					},
+					{
+						"phase_offset": 0.0,
+						"points": _moving_peg_full_width_points(tuning_edge_x, tuning_right_edge_x, 0.52, 13, 0.5),
+					},
+				],
+				rect,
+				Vector2.RIGHT,
+				tuning_motion_range,
+				TUNING_MOVING_PEG_BAND_CYCLE_SECONDS,
 				color
 			)
 
-func _add_moving_mechanism(
+func _moving_peg_motion_range(rect: Rect2, ratio: float) -> float:
+	return clampf(rect.size.x * ratio, _scaled(6.0, 4.0), _scaled(24.0, 12.0))
+
+func _moving_peg_edge_margin_ratio(rect: Rect2, motion_range: float) -> float:
+	if rect.size.x <= 0.0:
+		return 0.05
+	var margin: float = motion_range + _moving_peg_radius() + 1.0
+	return clampf(margin / rect.size.x, 0.02, 0.20)
+
+func _moving_peg_full_width_points(left_x: float, right_x: float, y_ratio: float, count: int, phase_bias: float) -> Array:
+	var points: Array = []
+	var safe_count: int = maxi(count, 2)
+	for index: int in range(safe_count):
+		var t: float = float(index) / float(safe_count - 1)
+		var phase: float = fposmod(phase_bias + t * 0.84, 1.0)
+		if index == 0:
+			phase = phase_bias
+		elif index == safe_count - 1:
+			phase = fposmod(phase_bias + 0.5, 1.0)
+		points.append({
+			"position": Vector2(lerpf(left_x, right_x, t), y_ratio),
+			"phase_offset": phase,
+		})
+	return points
+
+func _add_moving_peg_group(
 	stage: String,
-	mechanism_name: String,
+	group_name: String,
 	motion_role: String,
-	home_position: Vector2,
-	body_size: Vector2,
-	home_rotation: float,
-	swing_angle: float,
+	motion_kind: String,
+	row_layouts: Array,
+	rect: Rect2,
+	motion_axis: Vector2,
+	motion_range: float,
 	cycle_seconds: float,
-	phase_offset: float,
 	color: Color
 ) -> void:
 	var mechanisms: Node = get_node_or_null("Mechanisms")
 	if mechanisms == null:
 		return
-	if mechanisms.get_node_or_null(mechanism_name) != null:
+	var axis: Vector2 = motion_axis.normalized() if motion_axis.length() > 0.001 else Vector2.RIGHT
+	var peg_index: int = 0
+	for row_index: int in range(row_layouts.size()):
+		var row_variant: Variant = row_layouts[row_index]
+		if not (row_variant is Dictionary):
+			continue
+		var row: Dictionary = row_variant as Dictionary
+		var points_variant: Variant = row.get("points", [])
+		if not (points_variant is Array):
+			continue
+		var phase_offset: float = float(row.get("phase_offset", 0.0))
+		var points: Array = points_variant as Array
+		for point_variant: Variant in points:
+			var normalized_position := Vector2.INF
+			var point_phase_offset: float = phase_offset
+			if point_variant is Dictionary:
+				var point_info: Dictionary = point_variant as Dictionary
+				var position_variant: Variant = point_info.get("position", Vector2.INF)
+				if position_variant is Vector2:
+					normalized_position = position_variant as Vector2
+				point_phase_offset += float(point_info.get("phase_offset", 0.0))
+			elif point_variant is Vector2:
+				normalized_position = point_variant as Vector2
+			if not _is_finite_vector2(normalized_position):
+				continue
+			peg_index += 1
+			var home_position := rect.position + Vector2(rect.size.x * normalized_position.x, rect.size.y * normalized_position.y)
+			_add_moving_peg_body(
+				stage,
+				group_name,
+				"%s_R%dP%02d" % [group_name, row_index + 1, peg_index],
+				motion_role,
+				motion_kind,
+				home_position,
+				axis,
+				motion_range,
+				cycle_seconds,
+				point_phase_offset,
+				row_index,
+				row_layouts.size(),
+				color
+			)
+
+func _add_moving_peg_body(
+	stage: String,
+	group_name: String,
+	body_name: String,
+	motion_role: String,
+	motion_kind: String,
+	home_position: Vector2,
+	motion_axis: Vector2,
+	motion_range: float,
+	cycle_seconds: float,
+	phase_offset: float,
+	row_index: int,
+	row_count: int,
+	color: Color
+) -> void:
+	var mechanisms: Node = get_node_or_null("Mechanisms")
+	if mechanisms == null:
 		return
+	if mechanisms.get_node_or_null(body_name) != null:
+		return
+	var radius: float = _moving_peg_radius()
 	var body := AnimatableBody2D.new()
-	body.name = mechanism_name
+	body.name = body_name
 	body.z_index = 0
 	body.z_as_relative = true
 	body.visible = true
@@ -487,49 +630,50 @@ func _add_moving_mechanism(
 	body.set_meta("physics_role", "moving_landing_mechanism")
 	body.set_meta("motion_role", motion_role)
 	body.set_meta("moving_mechanism", true)
+	body.set_meta("moving_peg", true)
+	body.set_meta("mechanism_group", group_name)
 	body.set_meta("uses_physics_time", true)
-	body.set_meta("motion_kind", "rotating_paddle")
+	body.set_meta("motion_kind", motion_kind)
+	body.set_meta("motion_profile", "ping_pong_uniform")
 	body.set_meta("changes_landing_locally", true)
 	body.set_meta("does_not_replace_bin_widths", true)
 	body.set_meta("home_position", home_position)
-	body.set_meta("home_rotation", home_rotation)
-	body.set_meta("swing_angle", swing_angle)
+	body.set_meta("home_rotation", 0.0)
+	body.set_meta("motion_axis", motion_axis)
+	body.set_meta("motion_range", motion_range)
 	body.set_meta("cycle_seconds", cycle_seconds)
 	body.set_meta("phase_offset", phase_offset)
-	body.set_meta("body_size", body_size)
+	body.set_meta("row_index", row_index)
+	body.set_meta("row_count", row_count)
+	body.set_meta("peg_radius", radius)
+	body.set_meta("body_size", Vector2(radius * 2.0, radius * 2.0))
 	body.set_meta("bounce", MECHANISM_BOUNCE)
 	body.set_meta("friction", MECHANISM_FRICTION)
 
 	var shape_node := CollisionShape2D.new()
-	shape_node.name = "MechanismShape"
-	var shape := RectangleShape2D.new()
-	shape.size = body_size
+	shape_node.name = "MovingPegShape"
+	var shape := CircleShape2D.new()
+	shape.radius = radius
 	shape_node.shape = shape
 	body.add_child(shape_node)
 
 	var visual := Polygon2D.new()
-	visual.name = "MechanismPlate"
+	visual.name = "MovingPegVisual"
 	visual.z_index = 1
 	visual.z_as_relative = true
-	visual.color = color.darkened(0.04)
-	visual.polygon = PackedVector2Array([
-		Vector2(-body_size.x * 0.5, -body_size.y * 0.5),
-		Vector2(body_size.x * 0.5, -body_size.y * 0.5),
-		Vector2(body_size.x * 0.5, body_size.y * 0.5),
-		Vector2(-body_size.x * 0.5, body_size.y * 0.5),
-	])
+	visual.color = color.lightened(0.12)
+	visual.polygon = _circle_polygon(radius, 18)
 	body.add_child(visual)
-	var highlight := Line2D.new()
-	highlight.name = "MechanismHighlight"
-	highlight.z_index = 2
-	highlight.z_as_relative = true
-	highlight.default_color = color.lightened(0.28)
-	highlight.width = maxf(2.0, MECHANISM_THICKNESS * 0.25)
-	highlight.points = PackedVector2Array([
-		Vector2(-body_size.x * 0.46, 0.0),
-		Vector2(body_size.x * 0.46, 0.0),
-	])
-	body.add_child(highlight)
+
+	var ring := Line2D.new()
+	ring.name = "MovingPegRing"
+	ring.z_index = 2
+	ring.z_as_relative = true
+	ring.default_color = Color("#f4f0d8")
+	ring.width = maxf(1.5, radius * 0.28)
+	ring.points = _circle_outline_points(radius * 1.18, 18)
+	body.add_child(ring)
+
 	mechanisms.add_child(body)
 	_apply_moving_mechanism_transform(body)
 	body.reset_physics_interpolation()
@@ -543,17 +687,33 @@ func _update_moving_mechanisms() -> void:
 			_apply_moving_mechanism_transform(child as AnimatableBody2D)
 
 func _apply_moving_mechanism_transform(body: AnimatableBody2D) -> void:
+	if bool(body.get_meta("moving_peg", false)):
+		_apply_moving_peg_transform(body)
+
+func _apply_moving_peg_transform(body: AnimatableBody2D) -> void:
 	var home_position_variant: Variant = body.get_meta("home_position", body.position)
-	var home_position: Vector2 = body.position
-	if home_position_variant is Vector2:
-		home_position = home_position_variant as Vector2
-	var home_rotation: float = float(body.get_meta("home_rotation", 0.0))
-	var swing_angle: float = float(body.get_meta("swing_angle", 0.0))
+	var home_position: Vector2 = home_position_variant as Vector2 if home_position_variant is Vector2 else body.position
+	var axis_variant: Variant = body.get_meta("motion_axis", Vector2.RIGHT)
+	var axis: Vector2 = axis_variant as Vector2 if axis_variant is Vector2 else Vector2.RIGHT
+	if axis.length() <= 0.001:
+		axis = Vector2.RIGHT
+	axis = axis.normalized()
+	var motion_range: float = maxf(0.0, float(body.get_meta("motion_range", 0.0)))
 	var cycle_seconds: float = maxf(0.1, float(body.get_meta("cycle_seconds", 1.0)))
 	var phase_offset: float = float(body.get_meta("phase_offset", 0.0))
-	var phase: float = fmod(maxf(0.0, _battle_elapsed), cycle_seconds) / cycle_seconds * TAU + phase_offset
-	body.position = home_position
-	body.rotation = home_rotation + sin(phase) * swing_angle
+	var ratio: float = _ping_pong_ratio(_battle_elapsed, cycle_seconds, phase_offset)
+	var offset: float = (ratio - 0.5) * 2.0 * motion_range
+	var next_position: Vector2 = home_position + axis * offset
+	body.transform = Transform2D(0.0, next_position)
+	body.set_meta("current_position", next_position)
+	body.set_meta("current_rotation", 0.0)
+	if body.is_inside_tree():
+		body.force_update_transform()
+
+func _ping_pong_ratio(seconds: float, cycle_seconds: float, phase_offset: float) -> float:
+	var cycle: float = maxf(0.1, cycle_seconds)
+	var unit: float = fposmod(maxf(0.0, seconds) / cycle + phase_offset, 1.0)
+	return 1.0 - absf(unit * 2.0 - 1.0)
 
 func _stage_labels(stage: String) -> Array[String]:
 	var labels: Array[String] = []
@@ -599,7 +759,7 @@ func _build_unit_gate_blockers(labels: Array[String], color: Color) -> void:
 		var shape_node := CollisionShape2D.new()
 		shape_node.name = "GateShape"
 		var shape := RectangleShape2D.new()
-		shape.size = Vector2(UNIT_GATE_MIN_COLLISION_WIDTH, 24.0 + UNIT_GATE_PLATE_EXTRA_HEIGHT)
+		shape.size = Vector2(UNIT_GATE_MIN_COLLISION_WIDTH, _scaled(24.0) + _unit_gate_plate_extra_height())
 		shape_node.shape = shape
 		blocker.add_child(shape_node)
 
@@ -627,14 +787,15 @@ func _update_unit_gate_blockers() -> void:
 		var bin_size: Vector2 = _bin_size(bin)
 		var ratio: float = _slot_exposure_ratio(slot_id, _battle_elapsed)
 		var closed_width: float = maxf(0.0, bin_size.x * (1.0 - ratio))
-		var closed_height: float = bin_size.y + UNIT_GATE_PLATE_EXTRA_HEIGHT
+		var plate_extra_height: float = _unit_gate_plate_extra_height()
+		var closed_height: float = bin_size.y + plate_extra_height
 		var active: bool = closed_width > UNIT_GATE_MIN_COLLISION_WIDTH
 		var shape_width: float = maxf(UNIT_GATE_MIN_COLLISION_WIDTH, closed_width)
 		var slot_left: float = bin.position.x - bin_size.x * 0.5
 		var exposed_width: float = bin_size.x * ratio
 
 		blocker.visible = active
-		blocker.position = Vector2(slot_left + exposed_width + shape_width * 0.5, bin.position.y - UNIT_GATE_PLATE_EXTRA_HEIGHT * 0.25)
+		blocker.position = Vector2(slot_left + exposed_width + shape_width * 0.5, bin.position.y - plate_extra_height * 0.25)
 		blocker.set_meta("exposure_ratio", ratio)
 		blocker.set_meta("closed_width", closed_width)
 		blocker.set_meta("is_closed", active)
@@ -653,13 +814,19 @@ func _update_gate_plate_visual(blocker: StaticBody2D, plate_size: Vector2, ratio
 	var visual: Polygon2D = blocker.get_node_or_null("GatePlate") as Polygon2D
 	if visual == null:
 		return
+	var visual_height: float = minf(_scaled(MACHINE_BIN_RAIL_HEIGHT, 4.0), 10.0)
+	var visual_size := Vector2(plate_size.x, visual_height)
+	visual.position = Vector2(0.0, -plate_size.y * 0.5 + visual_height * 0.5)
 	visual.color = Color("#6d527a") if ratio > 0.0 else Color("#493750")
 	visual.polygon = PackedVector2Array([
-		Vector2(-plate_size.x * 0.5, -plate_size.y * 0.5),
-		Vector2(plate_size.x * 0.5, -plate_size.y * 0.5),
-		Vector2(plate_size.x * 0.5, plate_size.y * 0.5),
-		Vector2(-plate_size.x * 0.5, plate_size.y * 0.5),
+		Vector2(-visual_size.x * 0.5, -visual_size.y * 0.5),
+		Vector2(visual_size.x * 0.5, -visual_size.y * 0.5),
+		Vector2(visual_size.x * 0.5, visual_size.y * 0.5),
+		Vector2(-visual_size.x * 0.5, visual_size.y * 0.5),
 	])
+	blocker.set_meta("blocker_collision_height", plate_size.y)
+	blocker.set_meta("blocker_visual_height", visual_height)
+	blocker.set_meta("blocker_visual_role", "thin_exposure_gate_strip")
 
 func _add_peg(stage: String, peg_name: String, peg_position: Vector2, color: Color) -> void:
 	var peg := StaticBody2D.new()
@@ -677,10 +844,10 @@ func _add_peg(stage: String, peg_name: String, peg_position: Vector2, color: Col
 	peg.set_meta("friction", PEG_FRICTION)
 	var shape_node := CollisionShape2D.new()
 	var shape := CircleShape2D.new()
-	shape.radius = PEG_RADIUS
+	shape.radius = _peg_radius()
 	shape_node.shape = shape
 	peg.add_child(shape_node)
-	peg.add_child(_make_disc_visual(PEG_RADIUS, color, 10))
+	peg.add_child(_make_disc_visual(_peg_radius(), color, 10))
 	get_node("StaticGeometry").add_child(peg)
 
 func _add_stage_top_guard(stage: String, rect: Rect2, color: Color) -> void:
@@ -744,7 +911,7 @@ func _add_bin(stage: String, label: String, bin_position: Vector2, bin_size: Vec
 	shape_node.shape = shape
 	bin.add_child(shape_node)
 	var visual := Polygon2D.new()
-	var visual_height: float = MACHINE_BIN_RAIL_HEIGHT
+	var visual_height: float = _scaled(MACHINE_BIN_RAIL_HEIGHT, 4.0)
 	var visual_top: float = bin_size.y * 0.5 - visual_height
 	visual.color = color.darkened(0.72)
 	bin.set_meta("visual_role", "landing_rail")
@@ -761,7 +928,8 @@ func _add_bin(stage: String, label: String, bin_position: Vector2, bin_size: Vec
 	_stage_bins["%s:%s" % [stage, label]] = bin
 
 func _add_stage_bottom_catcher(stage: String, labels: Array[String], rect: Rect2) -> void:
-	var catcher_size := Vector2(rect.size.x, maxf(STAGE_BOTTOM_CATCHER_HEIGHT, rect.size.y * 0.42))
+	var desired_height: float = maxf(_scaled(STAGE_BOTTOM_CATCHER_HEIGHT), _ball_radius() * 3.0)
+	var catcher_size := Vector2(rect.size.x, minf(desired_height, rect.size.y * 0.36))
 	var catcher := Area2D.new()
 	catcher.name = "%sBottomCatchAll" % stage
 	catcher.position = Vector2(rect.get_center().x, rect.end.y - catcher_size.y * 0.5)
@@ -873,11 +1041,11 @@ func _make_ball(ball: Dictionary) -> RigidBody2D:
 	body.set_meta("tuning_value", 1)
 	var shape_node := CollisionShape2D.new()
 	var shape := CircleShape2D.new()
-	shape.radius = BALL_RADIUS
+	shape.radius = _ball_radius()
 	shape_node.shape = shape
 	body.add_child(shape_node)
 	var ball_color: Color = Color("#f4f0d8") if String(payload.get("kind", "clean")) != "junk" else Color("#6f5f35")
-	body.add_child(_make_disc_visual(BALL_RADIUS, ball_color, 18))
+	body.add_child(_make_disc_visual(_ball_radius(), ball_color, 18))
 	body.body_entered.connect(_on_ball_body_entered.bind(body))
 	return body
 
@@ -965,9 +1133,13 @@ func _on_bin_body_entered(body: Node2D, bin: Area2D) -> void:
 func _on_ball_body_entered(collided_body: Node, ball_body: RigidBody2D) -> void:
 	if ball_body == null or not is_instance_valid(ball_body):
 		return
-	if collided_body == null or not bool(collided_body.get_meta("unit_gate_blocker", false)):
+	if collided_body == null:
 		return
-	call_deferred("_bounce_body_from_unit_gate_blocker_contact", ball_body, collided_body)
+	if bool(collided_body.get_meta("unit_gate_blocker", false)):
+		call_deferred("_bounce_body_from_unit_gate_blocker_contact", ball_body, collided_body)
+		return
+	if bool(collided_body.get_meta("peg_bumper", false)):
+		call_deferred("_bounce_body_from_fixed_peg_contact", ball_body, collided_body)
 
 func _bounce_body_from_unit_gate_blocker_contact(body: RigidBody2D, blocker_node: Node) -> void:
 	if not is_instance_valid(body) or blocker_node == null:
@@ -1018,6 +1190,60 @@ func _bounce_body_from_unit_gate_blocker_contact(body: RigidBody2D, blocker_node
 	body.linear_velocity = rebound_velocity
 	body.angular_velocity = side_sign * 5.5
 	body.reset_physics_interpolation()
+
+func _bounce_body_from_fixed_peg_contact(body: RigidBody2D, peg_node: Node) -> void:
+	if not is_instance_valid(body) or peg_node == null:
+		return
+	var now_seconds: float = float(Time.get_ticks_msec()) / 1000.0
+	var last_rebound_seconds: float = float(body.get_meta("last_fixed_peg_rebound_seconds", -999.0))
+	if now_seconds - last_rebound_seconds < FIXED_PEG_REBOUND_INTERVAL_SECONDS:
+		return
+	body.set_meta("last_fixed_peg_rebound_seconds", now_seconds)
+	var before_velocity: Vector2 = body.linear_velocity
+	var normal: Vector2 = _fixed_peg_contact_normal(body, peg_node)
+	if normal.length() <= 0.001:
+		return
+	var incoming: Vector2 = before_velocity
+	if incoming.length() < 1.0:
+		incoming = -normal * FIXED_PEG_REBOUND_MIN_SPEED
+	var reflected: Vector2 = incoming
+	if incoming.dot(normal) < 0.0:
+		reflected = incoming - normal * (2.0 * incoming.dot(normal))
+	else:
+		reflected = -normal * maxf(incoming.length(), FIXED_PEG_REBOUND_MIN_SPEED)
+	var rebound_speed: float = maxf(reflected.length() * FIXED_PEG_REBOUND_SPEED_MULTIPLIER, FIXED_PEG_REBOUND_MIN_SPEED)
+	var after_velocity: Vector2 = reflected.normalized() * rebound_speed
+	if normal.y < -0.15 and after_velocity.y > -FIXED_PEG_REBOUND_MIN_UP_SPEED:
+		after_velocity.y = -FIXED_PEG_REBOUND_MIN_UP_SPEED
+		after_velocity = after_velocity.normalized() * maxf(after_velocity.length(), rebound_speed)
+	body.linear_velocity = after_velocity
+	body.angular_velocity += clampf(after_velocity.x / 42.0, -6.0, 6.0)
+	body.sleeping = false
+	body.reset_physics_interpolation()
+	fixed_peg_rebound_count += 1
+	last_fixed_peg_rebound = {
+		"source": "fixed_peg_rebound",
+		"stage": String(peg_node.get_meta("stage", body.get_meta("stage", ""))),
+		"peg_name": peg_node.name,
+		"chain_id": String(body.get_meta("chain_id", "")),
+		"normal": normal,
+		"before_velocity": before_velocity,
+		"after_velocity": after_velocity,
+		"min_speed": FIXED_PEG_REBOUND_MIN_SPEED,
+		"min_up_speed": FIXED_PEG_REBOUND_MIN_UP_SPEED,
+	}
+	body.set_meta("last_fixed_peg_rebound", last_fixed_peg_rebound.duplicate(true))
+
+func _fixed_peg_contact_normal(body: RigidBody2D, peg_node: Node) -> Vector2:
+	var peg_node_2d: Node2D = peg_node as Node2D
+	if peg_node_2d == null:
+		return Vector2.ZERO
+	var delta: Vector2 = body.global_position - peg_node_2d.global_position
+	if delta.length() <= 0.001:
+		if body.linear_velocity.length() > 0.001:
+			return -body.linear_velocity.normalized()
+		return Vector2.UP
+	return delta.normalized()
 
 func _resolve_tuning_redirect(natural_result_id: String, body: RigidBody2D) -> Dictionary:
 	redirect_requested.emit(natural_result_id, body)
@@ -1273,7 +1499,7 @@ func _rotated_rectangle_bounds(center: Vector2, rect_size: Vector2, rotation: fl
 
 func _stage_entry_y(stage: String) -> float:
 	var rect: Rect2 = _stage_rect(stage)
-	return rect.position.y + STAGE_TOP_GUARD_THICKNESS + BALL_RADIUS + STAGE_TOP_GUARD_CLEARANCE
+	return rect.position.y + STAGE_TOP_GUARD_THICKNESS + _ball_radius() + STAGE_TOP_GUARD_CLEARANCE
 
 func _bin_center(stage: String, label: String) -> Vector2:
 	var key: String = "%s:%s" % [stage, label]
@@ -1506,6 +1732,9 @@ func _unit_gate_visual_snapshot() -> Dictionary:
 			"blocker_z_index": blocker.z_index if blocker != null else 0,
 			"exposure_ratio": float(blocker.get_meta("exposure_ratio", 0.0)) if blocker != null else 0.0,
 			"closed_width": float(blocker.get_meta("closed_width", 0.0)) if blocker != null else 0.0,
+			"blocker_visual_height": float(blocker.get_meta("blocker_visual_height", 0.0)) if blocker != null else 0.0,
+			"blocker_collision_height": float(blocker.get_meta("blocker_collision_height", 0.0)) if blocker != null else 0.0,
+			"blocker_visual_role": String(blocker.get_meta("blocker_visual_role", "")) if blocker != null else "",
 			"bin_visual_role": String(bin.get_meta("visual_role", "")) if bin != null else "",
 			"bin_visual_height": float(bin.get_meta("visual_height", 0.0)) if bin != null else 0.0,
 		}
@@ -1526,7 +1755,7 @@ func _stage_top_guard_snapshot() -> Dictionary:
 			"stage_top_y": rect.position.y,
 			"guard_top_y": guard.position.y - guard_size.y * 0.5 if guard != null else -INF,
 			"guard_bottom_y": guard_bottom_y,
-			"ball_contact_limit_y": guard_bottom_y + BALL_RADIUS if guard != null else -INF,
+			"ball_contact_limit_y": guard_bottom_y + _ball_radius() if guard != null else -INF,
 			"width": guard_size.x,
 			"required_width": rect.size.x,
 			"full_width": guard_size.x >= rect.size.x - 0.5,
@@ -1669,16 +1898,19 @@ func _peg_grid_snapshot() -> Dictionary:
 		var max_x: float = -INF
 		var min_y: float = INF
 		var max_y: float = -INF
+		var rows: Dictionary = {}
 		for point: Vector2 in layout:
 			min_x = minf(min_x, point.x)
 			max_x = maxf(max_x, point.x)
 			min_y = minf(min_y, point.y)
 			max_y = maxf(max_y, point.y)
+			rows["%.3f" % point.y] = true
 		snapshot[stage] = {
 			"layout_type": "fixed_template",
 			"template_count": layout.size(),
 			"expected_count": layout.size(),
 			"actual_count": int(_peg_count_snapshot().get(stage, 0)),
+			"row_count": rows.size(),
 			"min_x_ratio": min_x if layout.size() > 0 else 0.0,
 			"max_x_ratio": max_x if layout.size() > 0 else 0.0,
 			"min_y_ratio": min_y if layout.size() > 0 else 0.0,
@@ -1692,6 +1924,11 @@ func _moving_mechanism_count_snapshot() -> Dictionary:
 		"Tuning": 0,
 		"Unit": 0,
 	}
+	var groups_by_stage: Dictionary = {
+		"Launch": {},
+		"Tuning": {},
+		"Unit": {},
+	}
 	var mechanisms: Node = get_node_or_null("Mechanisms")
 	if mechanisms == null:
 		return counts
@@ -1699,8 +1936,14 @@ func _moving_mechanism_count_snapshot() -> Dictionary:
 		if not bool(child.get_meta("moving_mechanism", false)):
 			continue
 		var stage: String = String(child.get_meta("stage", ""))
-		if counts.has(stage):
-			counts[stage] = int(counts[stage]) + 1
+		if not groups_by_stage.has(stage):
+			continue
+		var group_name: String = String(child.get_meta("mechanism_group", child.name))
+		var stage_groups: Dictionary = groups_by_stage[stage] as Dictionary
+		stage_groups[group_name] = true
+	for stage: String in counts.keys():
+		var stage_groups: Dictionary = groups_by_stage[stage] as Dictionary
+		counts[stage] = stage_groups.size()
 	return counts
 
 func _moving_mechanism_snapshot() -> Dictionary:
@@ -1708,50 +1951,132 @@ func _moving_mechanism_snapshot() -> Dictionary:
 	var mechanisms: Node = get_node_or_null("Mechanisms")
 	if mechanisms == null:
 		return snapshot
-	var names: Array[String] = []
+	var grouped_children: Dictionary = {}
 	for child: Node in mechanisms.get_children():
-		if bool(child.get_meta("moving_mechanism", false)):
-			names.append(child.name)
+		if child is AnimatableBody2D and bool(child.get_meta("moving_mechanism", false)):
+			var group_name: String = String(child.get_meta("mechanism_group", child.name))
+			var children: Array = grouped_children.get(group_name, []) as Array
+			children.append(child)
+			grouped_children[group_name] = children
+	var names: Array = grouped_children.keys()
 	names.sort()
-	for mechanism_name: String in names:
-		var child: Node = mechanisms.get_node_or_null(mechanism_name)
-		if child == null:
+	for mechanism_name_variant: Variant in names:
+		var mechanism_name := String(mechanism_name_variant)
+		var children: Array = grouped_children.get(mechanism_name, []) as Array
+		if children.is_empty():
 			continue
-		var stage: String = String(child.get_meta("stage", ""))
-		var body_size_variant: Variant = child.get_meta("body_size", Vector2.ZERO)
-		var body_size: Vector2 = body_size_variant as Vector2 if body_size_variant is Vector2 else Vector2.ZERO
-		var visual: Polygon2D = child.get_node_or_null("MechanismPlate") as Polygon2D
-		var highlight: Line2D = child.get_node_or_null("MechanismHighlight") as Line2D
-		var body: AnimatableBody2D = child as AnimatableBody2D
-		var stage_rect: Rect2 = _stage_rect(stage)
-		var mechanism_bounds := _rotated_rectangle_bounds(body.position, body_size, body.rotation) if body != null else Rect2()
-		snapshot[mechanism_name] = {
-			"node_type": child.get_class(),
-			"stage": stage,
-			"physics_role": String(child.get_meta("physics_role", "")),
-			"motion_role": String(child.get_meta("motion_role", "")),
-			"motion_kind": String(child.get_meta("motion_kind", "")),
-			"uses_physics_time": bool(child.get_meta("uses_physics_time", false)),
-			"changes_landing_locally": bool(child.get_meta("changes_landing_locally", false)),
-			"does_not_replace_bin_widths": bool(child.get_meta("does_not_replace_bin_widths", false)),
-			"cycle_seconds": float(child.get_meta("cycle_seconds", 0.0)),
-			"swing_angle": float(child.get_meta("swing_angle", 0.0)),
-			"visible": body != null and body.visible,
-			"plate_visible": visual != null and visual.visible,
-			"highlight_visible": highlight != null and highlight.visible,
-			"position": body.position if body != null else Vector2.INF,
-			"rotation": body.rotation if body != null else 0.0,
-			"body_size": body_size,
-			"bounds": mechanism_bounds,
-			"stage_rect_contains_center": stage_rect.has_point(body.position) if body != null else false,
-			"stage_rect_intersects_bounds": mechanism_bounds.intersects(stage_rect.grow(1.0)) if body != null else false,
-			"minimum_visible_thickness": minf(body_size.x, body_size.y),
-			"visual_alpha": visual.color.a if visual != null else 0.0,
-			"visual_z_index": visual.z_index if visual != null else -999,
-			"body_z_index": body.z_index if body != null else -999,
-			"body_z_as_relative": body.z_as_relative if body != null else false,
-		}
+		var first_child: Node = children[0] as Node
+		if first_child != null and bool(first_child.get_meta("moving_peg", false)):
+			snapshot[mechanism_name] = _moving_peg_group_snapshot(mechanism_name, children)
 	return snapshot
+
+func _moving_peg_group_snapshot(group_name: String, children: Array) -> Dictionary:
+	var first_body: AnimatableBody2D = children[0] as AnimatableBody2D
+	if first_body == null:
+		return {}
+	var stage: String = String(first_body.get_meta("stage", ""))
+	var stage_rect: Rect2 = _stage_rect(stage)
+	var peg_positions: Array = []
+	var row_indices: Dictionary = {}
+	var bounds := Rect2()
+	var sweep_bounds := Rect2()
+	var has_bounds := false
+	var has_sweep_bounds := false
+	var all_visible := true
+	var all_inside := true
+	var peg_visuals_visible := true
+	var max_body_size := Vector2.ZERO
+	var minimum_alpha: float = 1.0
+	for child_variant: Variant in children:
+		var body: AnimatableBody2D = child_variant as AnimatableBody2D
+		if body == null:
+			continue
+		_apply_moving_mechanism_transform(body)
+		var radius: float = maxf(0.0, float(body.get_meta("peg_radius", 0.0)))
+		var body_size := Vector2(radius * 2.0, radius * 2.0)
+		max_body_size.x = maxf(max_body_size.x, body_size.x)
+		max_body_size.y = maxf(max_body_size.y, body_size.y)
+		var current_position_variant: Variant = body.get_meta("current_position", body.position)
+		var current_position: Vector2 = current_position_variant as Vector2 if current_position_variant is Vector2 else body.position
+		peg_positions.append(current_position)
+		var peg_bounds := Rect2(current_position - body_size * 0.5, body_size)
+		bounds = peg_bounds if not has_bounds else bounds.merge(peg_bounds)
+		has_bounds = true
+		var peg_sweep_bounds: Rect2 = _moving_peg_sweep_bounds(body, body_size)
+		sweep_bounds = peg_sweep_bounds if not has_sweep_bounds else sweep_bounds.merge(peg_sweep_bounds)
+		has_sweep_bounds = true
+		all_visible = all_visible and body.visible
+		all_inside = all_inside and stage_rect.grow(1.0).encloses(peg_bounds)
+		row_indices[int(body.get_meta("row_index", 0))] = true
+		var visual: Polygon2D = body.get_node_or_null("MovingPegVisual") as Polygon2D
+		var ring: Line2D = body.get_node_or_null("MovingPegRing") as Line2D
+		peg_visuals_visible = peg_visuals_visible and visual != null and visual.visible and ring != null and ring.visible
+		if visual != null:
+			minimum_alpha = minf(minimum_alpha, visual.color.a)
+	var center: Vector2 = bounds.get_center() if has_bounds else Vector2.INF
+	var expected_row_count: int = int(first_body.get_meta("row_count", row_indices.size()))
+	var horizontal_visible_coverage_ratio: float = _horizontal_rect_coverage_ratio(bounds, stage_rect) if has_bounds else 0.0
+	var horizontal_sweep_coverage_ratio: float = _horizontal_rect_coverage_ratio(sweep_bounds, stage_rect) if has_sweep_bounds else 0.0
+	return {
+		"node_type": "MovingPegGroup",
+		"stage": stage,
+		"physics_role": String(first_body.get_meta("physics_role", "")),
+		"motion_role": String(first_body.get_meta("motion_role", "")),
+		"motion_kind": String(first_body.get_meta("motion_kind", "")),
+		"motion_profile": String(first_body.get_meta("motion_profile", "")),
+		"uses_physics_time": bool(first_body.get_meta("uses_physics_time", false)),
+		"changes_landing_locally": bool(first_body.get_meta("changes_landing_locally", false)),
+		"does_not_replace_bin_widths": bool(first_body.get_meta("does_not_replace_bin_widths", false)),
+		"cycle_seconds": float(first_body.get_meta("cycle_seconds", 0.0)),
+		"motion_range": float(first_body.get_meta("motion_range", 0.0)),
+		"motion_axis": first_body.get_meta("motion_axis", Vector2.RIGHT),
+		"home_position": first_body.get_meta("home_position", Vector2.INF),
+		"visible": all_visible and children.size() > 0,
+		"has_large_plate": false,
+		"peg_visuals_visible": peg_visuals_visible and children.size() > 0,
+		"has_physical_peg_bodies": children.size() > 0,
+		"peg_count": children.size(),
+		"row_count": expected_row_count,
+		"actual_row_count": row_indices.size(),
+		"physical_body_count": children.size(),
+		"peg_positions": peg_positions,
+		"position": center,
+		"rotation": 0.0,
+		"body_size": bounds.size if has_bounds else Vector2.ZERO,
+		"max_body_size": max_body_size,
+		"bounds": bounds,
+		"sweep_bounds": sweep_bounds,
+		"stage_rect": stage_rect,
+		"stage_rect_contains_center": stage_rect.has_point(center) if has_bounds else false,
+		"stage_rect_intersects_bounds": bounds.intersects(stage_rect.grow(1.0)) if has_bounds else false,
+		"all_pegs_inside_stage": all_inside and children.size() > 0,
+		"horizontal_visible_coverage_ratio": horizontal_visible_coverage_ratio,
+		"horizontal_sweep_coverage_ratio": horizontal_sweep_coverage_ratio,
+		"minimum_visible_thickness": minf(max_body_size.x, max_body_size.y),
+		"visual_alpha": minimum_alpha,
+		"body_z_index": first_body.z_index,
+		"body_z_as_relative": first_body.z_as_relative,
+	}
+
+func _moving_peg_sweep_bounds(body: AnimatableBody2D, body_size: Vector2) -> Rect2:
+	var home_position_variant: Variant = body.get_meta("home_position", body.position)
+	var home_position: Vector2 = home_position_variant as Vector2 if home_position_variant is Vector2 else body.position
+	var axis_variant: Variant = body.get_meta("motion_axis", Vector2.RIGHT)
+	var axis: Vector2 = axis_variant as Vector2 if axis_variant is Vector2 else Vector2.RIGHT
+	if axis.length() <= 0.001:
+		axis = Vector2.RIGHT
+	axis = axis.normalized()
+	var motion_range: float = maxf(0.0, float(body.get_meta("motion_range", 0.0)))
+	var start_bounds := Rect2(home_position - axis * motion_range - body_size * 0.5, body_size)
+	var end_bounds := Rect2(home_position + axis * motion_range - body_size * 0.5, body_size)
+	return start_bounds.merge(end_bounds)
+
+func _horizontal_rect_coverage_ratio(rect: Rect2, stage_rect: Rect2) -> float:
+	if stage_rect.size.x <= 0.0:
+		return 0.0
+	var left: float = maxf(rect.position.x, stage_rect.position.x)
+	var right: float = minf(rect.end.x, stage_rect.end.x)
+	return clampf((right - left) / stage_rect.size.x, 0.0, 1.0)
 
 func _physics_material_snapshot() -> Dictionary:
 	var ball_material: PhysicsMaterial = active_ball.physics_material_override if active_ball != null and is_instance_valid(active_ball) else null
@@ -1804,6 +2129,27 @@ func _make_physics_material(bounce: float, friction: float) -> PhysicsMaterial:
 	material.friction = friction
 	return material
 
+func _scaled(value: float, min_value: float = 0.0) -> float:
+	return maxf(min_value, value * _layout_physics_scale)
+
+func _ball_radius() -> float:
+	return _scaled(BALL_RADIUS, 4.0)
+
+func _peg_radius() -> float:
+	return _scaled(PEG_RADIUS, 3.0)
+
+func _moving_peg_radius() -> float:
+	return _scaled(MOVING_PEG_RADIUS, 4.0)
+
+func _wall_thickness() -> float:
+	return _scaled(WALL_THICKNESS, 4.0)
+
+func _mechanism_thickness() -> float:
+	return _scaled(MECHANISM_THICKNESS, 10.0)
+
+func _unit_gate_plate_extra_height() -> float:
+	return _scaled(UNIT_GATE_PLATE_EXTRA_HEIGHT, 12.0)
+
 func _bin_size(bin: Area2D) -> Vector2:
 	var size_variant: Variant = bin.get_meta("bin_size", Vector2.ZERO)
 	if size_variant is Vector2:
@@ -1854,12 +2200,21 @@ func _bin_weight_for_label(stage: String, label: String) -> float:
 func _make_disc_visual(radius: float, color: Color, segments: int) -> Polygon2D:
 	var visual := Polygon2D.new()
 	visual.color = color
+	visual.polygon = _circle_polygon(radius, segments)
+	return visual
+
+func _circle_polygon(radius: float, segments: int) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	for index: int in range(segments):
 		var angle: float = TAU * float(index) / float(segments)
 		points.append(Vector2(cos(angle), sin(angle)) * radius)
-	visual.polygon = points
-	return visual
+	return points
+
+func _circle_outline_points(radius: float, segments: int) -> PackedVector2Array:
+	var points := _circle_polygon(radius, segments)
+	if not points.is_empty():
+		points.append(points[0])
+	return points
 
 func _has_visible_rigidbody_ball() -> bool:
 	if active_ball != null and is_instance_valid(active_ball):
@@ -1937,7 +2292,7 @@ func _slot_exposed_width(slot_id: int, battle_elapsed: float) -> float:
 	return bin_size.x * _slot_exposure_ratio(slot_id, battle_elapsed)
 
 func _minimum_safe_exposed_width() -> float:
-	return BALL_RADIUS * 2.0 + UNIT_GATE_BOUNCE_MARGIN
+	return _ball_radius() * 2.0 + _scaled(UNIT_GATE_BOUNCE_MARGIN, 3.0)
 
 func _unit_slot_target_x(slot_id: int, battle_elapsed: float) -> float:
 	var bin: Area2D = _unit_bin(slot_id)
@@ -1950,7 +2305,8 @@ func _unit_slot_target_x(slot_id: int, battle_elapsed: float) -> float:
 		var open_width: float = bin_size.x * ratio
 		if open_width < _minimum_safe_exposed_width():
 			return bin.position.x
-		var local_target: float = clampf(open_width * 0.5, BALL_RADIUS + 2.0, maxf(BALL_RADIUS + 2.0, open_width - BALL_RADIUS - 2.0))
+		var ball_radius: float = _ball_radius()
+		var local_target: float = clampf(open_width * 0.5, ball_radius + 2.0, maxf(ball_radius + 2.0, open_width - ball_radius - 2.0))
 		return slot_left + local_target
 	return bin.position.x
 

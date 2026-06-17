@@ -130,6 +130,10 @@ func _verify_exposure_gate_visual_contract() -> void:
 			failures.append("S%d blocker plate must render above Unit bin rails." % slot_id)
 		if float(slot_visual.get("closed_width", 0.0)) <= 0.0:
 			failures.append("S%d blocker plate must report positive closed width at 9s." % slot_id)
+		if float(slot_visual.get("blocker_visual_height", 999.0)) >= 12.0:
+			failures.append("S%d blocker visual must be a thin gate strip, not a solid plate covering slot content." % slot_id)
+		if float(slot_visual.get("blocker_collision_height", 0.0)) <= float(slot_visual.get("blocker_visual_height", 0.0)):
+			failures.append("S%d blocker collision may stay large, but visual height must be thinner than collision height." % slot_id)
 	root.remove_child(board)
 	board.free()
 

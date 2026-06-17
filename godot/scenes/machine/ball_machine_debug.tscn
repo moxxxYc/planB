@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://planb_ball_machine_debug_scene"]
 
 [ext_resource type="Script" path="res://scripts/debug/ball_machine_debug_scene.gd" id="1_debug_script"]
-[ext_resource type="Script" path="res://scripts/ui/machine_board_view.gd" id="2_machine_board"]
+[ext_resource type="PackedScene" path="res://scenes/machine/ball_machine_view.tscn" id="2_ball_machine_view"]
 
 [node name="BallMachineDebug" type="Control"]
 layout_mode = 3
@@ -63,13 +63,12 @@ size_flags_horizontal = 3
 size_flags_stretch_ratio = 70.0
 custom_minimum_size = Vector2(720, 0)
 
-[node name="MachineBoardView" type="Control" parent="SafeArea/RootRows/MainColumns/MachinePanel"]
+[node name="BallMachineView" parent="SafeArea/RootRows/MainColumns/MachinePanel" instance=ExtResource("2_ball_machine_view")]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 custom_minimum_size = Vector2(720, 760)
-script = ExtResource("2_machine_board")
 
 [node name="DebugPanel" type="PanelContainer" parent="SafeArea/RootRows/MainColumns"]
 layout_mode = 2

@@ -105,12 +105,40 @@ fi
 
 run_godot_verifier "res://tools/verify_ball_machine_design_alignment.gd"
 
+if [[ ! -f "$PROJECT_DIR/tools/verify_ball_machine_shared_view_contract.gd" ]]; then
+  echo "Missing required ball machine shared view verifier at $PROJECT_DIR/tools/verify_ball_machine_shared_view_contract.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_ball_machine_shared_view_contract.gd"
+
 if [[ ! -f "$PROJECT_DIR/tools/verify_ball_machine_debug_scene.gd" ]]; then
   echo "Missing required ball machine debug scene verifier at $PROJECT_DIR/tools/verify_ball_machine_debug_scene.gd" >&2
   exit 1
 fi
 
 run_godot_verifier "res://tools/verify_ball_machine_debug_scene.gd"
+
+if [[ ! -f "$PROJECT_DIR/tools/verify_ball_machine_layout_rect_alignment.gd" ]]; then
+  echo "Missing required ball machine layout rect alignment verifier at $PROJECT_DIR/tools/verify_ball_machine_layout_rect_alignment.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_ball_machine_layout_rect_alignment.gd"
+
+if [[ ! -f "$PROJECT_DIR/tools/verify_ball_machine_host_size_layout.gd" ]]; then
+  echo "Missing required ball machine host size layout verifier at $PROJECT_DIR/tools/verify_ball_machine_host_size_layout.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_ball_machine_host_size_layout.gd"
+
+if [[ ! -f "$PROJECT_DIR/tools/verify_ball_machine_landing_distribution.gd" ]]; then
+  echo "Missing required ball machine landing distribution verifier at $PROJECT_DIR/tools/verify_ball_machine_landing_distribution.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_ball_machine_landing_distribution.gd"
 
 if [[ ! -f "$PROJECT_DIR/tools/verify_ball_machine_layout_stability.gd" ]]; then
   echo "Missing required ball machine layout stability verifier at $PROJECT_DIR/tools/verify_ball_machine_layout_stability.gd" >&2

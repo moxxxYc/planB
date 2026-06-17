@@ -3,13 +3,13 @@ extends VBoxContainer
 
 signal landing_resolved(result: MachinePhysicsResult)
 
-const MachineBoardViewScript := preload("res://scripts/ui/machine_board_view.gd")
+const BallMachineViewScript := preload("res://scripts/ui/ball_machine_view.gd")
 
 const FORGE_CYCLE_SECONDS: float = 2.2
 const LAUNCHER_CYCLE_SECONDS: float = 1.3
 const LOG_LINE_COUNT: int = 3
 
-@onready var machine_board: MachineBoardViewScript = %MachineBoardView
+@onready var machine_board: BallMachineViewScript = %BallMachineView
 @onready var forge_label: Label = %ForgeLabel
 @onready var forge_bar: ProgressBar = %ForgeProgressBar
 @onready var launcher_label: Label = %LauncherLabel
@@ -65,6 +65,10 @@ func launch_ball(ball: Dictionary, battle_elapsed: float) -> void:
 func set_exposure_state(exposure_state) -> void:
 	_ensure_nodes()
 	machine_board.set_exposure_state(exposure_state)
+
+func set_battle_elapsed(seconds: float) -> void:
+	_ensure_nodes()
+	machine_board.set_battle_elapsed(seconds)
 
 func set_redirect_resolver(resolver: Callable) -> void:
 	_ensure_nodes()
@@ -263,7 +267,7 @@ func _configure_machine_panel_layout() -> void:
 
 func _ensure_nodes() -> void:
 	if machine_board == null:
-		machine_board = get_node("MachineBoardView") as MachineBoardViewScript
+		machine_board = get_node("BallMachineView") as BallMachineViewScript
 	if forge_label == null:
 		forge_label = get_node("ForgeLabel") as Label
 	if forge_bar == null:

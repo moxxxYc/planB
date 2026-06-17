@@ -1,7 +1,7 @@
 class_name BallMachineDebugScene
 extends Control
 
-const MachineBoardViewScript := preload("res://scripts/ui/machine_board_view.gd")
+const BallMachineViewScript := preload("res://scripts/ui/ball_machine_view.gd")
 const MachineBallPayloadScript := preload("res://scripts/model/machine/machine_ball_payload.gd")
 const MachineSlotExposureStateScript := preload("res://scripts/model/machine/machine_slot_exposure_state.gd")
 
@@ -9,7 +9,7 @@ const DEFAULT_TIME_SCALE: float = 1.0
 const FAST_TIME_SCALE: float = 4.0
 const MAX_LOG_LINES: int = 12
 
-@onready var machine_view: MachineBoardViewScript = %MachineBoardView
+@onready var machine_view: BallMachineViewScript = %BallMachineView
 @onready var status_label: Label = %StatusLabel
 @onready var control_rows: VBoxContainer = %ControlRows
 @onready var log_label: Label = %LogLabel
@@ -298,9 +298,9 @@ func _debug_button_count() -> int:
 
 func _ensure_nodes() -> void:
 	if machine_view == null:
-		machine_view = get_node_or_null("%MachineBoardView") as MachineBoardViewScript
+		machine_view = get_node_or_null("%BallMachineView") as BallMachineViewScript
 		if machine_view == null:
-			machine_view = find_child("MachineBoardView", true, false) as MachineBoardViewScript
+			machine_view = find_child("BallMachineView", true, false) as BallMachineViewScript
 	if status_label == null:
 		status_label = get_node_or_null("%StatusLabel") as Label
 		if status_label == null:

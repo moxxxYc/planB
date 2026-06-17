@@ -4,6 +4,7 @@ extends Control
 signal landing_resolved(result: MachinePhysicsResult)
 
 const MachinePhysicsBoardViewScript := preload("res://scripts/ui/machine_physics_board_view.gd")
+const MachineBoardLayoutMetricsScript := preload("res://scripts/ui/machine_board_layout_metrics.gd")
 
 const FORGE_CYCLE_SECONDS: float = 2.2
 const LAUNCHER_CYCLE_SECONDS: float = 1.3
@@ -29,6 +30,10 @@ const POOL_BALL_RING_RADIUS: float = 20.0
 const LAUNCH_SLOT_ORDER: Array[String] = ["Split", "Tuning", "Recycle", "Waste"]
 const TUNING_SLOT_ORDER: Array[String] = ["Prime", "Gate", "Echo", "Surge"]
 const UNIT_SLOT_ORDER: Array[String] = ["S1", "S2", "S3", "S4"]
+const MOVING_MECHANISM_VISUAL_NAMES: Array[String] = [
+	"LaunchMovingPegRow",
+	"TuningMovingPegBand",
+]
 const BOARD_SUBTITLES: Dictionary = {
 	"Launch": "Split / Tuning / Recycle / Waste",
 	"Tuning": "Prime / Gate / Echo / Surge",
@@ -58,7 +63,9 @@ var exposure_gate_snapshot: Dictionary = {}
 var blocked_bounce_count: int = 0
 var last_blocked_bounce: Dictionary = {}
 var has_unit_gate_blockers: bool = false
+var moving_mechanism_visual_snapshot: Dictionary = {}
 var _last_physics_layout_size: Vector2 = Vector2(-1.0, -1.0)
+var layout_metrics: RefCounted = null
 
 func _ready() -> void:
 	clip_contents = true
@@ -123,6 +130,8 @@ func get_visual_contract_summary() -> Dictionary:
 	)
 	if physics_landing_count_value > 0:
 		runtime_physics_drives_results = runtime_physics_drives_results and last_result_source == "physics"
+	var mechanism_overlay_summary: Dictionary = _moving_mechanism_overlay_summary(board_contract)
+	var current_metrics: RefCounted = _layout_metrics()
 
 	return {
 		"board_count": 3,
@@ -132,14 +141,23 @@ func get_visual_contract_summary() -> Dictionary:
 		"has_schematic_active_ball_overlay": false,
 		"has_schematic_peg_overlay": false,
 		"has_visible_rigidbody_ball": bool(board_contract.get("has_visible_rigidbody_ball", false)),
+		"layout_physics_scale": float(board_contract.get("layout_physics_scale", 0.0)),
+		"scaled_ball_radius": float(board_contract.get("scaled_ball_radius", 0.0)),
+		"scaled_peg_radius": float(board_contract.get("scaled_peg_radius", 0.0)),
+		"scaled_mechanism_thickness": float(board_contract.get("scaled_mechanism_thickness", 0.0)),
 		"runtime_physics_drives_results": runtime_physics_drives_results,
 		"runtime_uses_preselected_target_labels": bool(board_contract.get("runtime_uses_preselected_target_labels", true)),
 		"bin_width_ratios": (board_contract.get("bin_width_ratios", {}) as Dictionary).duplicate(true),
 		"bin_orders": (board_contract.get("bin_orders", {}) as Dictionary).duplicate(true),
 		"stage_rects": (board_contract.get("stage_rects", {}) as Dictionary).duplicate(true),
+		"visible_stage_rects": _visible_stage_rect_snapshot(current_metrics),
+		"layout_metrics_source": "MachineBoardLayoutMetrics",
+		"layout_metrics_readable": current_metrics.readable,
 		"stage_bottom_catchers": (board_contract.get("stage_bottom_catchers", {}) as Dictionary).duplicate(true),
 		"moving_mechanism_counts": (board_contract.get("moving_mechanism_counts", {}) as Dictionary).duplicate(true),
 		"moving_mechanisms": (board_contract.get("moving_mechanisms", {}) as Dictionary).duplicate(true),
+		"draws_moving_mechanism_overlay": true,
+		"moving_mechanism_overlay": mechanism_overlay_summary,
 		"clips_physics_children": physics_clip != null and physics_clip.clip_contents,
 		"physics_clip_children_mode": int(physics_clip.clip_children) if physics_clip != null else -1,
 		"physics_board_uses_stage_clip": physics_clip != null and physics_board != null and physics_board.get_parent() == physics_clip,
@@ -217,16 +235,94 @@ func _draw() -> void:
 	var rect := Rect2(Vector2.ZERO, size)
 	draw_rect(rect, COLOR_BG, true)
 	draw_rect(rect, COLOR_TRIM, false, 2.0)
-	_draw_supply_strip(rect)
-	_draw_machine_boards(rect)
-	_draw_queue_preview(rect)
+	_draw_supply_strip()
+	_draw_machine_boards()
+	_draw_moving_mechanism_overlay()
+	_draw_queue_preview()
 
-func _draw_supply_strip(rect: Rect2) -> void:
+func _draw_moving_mechanism_overlay() -> void:
+	for mechanism_name: String in MOVING_MECHANISM_VISUAL_NAMES:
+		var mechanism_variant: Variant = moving_mechanism_visual_snapshot.get(mechanism_name, {})
+		if not (mechanism_variant is Dictionary):
+			continue
+		var mechanism: Dictionary = mechanism_variant as Dictionary
+		var stage: String = String(mechanism.get("stage", ""))
+		_draw_moving_peg_group(mechanism, _mechanism_stage_color(stage))
+
+func _draw_moving_peg_group(mechanism: Dictionary, accent: Color) -> void:
+	var peg_positions_variant: Variant = mechanism.get("peg_positions", [])
+	if not (peg_positions_variant is Array):
+		return
+	var max_body_size_variant: Variant = mechanism.get("max_body_size", Vector2.ZERO)
+	var max_body_size: Vector2 = max_body_size_variant as Vector2 if max_body_size_variant is Vector2 else Vector2(10.0, 10.0)
+	var radius: float = clampf(maxf(max_body_size.x, max_body_size.y) * 0.5, 4.0, 12.0)
+	var peg_positions: Array = peg_positions_variant as Array
+	for position_variant: Variant in peg_positions:
+		if not (position_variant is Vector2):
+			continue
+		var center: Vector2 = position_variant as Vector2
+		draw_circle(center, radius * 1.34, Color("#f4f0d8"))
+		draw_circle(center, radius, accent.lightened(0.1))
+		draw_arc(center, radius * 1.38, 0.0, TAU, 18, accent.lightened(0.35), maxf(1.5, radius * 0.22), true)
+
+func _mechanism_stage_color(stage: String) -> Color:
+	match stage:
+		"Launch":
+			return Color("#8aff73")
+		"Tuning":
+			return Color("#ffd36a")
+		_:
+			return COLOR_ACTIVE
+
+func _moving_mechanism_overlay_summary(board_contract: Dictionary) -> Dictionary:
+	var mechanisms_variant: Variant = board_contract.get("moving_mechanisms", {})
+	var mechanisms: Dictionary = mechanisms_variant as Dictionary if mechanisms_variant is Dictionary else {}
+	var drawable_names: Array[String] = []
+	var bounds: Dictionary = {}
+	for mechanism_name: String in MOVING_MECHANISM_VISUAL_NAMES:
+		var mechanism_variant: Variant = mechanisms.get(mechanism_name, {})
+		if not (mechanism_variant is Dictionary):
+			continue
+		var mechanism: Dictionary = mechanism_variant as Dictionary
+		var mechanism_bounds: Rect2 = _moving_peg_group_bounds(mechanism)
+		if mechanism_bounds.size.x > 1.0 and mechanism_bounds.size.y > 1.0 and bool(mechanism.get("all_pegs_inside_stage", false)) and not bool(mechanism.get("has_large_plate", true)):
+			drawable_names.append(mechanism_name)
+		bounds[mechanism_name] = mechanism_bounds
+	return {
+		"source": "MachineBoardView",
+		"required_count": MOVING_MECHANISM_VISUAL_NAMES.size(),
+		"drawable_count": drawable_names.size(),
+		"all_required_drawable": drawable_names.size() == MOVING_MECHANISM_VISUAL_NAMES.size(),
+		"drawable_names": drawable_names,
+		"bounds": bounds,
+	}
+
+func _moving_peg_group_bounds(mechanism: Dictionary) -> Rect2:
+	var peg_positions_variant: Variant = mechanism.get("peg_positions", [])
+	if not (peg_positions_variant is Array):
+		return Rect2()
+	var max_body_size_variant: Variant = mechanism.get("max_body_size", Vector2.ZERO)
+	var max_body_size: Vector2 = max_body_size_variant as Vector2 if max_body_size_variant is Vector2 else Vector2(10.0, 10.0)
+	var radius: float = maxf(max_body_size.x, max_body_size.y) * 0.5
+	var bounds := Rect2()
+	var has_bounds := false
+	var peg_positions: Array = peg_positions_variant as Array
+	for position_variant: Variant in peg_positions:
+		if not (position_variant is Vector2):
+			continue
+		var center: Vector2 = position_variant as Vector2
+		var peg_bounds := Rect2(center - Vector2(radius, radius), Vector2(radius * 2.0, radius * 2.0))
+		bounds = peg_bounds if not has_bounds else bounds.merge(peg_bounds)
+		has_bounds = true
+	return bounds
+
+func _draw_supply_strip() -> void:
+	var metrics: RefCounted = _layout_metrics()
 	var font := get_theme_default_font()
-	var left := rect.position.x + 14.0
-	var top := rect.position.y + 14.0
-	var width := rect.size.x - 28.0
-	var strip_rect := Rect2(left, top, width, SUPPLY_STRIP_HEIGHT)
+	var strip_rect: Rect2 = metrics.supply_rect
+	var left := strip_rect.position.x
+	var top := strip_rect.position.y
+	var width := strip_rect.size.x
 
 	draw_rect(strip_rect, COLOR_PANEL, true)
 	draw_rect(strip_rect, COLOR_LAUNCH, false, 2.0)
@@ -273,24 +369,20 @@ func _draw_supply_strip(rect: Rect2) -> void:
 		if filled:
 			draw_arc(center, POOL_BALL_RING_RADIUS + 3.0, 0.0, TAU, 24, COLOR_ACTIVE, 2.0, true)
 
-func _draw_machine_boards(rect: Rect2) -> void:
-	var board_top := rect.position.y + SUPPLY_STRIP_HEIGHT + 32.0
-	var board_gap := 12.0
-	var queue_height := 64.0
-	var available_height := rect.size.y - board_top - queue_height - board_gap * 2.0 - 18.0
-	var board_height := maxf(96.0, available_height / 3.0)
-	var board_rect := Rect2(rect.position.x + 14.0, board_top, rect.size.x - 28.0, board_height)
+func _draw_machine_boards() -> void:
+	var stage_rects: Dictionary = _layout_metrics().stage_rects
+	var launch_rect: Rect2 = stage_rects["Launch"] as Rect2
+	var tuning_rect: Rect2 = stage_rects["Tuning"] as Rect2
+	var unit_rect: Rect2 = stage_rects["Unit"] as Rect2
 
-	_draw_board(board_rect, "Launch", String(BOARD_SUBTITLES["Launch"]), COLOR_LAUNCH, active_board_index == 0, _targets_pool())
-	_draw_launch_slots(board_rect)
+	_draw_board(launch_rect, "Launch", String(BOARD_SUBTITLES["Launch"]), COLOR_LAUNCH, active_board_index == 0, _targets_pool())
+	_draw_launch_slots(launch_rect)
 
-	board_rect.position.y += board_height + board_gap
-	_draw_board(board_rect, "Tuning", String(BOARD_SUBTITLES["Tuning"]), COLOR_TUNING, active_board_index == 1, _targets_echo())
-	_draw_tuning_slots(board_rect)
+	_draw_board(tuning_rect, "Tuning", String(BOARD_SUBTITLES["Tuning"]), COLOR_TUNING, active_board_index == 1, _targets_echo())
+	_draw_tuning_slots(tuning_rect)
 
-	board_rect.position.y += board_height + board_gap
-	_draw_board(board_rect, "Unit", String(BOARD_SUBTITLES["Unit"]), COLOR_UNIT, active_board_index == 2, _targets_unit_or_queue())
-	_draw_unit_slots(board_rect)
+	_draw_board(unit_rect, "Unit", String(BOARD_SUBTITLES["Unit"]), COLOR_UNIT, active_board_index == 2, _targets_unit_or_queue())
+	_draw_unit_slots(unit_rect)
 
 func _ensure_physics_board() -> void:
 	clip_contents = true
@@ -316,6 +408,9 @@ func _layout_physics_board() -> void:
 	if physics_board == null or not is_instance_valid(physics_board):
 		return
 	var current_size: Vector2 = _stable_layout_size()
+	var metrics: RefCounted = _layout_metrics()
+	if physics_board.has_method("set_layout_physics_scale"):
+		physics_board.call("set_layout_physics_scale", float(metrics.physics_scale))
 	_update_physics_clip_for_size(current_size)
 	if current_size.is_equal_approx(_last_physics_layout_size):
 		_update_exposure_contract_from_physics_board()
@@ -339,29 +434,29 @@ func _apply_exposure_contract(board_contract: Dictionary) -> void:
 	else:
 		last_blocked_bounce = {}
 	has_unit_gate_blockers = bool(board_contract.get("has_unit_gate_blockers", false))
+	if board_contract.get("moving_mechanisms", {}) is Dictionary:
+		moving_mechanism_visual_snapshot = (board_contract.get("moving_mechanisms", {}) as Dictionary).duplicate(true)
 
 func _stage_rects_for_current_size() -> Dictionary:
 	return _stage_rects_for_size(_stable_layout_size())
 
+func _layout_metrics() -> RefCounted:
+	var current_size: Vector2 = _stable_layout_size()
+	if layout_metrics == null or not layout_metrics.view_size.is_equal_approx(current_size):
+		layout_metrics = _build_layout_metrics(current_size)
+	return layout_metrics
+
+func _build_layout_metrics(current_size: Vector2) -> RefCounted:
+	var metrics: RefCounted = MachineBoardLayoutMetricsScript.new()
+	metrics.call("configure", current_size)
+	return metrics
+
 func _stable_layout_size() -> Vector2:
 	var current_size: Vector2 = size
-	if current_size.x <= 0.0 or current_size.y <= 0.0:
-		current_size = MIN_VIEW_SIZE
-	return current_size
+	return MachineBoardLayoutMetricsScript.stable_size(current_size)
 
 func _stage_rects_for_size(current_size: Vector2) -> Dictionary:
-	var rect := Rect2(Vector2.ZERO, current_size)
-	var board_top := rect.position.y + SUPPLY_STRIP_HEIGHT + 32.0
-	var board_gap := 12.0
-	var queue_height := 64.0
-	var available_height := rect.size.y - board_top - queue_height - board_gap * 2.0 - 18.0
-	var board_height := maxf(96.0, available_height / 3.0)
-	var board_rect := Rect2(rect.position.x + 14.0, board_top, rect.size.x - 28.0, board_height)
-	return {
-		"Launch": board_rect,
-		"Tuning": Rect2(board_rect.position + Vector2(0.0, board_height + board_gap), board_rect.size),
-		"Unit": Rect2(board_rect.position + Vector2(0.0, (board_height + board_gap) * 2.0), board_rect.size),
-	}
+	return _build_layout_metrics(current_size).stage_rects
 
 func _update_physics_clip_for_size(current_size: Vector2) -> void:
 	if physics_clip == null or not is_instance_valid(physics_clip):
@@ -378,11 +473,17 @@ func _current_physics_clip_rect() -> Rect2:
 	return Rect2(physics_clip.position, physics_clip.size)
 
 func _physics_clip_rect_for_size(current_size: Vector2) -> Rect2:
-	var stage_rects: Dictionary = _stage_rects_for_size(current_size)
-	var clip_rect: Rect2 = stage_rects["Launch"] as Rect2
-	clip_rect = clip_rect.merge(stage_rects["Tuning"] as Rect2)
-	clip_rect = clip_rect.merge(stage_rects["Unit"] as Rect2)
-	return clip_rect
+	return _build_layout_metrics(current_size).physics_clip_rect
+
+func _visible_stage_rect_snapshot(metrics: RefCounted) -> Dictionary:
+	var snapshot: Dictionary = {}
+	for stage: String in ["Launch", "Tuning", "Unit"]:
+		var rect: Rect2 = metrics.stage_rects[stage] as Rect2
+		snapshot[stage] = {
+			"position": rect.position,
+			"size": rect.size,
+		}
+	return snapshot
 
 func _on_physics_board_landing_resolved(result: MachinePhysicsResult) -> void:
 	physics_landing_count += 1
@@ -562,11 +663,12 @@ func _draw_unit_slots(board_rect: Rect2) -> void:
 		var gate_text: String = "已开" if is_fully_exposed else ("开%.0f%%" % (exposure_ratio * 100.0) if is_open else "未开")
 		_draw_text(font, slot_rect.position + Vector2(4.0, 15.0), "S%d %s %d/%d" % [slot_id, gate_text, progress, required], 9, COLOR_TEXT)
 
-func _draw_queue_preview(rect: Rect2) -> void:
+func _draw_queue_preview() -> void:
+	var queue_rect: Rect2 = _layout_metrics().queue_rect
 	var font := get_theme_default_font()
-	var left := rect.position.x + 14.0
-	var bottom := rect.position.y + rect.size.y - 54.0
-	var width := rect.size.x - 28.0
+	var left := queue_rect.position.x
+	var bottom := queue_rect.position.y + 16.0
+	var width := queue_rect.size.x
 	_draw_text(font, Vector2(left, bottom), "队列预览", 14, COLOR_QUEUE)
 	for index: int in range(QUEUE_PREVIEW_COUNT):
 		var item_rect := Rect2(left + 78.0 + float(index) * 58.0, bottom - 15.0, 46.0, 24.0)

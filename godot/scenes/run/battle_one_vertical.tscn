@@ -4,7 +4,7 @@
 [ext_resource type="Script" path="res://scripts/ui/machine_strip_view.gd" id="2_machine_view"]
 [ext_resource type="Script" path="res://scripts/ui/queue_bridge_view.gd" id="3_bridge_view"]
 [ext_resource type="Script" path="res://scripts/ui/battlefield_view.gd" id="4_battlefield_view"]
-[ext_resource type="Script" path="res://scripts/ui/machine_board_view.gd" id="5_machine_board_view"]
+[ext_resource type="PackedScene" path="res://scenes/machine/ball_machine_view.tscn" id="5_ball_machine_view"]
 
 [node name="BattleOneVertical" type="Control"]
 layout_mode = 3
@@ -80,12 +80,11 @@ script = ExtResource("2_machine_view")
 layout_mode = 2
 text = "三仓球机 | Launch / Tuning / Unit"
 
-[node name="MachineBoardView" type="Control" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+[node name="BallMachineView" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView" instance=ExtResource("5_ball_machine_view")]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 custom_minimum_size = Vector2(0, 600)
-script = ExtResource("5_machine_board_view")
 
 [node name="ForgeLabel" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
 unique_name_in_owner = true

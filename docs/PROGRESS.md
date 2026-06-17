@@ -1,6 +1,6 @@
 # 进度与决策日志
 
-**最后更新：** 2026-06-16
+**最后更新：** 2026-06-17
 **仓库状态：** 文档主导；原 `mvp/` Godot MVP v0 实现已归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`，当前活动 Godot 实现目录为 `godot/`，当前实现目标对齐原 reset handoff 的 M0-M4 全范围。本文记录设计状态和决策日志，不作为代码状态证明。
 
 ## 当前正式文档
@@ -35,7 +35,7 @@
 
 - 仓库当前处于“文档主导 + MVP v0 原 handoff M0-M4 全范围 gap repair”阶段；原 `mvp/` Godot MVP v0 实现已归档，当前活动实现目录为 `godot/`。
 - 此前 Battle 4 / Reward 2 的窄版 M4 只是中间切片；Battle 5、Endpoint Prep、Endpoint 和 Final Result 属于原 handoff M3/M4 未完成部分，不另起 M5/M6。
-- 当前可运行的 Godot MVP 主验证命令是 `bash tools/verify_godot.sh`；验证链覆盖 project parse、M1 machine-to-lane、M2 run flow、M3 counters、Battle 4 / Reward 2、entity battlefield、full handoff flow、Endpoint result fields、machine physics contract、ball machine design alignment、physics-machine integration、exposure gate、Guardian Contract、Hive unit/battle profile、modifier semantics 和 complete learning record。归档目录里的旧验证脚本只作历史背景，不作为当前验收入口。
+- 当前可运行的 Godot MVP 主验证命令是 `bash tools/verify_godot.sh`；验证链覆盖 project parse、M1 machine-to-lane、M2 run flow、M3 counters、Battle 4 / Reward 2、entity battlefield、full handoff flow、Endpoint result fields、machine physics contract、ball machine design alignment、ball machine shared view contract、ball machine layout rect alignment、ball machine host-size layout、ball machine landing distribution、ball machine layout stability、physics-machine integration、exposure gate、Guardian Contract、Hive unit/battle profile、modifier semantics 和 complete learning record。归档目录里的旧验证脚本只作历史背景，不作为当前验收入口。
 - 旧 Web MVP、旧脚本、旧验证命令和旧实现假设都不再作为当前设计依据。
 - 旧 Godot prototype 已归档到 `docs/archive/prototypes/`，完全过期，不再作为 build、验证、评审或路由信号。
 - 当前正在从基础机制整理转入 Hive 第一种族设计；`Caste Hive` 方向已确认，单位工作名、占位剪影、轻行为和第一版攻击几何已定，两个 Guardian 的身份、轴倾向、技能结构、技能方向、战术技能目标优先级和第一版战术技能范围已定，最终美术资源和最终数值仍未定。
@@ -531,9 +531,17 @@
   - 底槽分布采用槽宽物理宽度主导，固定钉子和活动机关只负责可见扰动、弱打散和构筑改写入口。
   - `Launch` 物理左到右顺序调整为 `Split / Tuning / Recycle / Waste`，让 `Tuning` 主路径位于中部大槽，回流和废弃读成侧路。
   - `Tuning` 物理左到右顺序调整为 `Prime / Gate / Echo / Surge`，让 `Gate` 普通主路径位于中部大槽，并为 `Gate -> Prime` 强制导轨保留邻接关系。
-  - `Launch` 默认包含 `launch_diverter` 分流拨片和 `launch_return_flap` 回流侧活动挡片；`Tuning` 默认包含 `tuning_quality_cam` 质量转换活动机关；这些活动机关使用真实 `AnimatableBody2D` 碰撞体，由物理时间驱动。
-  - `Unit` 默认不额外加入随机活动机关，活动结构主要来自 `Unit.Slot.Exposure Gate`，避免底部 slot / gate 落区被过多运动件干扰。
-- 当前 verifier 已将槽位顺序、固定钉子模板和 Launch / Tuning 活动机关写入球机物理合同。精确坐标、速度、摆角、碰撞材质和实际分布手感仍需 playtest 调整。
+  - `Launch` 默认动态扰动改为一组轻量移动钉子排 `LaunchMovingPegRow`；`Tuning` 默认动态扰动改为一组两排移动钉子带 `TuningMovingPegBand`；旧的大型活动板 / 拨片 / cam 不再作为默认球机结构。
+  - `Unit` 默认不额外加入移动钉子或随机活动机关，活动结构主要来自 `Unit.Slot.Exposure Gate`，避免底部 slot / gate 落区被过多运动件干扰。
+- 当前 verifier 已将槽位顺序、更密的固定钉子模板、Launch 一排移动钉子、Tuning 两排移动钉子带和 Unit 无动态随机件写入球机物理合同。固定钉子模板当前为 Launch 30 个 / Tuning 30 个 / Unit 20 个，Launch / Tuning 至少 5 排交错，Unit 至少 4 排且不进入底部 slot / gate 落区。精确坐标、速度、运动范围、碰撞材质和实际分布手感仍需 playtest 调整。
+- 固定钉子不再只依赖 `PhysicsMaterial.bounce`；球接触固定钉子时会记录 `fixed_peg_rebound` 并按接触法线给出可见向外弹跳，避免 stage flow / 底部结算区把撞钉表现读成“贴住不弹”。
+- 球机显示已抽为共享 `BallMachineView` 场景；球机单独调试场景和 Battle 1 vertical 都宿主同一个共享组件，不再各自挂一套私有 `MachineBoardView`。
+- 球机布局改为由 `MachineBoardLayoutMetrics` 统一计算供给区、三仓舞台、物理裁剪区和队列预览区；绘制层和物理层读取同一组矩形，窗口尺寸变化时不再通过固定绝对位置分别计算。
+- `AnimatableBody2D` 移动钉子现在按组记录当前 transform / peg positions 作为视觉契约状态；覆盖层、契约快照和物理节点使用同一套 stage rect / current position 数据，避免动态件出现在球机外或在 headless 初始化帧读成 `(0,0)`。Launch / Tuning 的移动钉子边缘点按仓宽、运动幅度和钉子半径计算，验证要求横向扫掠接近完整仓宽且当前可见分布覆盖整仓；当前 Launch 移动钉子为 15 个，Tuning 移动钉子为两排共 26 个。
+- `Unit.Slot.Exposure Gate` 的物理碰撞体继续覆盖未开放槽宽，用于挡回未开放 slot 的球；玩家可见层改为薄闸线 `thin_exposure_gate_strip`，不再用整块实心挡板盖住 Unit 槽位内容。
+- 本次没有修改 `project.godot` 的 `canvas_items + keep` stretch 设置；新增 host-size verifier 验证的是共享组件在明确宿主尺寸下的布局，不等同于确认运行时窗口自由缩放模式已改。
+- 本次是组件化和布局来源重构，没有改变 `Launch / Tuning / Unit` 规则、槽位顺序、槽宽权重或任何玩法 canon。
+- 新增并接入 `verify_ball_machine_shared_view_contract.gd`、`verify_ball_machine_layout_rect_alignment.gd`、`verify_ball_machine_host_size_layout.gd` 和 `verify_ball_machine_landing_distribution.gd`；`verify_ball_machine_layout_stability.gd` 已改为采样共享 `BallMachineView` 和内部 `MachineBoardView`。
 
 ## 当前未定
 
@@ -541,7 +549,7 @@
 - Hive 4 个 Unit slot 的最终 sprite sheet、攻击频率和 playtest 后最终平衡。
 - 两个 Guardian 的 playtest 后最终数值。MVP 实现输入使用已确认的职责带口径和 first-pass 参数。
 - `Unit.Slot.Exposure Gate` 暴露开始到完全暴露之间的插值方式。
-- 球机物理层的层间随机范围、钉子 / 活动块精确参数、炮台摆动参数、球物理参数与同屏球数、回流与 Exposure 挡板物理形态、各 Guardian / 修正 / 反制的具体物理表现（见 `docs/ball-machine-physical.md`），以及是否提升为正式规则。
+- 球机物理层的层间随机范围、固定钉子 / 移动钉子精确参数、炮台摆动参数、球物理参数与同屏球数、回流与 Exposure 挡板物理形态、各 Guardian / 修正 / 反制的具体物理表现（见 `docs/ball-machine-physical.md`），以及是否提升为正式规则。
 - `docs/DESIGN.md` 已确认生产风格基线和 Battle Screen 三段布局方向；最终字体、图标、具体种族 skin kit、sprite sheet 尺寸、pivot、碰撞区域、音频资产、精确色值、布局响应式细节和无障碍对比仍需实现后验证。
 
 ## 下一步
