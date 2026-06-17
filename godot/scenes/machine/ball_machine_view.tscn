@@ -1,0 +1,24 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/ball_machine_view.gd" id="1_ball_machine_view"]
+[ext_resource type="Script" path="res://scripts/ui/machine_board_view.gd" id="2_machine_board"]
+
+[node name="BallMachineView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ball_machine_view")
+
+[node name="MachineBoardView" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+custom_minimum_size = Vector2(720, 760)
+script = ExtResource("2_machine_board")
