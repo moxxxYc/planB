@@ -1,8 +1,8 @@
 # Phase 2 Readability Sprint
 
 **最后更新：** 2026-06-09
-**仓库状态：** 文档主导，`mvp/` 是当前 Godot MVP v0 实现目录。
-**权威范围：** Phase 2 MVP Readability Sprint 的实现合同和验收口径。
+**仓库状态：** 历史 Phase 2 草案，非当前正式实现输入；当前活动 Godot MVP v0 实现目录为 `godot/`。
+**权威范围：** 历史 Phase 2 MVP Readability Sprint 的实现合同和验收口径；当前正式文档列表见 `AGENTS.md` 和 `docs/PROGRESS.md`。
 
 本文只定义 Phase 2 要验证的可读性目标、非目标、验收标准和 playtest handoff。它不是完整 MVP 开发计划，不是公开 demo 打磨计划，也不扩展内容表。
 
@@ -16,7 +16,7 @@
 - `docs/deploy-lane-ui.md`：`Deploy Lane` 直接选路和路线危险提示。
 - `docs/enemy-rules.md`：敌人波次和既有反制家族。
 - `docs/rewards-economy.md`：第一次奖励、商店、Gold 和休整结果页口径。
-- `mvp/docs/agent/`：Godot MVP 工程实现和验证规则。
+- `godot/` 与根目录 `tools/verify_godot.sh`：当前活动 Godot MVP 工程和验证入口。
 
 ## 1. Phase Goal
 
@@ -176,10 +176,10 @@ Phase 2 可以澄清既有反制，但只能在核心可读性闭环完成后做
 
 ## 11. Verification
 
-标准验证命令从仓库根目录运行：
+当前标准验证命令从仓库根目录运行：
 
 ```bash
-bash mvp/tools/verify_all.sh
+bash tools/verify_godot.sh
 ```
 
 Phase 2 每个实现边界完成后都应运行该命令，除非是本文件这样的 docs-only 变更。docs-only 变更可以不运行 Godot，但汇报时必须写明未运行原因。
@@ -207,6 +207,6 @@ Phase 2 结束后可以进入小范围外部 playtest 的最低条件：
 - Queue-to-Lane bridge 可读，不会被误解为直接指挥已部署单位。
 - 结果页 6 个 recap 字段都有稳定文案或稳定占位，不依赖口头解释。
 - 既有 counter 提示不会制造新规则误解。
-- 运行 `bash mvp/tools/verify_all.sh` 通过，或明确记录阻塞原因。
+- 运行 `bash tools/verify_godot.sh` 通过，或明确记录阻塞原因。
 
 外部 playtest 目的只验证可读性，不验证商业化吸引力、公开 demo 质量、长期留存、完整平衡或内容规模。

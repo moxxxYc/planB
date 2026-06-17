@@ -1,7 +1,7 @@
 # MVP Hive Loadout
 
 **最后更新：** 2026-06-09
-**仓库状态：** 文档主导，MVP v0 实现已在 `mvp/` 启动；本文不作为代码状态证明。
+**仓库状态：** 文档主导，当前活动 MVP v0 实现目录为 `godot/`；本文不作为代码状态证明。
 **权威范围：** MVP v0 的 Hive 单位、Guardian、职责带和起始配置。
 
 本文只记录 MVP v0 第一种族 Hive 的具体 loadout。MVP 做什么 / 不做什么见 `docs/mvp-scope.md`；机器规则见 `docs/machine-warehouses.md`；战场规则见 `docs/battlefield-rules.md`；Guardian 通用规则见 `docs/guardian-system.md`。

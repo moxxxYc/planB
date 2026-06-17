@@ -1,7 +1,7 @@
 # Deploy Lane UI 与路线危险提示
 
 **最后更新：** 2026-06-10
-**仓库状态：** 文档主导，MVP v0 实现已在 `mvp/` 启动；本文不作为代码状态证明。
+**仓库状态：** 文档主导，当前活动 MVP v0 实现目录为 `godot/`；本文不作为代码状态证明。
 **权威范围：** `Deploy Lane` 的直接选路、选中高亮、路线危险提示、队列落点反馈。
 
 本文只定义玩家如何选择部署路线，以及系统如何提示路线危险。机器队列见 `docs/machine-warehouses.md`，战场结算见 `docs/battlefield-rules.md`，敌人波次见 `docs/enemy-rules.md`。

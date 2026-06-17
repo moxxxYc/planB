@@ -1,0 +1,686 @@
+extends SceneTree
+
+const RUN_SCENE_PATH: String = "res://scenes/run/mvp_run_session.tscn"
+
+const REQUIRED_KEYS: Array[String] = [
+	"guardian.choice_id",
+	"guardian.choice_read",
+	"guardian.outcome",
+	"guardian.hp_pressure_events",
+	"battle1.machine_chain_sample",
+	"battle1.exposure_gate_snapshot",
+	"battle1.deploy_lane_selection",
+	"battle1.lane_danger_snapshot",
+	"unit.visible_contribution_slots",
+	"unit.key_queue_entries_by_slot",
+	"unit.dominant_slot_share",
+	"reward1.choice_id",
+	"reward1.axis",
+	"reward1.component_operation",
+	"reward1.battlefield_expectation",
+	"reward1.battlefield_result",
+	"shop1.gold_before",
+	"shop1.purchase_id",
+	"shop1.purchase_role",
+	"shop1.gold_after",
+	"rest_windows",
+	"rest.total_purchases",
+	"rest.total_gold_spent",
+	"rest.total_hp_restored",
+	"rest.endpoint_relevance",
+	"rest.opportunity_cost",
+	"counter1.family",
+	"counter1.target_component",
+	"counter1.visible_effect",
+	"counter1.response_link",
+	"second_offer.current_axis",
+	"second_offer.candidates",
+	"second_offer.choice_id",
+	"second_offer.choice_role",
+	"endpoint.outcome",
+	"endpoint.primary_axis_payoff",
+	"endpoint.main_break_reason",
+	"endpoint.next_run_watch_tag",
+	"endpoint.deploy_lane_impact",
+	"endpoint.guardian_hp",
+	"session.decision_windows",
+	"session.consecutive_no_explained_decision_battles",
+]
+
+const NON_EMPTY_STRING_KEYS: Array[String] = [
+	"guardian.choice_id",
+	"guardian.choice_read",
+	"guardian.outcome",
+	"reward1.choice_id",
+	"reward1.axis",
+	"reward1.component_operation",
+	"reward1.battlefield_expectation",
+	"reward1.battlefield_result",
+	"shop1.purchase_id",
+	"shop1.purchase_role",
+	"rest.endpoint_relevance",
+	"rest.opportunity_cost",
+	"counter1.family",
+	"counter1.target_component",
+	"counter1.visible_effect",
+	"counter1.response_link",
+	"second_offer.current_axis",
+	"second_offer.choice_id",
+	"second_offer.choice_role",
+	"endpoint.outcome",
+	"endpoint.primary_axis_payoff",
+	"endpoint.main_break_reason",
+	"endpoint.next_run_watch_tag",
+	"endpoint.deploy_lane_impact",
+	"endpoint.guardian_hp",
+]
+
+const NON_EMPTY_ARRAY_KEYS: Array[String] = [
+	"guardian.hp_pressure_events",
+	"second_offer.candidates",
+	"session.decision_windows",
+]
+
+const NON_NEGATIVE_NUMBER_KEYS: Array[String] = [
+	"shop1.gold_before",
+	"shop1.gold_after",
+	"rest.total_purchases",
+	"rest.total_gold_spent",
+	"rest.total_hp_restored",
+	"session.consecutive_no_explained_decision_battles",
+]
+
+const SPECIAL_SHAPE_KEYS: Array[String] = [
+	"battle1.machine_chain_sample",
+	"battle1.exposure_gate_snapshot",
+	"battle1.deploy_lane_selection",
+	"battle1.lane_danger_snapshot",
+	"unit.visible_contribution_slots",
+	"unit.key_queue_entries_by_slot",
+	"unit.dominant_slot_share",
+	"rest_windows",
+]
+
+var failures: Array[String] = []
+
+func _initialize() -> void:
+	var scene: PackedScene = load(RUN_SCENE_PATH)
+	if scene == null:
+		failures.append("Run session scene missing: %s" % RUN_SCENE_PATH)
+		_finish()
+		return
+
+	var run: Node = scene.instantiate()
+	if run == null:
+		failures.append("Could not instantiate run session scene.")
+		_finish()
+		return
+
+	root.add_child(run)
+	if _require_methods(run):
+		_drive_full_run_to_final_result(run)
+		_verify_required_learning_keys(run)
+	root.remove_child(run)
+	run.free()
+	_finish()
+
+func _drive_full_run_to_final_result(run: Node) -> void:
+	run.call("select_guardian", "hive_acid_crown_mother")
+	run.call("confirm_guardian")
+	if not _expect_node(run, "battle_1"):
+		return
+	run.call("complete_current_battle_for_verifier", "Win")
+	if not _expect_node(run, "reward_1"):
+		return
+	run.call("choose_reward_one", "slot_primer")
+	if not _expect_node(run, "battle_2"):
+		return
+	run.call("complete_current_battle_for_verifier", "Win")
+	if not _expect_node(run, "shop_1"):
+		return
+	run.call("buy_shop_item", "queue_brace")
+	run.call("confirm_shop_and_rest")
+	if not _expect_node(run, "battle_3"):
+		return
+	run.call("complete_current_battle_for_verifier", "Win")
+	if not _expect_node(run, "rest_after_battle_3"):
+		return
+	run.call("confirm_shop_and_rest")
+	if not _expect_node(run, "battle_4"):
+		return
+	run.call("complete_current_battle_for_verifier", "Win")
+	if not _expect_node(run, "reward_2"):
+		return
+	run.call("choose_second_reward", "muster_pair")
+	if not _expect_node(run, "battle_5"):
+		return
+	run.call("complete_current_battle_for_verifier", "Win")
+	if not _expect_node(run, "endpoint_prep"):
+		return
+	run.call("confirm_endpoint_prep")
+	if not _expect_node(run, "endpoint"):
+		return
+	run.call("complete_current_battle_for_verifier", "Win")
+	_expect_node(run, "final_result")
+
+func _verify_required_learning_keys(run: Node) -> void:
+	if String(run.call("get_current_node_id")) != "final_result":
+		failures.append("Complete learning record verifier must drive the run to Final Result.")
+		return
+	var record_variant: Variant = run.call("get_result_record")
+	if not (record_variant is Dictionary):
+		failures.append("get_result_record() must return a Dictionary at Final Result.")
+		return
+	var record: Dictionary = record_variant as Dictionary
+	for key: String in REQUIRED_KEYS:
+		if not record.has(key):
+			failures.append("Final Result learning record missing required field: %s" % key)
+	_verify_shape_rules_cover_required_keys()
+	_verify_learning_field_shapes(record)
+
+func _verify_learning_field_shapes(record: Dictionary) -> void:
+	_verify_machine_chain_sample(record)
+	_verify_exposure_gate_snapshot(record)
+	_verify_non_empty_string_fields(record, NON_EMPTY_STRING_KEYS)
+	_verify_non_empty_array_fields(record, NON_EMPTY_ARRAY_KEYS)
+	_verify_non_negative_number_fields(record, NON_NEGATIVE_NUMBER_KEYS)
+	_verify_non_empty_selection_field(record, "battle1.deploy_lane_selection")
+	_verify_lane_danger_snapshot(record)
+	_verify_visible_contribution_slots(record)
+	_verify_key_queue_entries_by_slot(record)
+	_verify_dominant_slot_share(record)
+	_verify_rest_windows(record)
+
+func _verify_shape_rules_cover_required_keys() -> void:
+	var covered: Dictionary = {}
+	for key: String in NON_EMPTY_STRING_KEYS:
+		covered[key] = true
+	for key: String in NON_EMPTY_ARRAY_KEYS:
+		covered[key] = true
+	for key: String in NON_NEGATIVE_NUMBER_KEYS:
+		covered[key] = true
+	for key: String in SPECIAL_SHAPE_KEYS:
+		covered[key] = true
+	for key: String in REQUIRED_KEYS:
+		if not covered.has(key):
+			failures.append("Verifier internal error: %s has no typed learning-record validation rule." % key)
+
+func _verify_machine_chain_sample(record: Dictionary) -> void:
+	if not record.has("battle1.machine_chain_sample"):
+		return
+	var value: Variant = record.get("battle1.machine_chain_sample")
+	if value is String:
+		var text: String = String(value)
+		if not _text_has_all(text, ["Pool", "Tuning", "Unit", "Queue"]):
+			failures.append("battle1.machine_chain_sample string must contain Pool/Tuning/Unit/Queue.")
+		return
+	if value is Dictionary:
+		var chain: Dictionary = value as Dictionary
+		if chain.is_empty():
+			failures.append("battle1.machine_chain_sample Dictionary must be non-empty.")
+			return
+		if not (
+			_has_any_key(chain, ["pool", "pool_entry", "Pool"])
+			and _has_any_key(chain, ["tuning", "tuning_result", "Tuning"])
+			and _has_any_key(chain, ["unit", "unit_slot", "Unit"])
+			and _has_any_key(chain, ["queue", "queue_entry", "Queue"])
+		) and not _text_has_all(JSON.stringify(chain), ["Pool", "Tuning", "Unit", "Queue"]):
+			failures.append("battle1.machine_chain_sample Dictionary must structure Pool/Tuning/Unit/Queue evidence.")
+		return
+	if value is Array:
+		var chain_array: Array = value as Array
+		if chain_array.is_empty() or not _text_has_all(JSON.stringify(chain_array), ["Pool", "Tuning", "Unit", "Queue"]):
+			failures.append("battle1.machine_chain_sample Array must be non-empty and include Pool/Tuning/Unit/Queue evidence.")
+		return
+	failures.append("battle1.machine_chain_sample must be a structured Dictionary/Array or descriptive String.")
+
+func _verify_exposure_gate_snapshot(record: Dictionary) -> void:
+	if not record.has("battle1.exposure_gate_snapshot"):
+		return
+	var value: Variant = record.get("battle1.exposure_gate_snapshot")
+	if not (value is Dictionary):
+		failures.append("battle1.exposure_gate_snapshot must be a Dictionary.")
+		return
+	var snapshot: Dictionary = value as Dictionary
+	if snapshot.is_empty():
+		failures.append("battle1.exposure_gate_snapshot must be non-empty.")
+		return
+	for required_time: float in [0.0, 12.0, 24.0, 30.0]:
+		if not _has_snapshot_time(snapshot, required_time):
+			failures.append("battle1.exposure_gate_snapshot missing required time t_%.0f." % required_time)
+
+func _has_snapshot_time(snapshot: Dictionary, required_time: float) -> bool:
+	for key: String in [
+		"t_%d" % int(required_time),
+		str(int(required_time)),
+		"%.1f" % required_time,
+		"time_%d" % int(required_time),
+	]:
+		if snapshot.has(key):
+			return true
+	var snapshots_variant: Variant = snapshot.get("snapshots", [])
+	if snapshots_variant is Array:
+		for entry_variant: Variant in snapshots_variant:
+			if entry_variant is Dictionary:
+				var entry: Dictionary = entry_variant as Dictionary
+				var time_value: float = float(entry.get("time", entry.get("battle_elapsed", -999.0)))
+				if absf(time_value - required_time) <= 0.05:
+					return true
+	return false
+
+func _verify_non_empty_string_fields(record: Dictionary, keys: Array[String]) -> void:
+	for key: String in keys:
+		if not record.has(key):
+			continue
+		var value: Variant = record.get(key)
+		if not (value is String) or String(value).strip_edges().is_empty():
+			failures.append("%s must be a non-empty String; use an explicit none marker such as 无/none when no choice was made." % key)
+
+func _verify_non_empty_selection_field(record: Dictionary, key: String) -> void:
+	if not record.has(key):
+		return
+	var value: Variant = record.get(key)
+	if value is String and not String(value).strip_edges().is_empty():
+		return
+	if value is Array and not (value as Array).is_empty():
+		return
+	if value is Dictionary and not (value as Dictionary).is_empty():
+		return
+	failures.append("%s must be a non-empty String, Array, or Dictionary." % key)
+
+func _verify_non_empty_array_fields(record: Dictionary, keys: Array[String]) -> void:
+	for key: String in keys:
+		if not record.has(key):
+			continue
+		var value: Variant = record.get(key)
+		if not (value is Array) or (value as Array).is_empty():
+			failures.append("%s must be a non-empty Array." % key)
+
+func _verify_non_negative_number_fields(record: Dictionary, keys: Array[String]) -> void:
+	for key: String in keys:
+		if not record.has(key):
+			continue
+		var value: Variant = record.get(key)
+		if not (value is int or value is float):
+			failures.append("%s must be a Number >= 0." % key)
+			continue
+		if float(value) < 0.0:
+			failures.append("%s must be >= 0." % key)
+
+func _verify_lane_danger_snapshot(record: Dictionary) -> void:
+	if not record.has("battle1.lane_danger_snapshot"):
+		return
+	var value: Variant = record.get("battle1.lane_danger_snapshot")
+	if not (value is Dictionary):
+		failures.append("battle1.lane_danger_snapshot must be a non-empty Dictionary.")
+		return
+	var snapshot: Dictionary = value as Dictionary
+	if snapshot.is_empty():
+		failures.append("battle1.lane_danger_snapshot must be a non-empty Dictionary.")
+		return
+	for lane_key: Variant in snapshot.keys():
+		var entry: Variant = snapshot.get(lane_key)
+		var danger_value: Variant = entry
+		if entry is Dictionary:
+			var entry_dictionary: Dictionary = entry as Dictionary
+			danger_value = entry_dictionary.get("danger", entry_dictionary.get("danger_level", entry_dictionary.get("level", null)))
+		if not (danger_value is int or danger_value is float):
+			failures.append("battle1.lane_danger_snapshot[%s] must expose numeric danger level 0-3." % String(lane_key))
+			continue
+		var danger: float = float(danger_value)
+		if danger < 0.0 or danger > 3.0:
+			failures.append("battle1.lane_danger_snapshot[%s] danger level must be in range 0-3." % String(lane_key))
+
+func _verify_visible_contribution_slots(record: Dictionary) -> void:
+	if not record.has("unit.visible_contribution_slots"):
+		return
+	var value: Variant = record.get("unit.visible_contribution_slots")
+	if value is Dictionary:
+		var by_slot: Dictionary = value as Dictionary
+		if by_slot.is_empty():
+			failures.append("unit.visible_contribution_slots Dictionary must be non-empty.")
+			return
+		for slot_key: Variant in by_slot.keys():
+			var slot_id: int = _slot_id_from_variant(slot_key)
+			if not _is_valid_slot_id(slot_id):
+				failures.append("unit.visible_contribution_slots has invalid slot key: %s." % String(slot_key))
+				continue
+			_verify_visible_contribution_slot_record(by_slot.get(slot_key), slot_id, "unit.visible_contribution_slots[%s]" % String(slot_key))
+		return
+	if not (value is Array):
+		failures.append("unit.visible_contribution_slots must be a non-empty Array of slot records or Dictionary keyed by slots.")
+		return
+	var slot_records: Array = value as Array
+	if slot_records.is_empty():
+		failures.append("unit.visible_contribution_slots must be non-empty.")
+		return
+	for index: int in range(slot_records.size()):
+		var entry_variant: Variant = slot_records[index]
+		if not (entry_variant is Dictionary):
+			failures.append("unit.visible_contribution_slots[%d] must be a Dictionary with slot and visible contribution evidence." % index)
+			continue
+		var entry: Dictionary = entry_variant as Dictionary
+		var slot_id: int = _slot_id_from_record(entry, ["slot_id", "slot", "unit_slot", "unit_slot_id"])
+		if not _is_valid_slot_id(slot_id):
+			failures.append("unit.visible_contribution_slots[%d] must include slot_id 1-4 or S1-S4." % index)
+			continue
+		_verify_visible_contribution_slot_record(entry, slot_id, "unit.visible_contribution_slots[%d]" % index)
+
+func _verify_visible_contribution_slot_record(value: Variant, expected_slot_id: int, label: String) -> void:
+	if not (value is Dictionary):
+		failures.append("%s must be a Dictionary with per-slot visible/count/unit/contribution evidence." % label)
+		return
+	var entry: Dictionary = value as Dictionary
+	if entry.is_empty():
+		failures.append("%s must be non-empty." % label)
+		return
+	var entry_slot_id: int = _slot_id_from_record(entry, ["slot_id", "slot", "unit_slot", "unit_slot_id"])
+	if _is_valid_slot_id(entry_slot_id) and entry_slot_id != expected_slot_id:
+		failures.append("%s slot evidence must match slot %d." % [label, expected_slot_id])
+	if not _has_any_meaningful_value(entry, [
+		"visible",
+		"visible_result",
+		"visible_contribution",
+		"count",
+		"visible_count",
+		"contribution_count",
+		"unit",
+		"unit_id",
+		"unit_name",
+		"unit_label",
+		"contribution",
+		"contribution_type",
+		"contribution_role",
+		"result",
+		"impact",
+	]):
+		failures.append("%s must include non-empty visible/count/unit/contribution evidence." % label)
+
+func _verify_key_queue_entries_by_slot(record: Dictionary) -> void:
+	if not record.has("unit.key_queue_entries_by_slot"):
+		return
+	var value: Variant = record.get("unit.key_queue_entries_by_slot")
+	if not (value is Dictionary):
+		failures.append("unit.key_queue_entries_by_slot must be a non-empty Dictionary.")
+		return
+	var by_slot: Dictionary = value as Dictionary
+	if by_slot.is_empty():
+		failures.append("unit.key_queue_entries_by_slot must be a non-empty Dictionary.")
+		return
+	for slot_key: Variant in by_slot.keys():
+		var slot_id: int = _slot_id_from_variant(slot_key)
+		if not _is_valid_slot_id(slot_id):
+			failures.append("unit.key_queue_entries_by_slot has invalid slot key: %s." % String(slot_key))
+			continue
+		var entries_variant: Variant = by_slot.get(slot_key)
+		_verify_queue_entries_for_slot(entries_variant, slot_id, "unit.key_queue_entries_by_slot[%s]" % String(slot_key))
+
+func _verify_queue_entries_for_slot(value: Variant, expected_slot_id: int, label: String) -> void:
+	if value is Array:
+		var entries: Array = value as Array
+		if entries.is_empty():
+			failures.append("%s must contain at least one queue entry." % label)
+			return
+		for index: int in range(entries.size()):
+			_verify_queue_entry_shape(entries[index], expected_slot_id, "%s[%d]" % [label, index])
+		return
+	if value is Dictionary:
+		var entry_or_group: Dictionary = value as Dictionary
+		if entry_or_group.is_empty():
+			failures.append("%s must contain non-empty queue entry evidence." % label)
+			return
+		if _looks_like_queue_entry(entry_or_group):
+			_verify_queue_entry_shape(entry_or_group, expected_slot_id, label)
+			return
+		for nested_key: String in ["entries", "queue_entries", "key_entries", "records"]:
+			if entry_or_group.has(nested_key):
+				_verify_queue_entries_for_slot(entry_or_group.get(nested_key), expected_slot_id, "%s.%s" % [label, nested_key])
+				return
+		for entry_key: Variant in entry_or_group.keys():
+			var nested_entry: Variant = entry_or_group.get(entry_key)
+			if not (nested_entry is Dictionary):
+				failures.append("%s.%s must be a queue entry Dictionary." % [label, String(entry_key)])
+				continue
+			_verify_queue_entry_shape(nested_entry, expected_slot_id, "%s.%s" % [label, String(entry_key)])
+		return
+	failures.append("%s must be an Array or Dictionary of queue entry records." % label)
+
+func _looks_like_queue_entry(entry: Dictionary) -> bool:
+	return (
+		_has_any_key(entry, ["unit_id", "unit_name", "unit"])
+		or _has_any_key(entry, ["lane", "route", "deploy_lane", "deploy_target", "target_lane"])
+		or _has_any_key(entry, ["time", "battle_time", "elapsed_seconds", "result", "reason"])
+	)
+
+func _verify_queue_entry_shape(value: Variant, expected_slot_id: int, label: String) -> void:
+	if not (value is Dictionary):
+		failures.append("%s must be a Dictionary." % label)
+		return
+	var entry: Dictionary = value as Dictionary
+	if entry.is_empty():
+		failures.append("%s must be non-empty." % label)
+		return
+	var entry_slot_id: int = _slot_id_from_record(entry, ["slot_id", "slot", "unit_slot", "unit_slot_id"])
+	if not _is_valid_slot_id(entry_slot_id):
+		failures.append("%s must include slot evidence 1-4 or S1-S4." % label)
+	elif entry_slot_id != expected_slot_id:
+		failures.append("%s slot evidence must match slot %d." % [label, expected_slot_id])
+	if not _has_any_meaningful_value(entry, ["unit_id", "unit_name", "unit", "unit_label"]):
+		failures.append("%s must include unit id/name evidence." % label)
+	if not _has_any_meaningful_value(entry, ["lane", "route", "deploy_lane", "deploy_target", "target_lane", "target_route"]):
+		failures.append("%s must include lane/route/deploy target evidence." % label)
+	if not (
+		_has_any_meaningful_value(entry, ["result", "reason", "contribution_reason", "visible_result", "impact"])
+		or _has_any_non_negative_number(entry, ["time", "battle_time", "elapsed_seconds", "timestamp"])
+	):
+		failures.append("%s must include time/result/reason evidence." % label)
+
+func _verify_dominant_slot_share(record: Dictionary) -> void:
+	if not record.has("unit.dominant_slot_share"):
+		return
+	var value: Variant = record.get("unit.dominant_slot_share")
+	if value is Dictionary:
+		var share_record: Dictionary = value as Dictionary
+		if share_record.is_empty():
+			failures.append("unit.dominant_slot_share Dictionary must be non-empty.")
+			return
+		if not _has_any_key(share_record, ["slot_id", "slot", "dominant_slot"]):
+			failures.append("unit.dominant_slot_share Dictionary must include slot_id/slot/dominant_slot.")
+		var share_variant: Variant = share_record.get("share", share_record.get("ratio", share_record.get("dominant_share", null)))
+		if not (share_variant is int or share_variant is float):
+			failures.append("unit.dominant_slot_share Dictionary must include numeric share/ratio.")
+			return
+		_verify_ratio(float(share_variant), "unit.dominant_slot_share.share")
+		return
+	if value is int or value is float:
+		_verify_ratio(float(value), "unit.dominant_slot_share")
+		return
+	failures.append("unit.dominant_slot_share must be a Dictionary with slot/share evidence or numeric ratio.")
+
+func _verify_ratio(value: float, label: String) -> void:
+	if value < 0.0 or value > 1.0:
+		failures.append("%s must be in range 0.0-1.0." % label)
+
+func _verify_rest_windows(record: Dictionary) -> void:
+	if not record.has("rest_windows"):
+		return
+	_verify_rest_windows_value(record.get("rest_windows"), "rest_windows")
+
+func _verify_rest_windows_value(value: Variant, label: String) -> void:
+	if value is Array:
+		var windows: Array = value as Array
+		if windows.is_empty():
+			failures.append("%s must be a non-empty Array or Dictionary of rest window records." % label)
+			return
+		for index: int in range(windows.size()):
+			_verify_rest_window_record(windows[index], "", "%s[%d]" % [label, index])
+		return
+	if value is Dictionary:
+		var windows_by_key: Dictionary = value as Dictionary
+		if windows_by_key.is_empty():
+			failures.append("%s must be a non-empty Array or Dictionary of rest window records." % label)
+			return
+		for nested_key: String in ["windows", "entries", "records"]:
+			if windows_by_key.has(nested_key):
+				_verify_rest_windows_value(windows_by_key.get(nested_key), "%s.%s" % [label, nested_key])
+				return
+		for window_key: Variant in windows_by_key.keys():
+			_verify_rest_window_record(windows_by_key.get(window_key), String(window_key), "%s[%s]" % [label, String(window_key)])
+		return
+	failures.append("%s must be a non-empty Array or Dictionary of rest window records." % label)
+
+func _verify_rest_window_record(value: Variant, fallback_label: String, label: String) -> void:
+	if not (value is Dictionary):
+		failures.append("%s must be a Dictionary rest window record." % label)
+		return
+	var window: Dictionary = value as Dictionary
+	if window.is_empty():
+		failures.append("%s must be non-empty." % label)
+		return
+	if not _has_any_meaningful_value(window, ["id", "name", "window", "label", "window_id", "window_label", "title"]) and fallback_label.strip_edges().is_empty():
+		failures.append("%s must include name/id/window label evidence." % label)
+	if not (
+		_has_true_bool(window, ["appeared", "offered", "available", "present"])
+		or _has_any_non_empty_container(window, ["choices", "options", "offers"])
+	):
+		failures.append("%s must include appeared/offered flag or non-empty choices/options evidence." % label)
+	if not (
+		_has_bool_key(window, ["purchased", "purchase", "bought", "restored"])
+		or _has_any_meaningful_value(window, ["purchase_id", "purchase_role", "purchase_result", "rest_action", "restored_info"])
+		or _has_any_non_negative_number(window, ["hp_restored", "restored_hp", "heal_amount"])
+	):
+		failures.append("%s must include explicit purchase/bought/restored info." % label)
+	if not _has_any_non_negative_number(window, ["gold_before", "before_gold"]):
+		failures.append("%s must include gold_before evidence >= 0." % label)
+	if not _has_any_non_negative_number(window, ["gold_after", "after_gold"]):
+		failures.append("%s must include gold_after evidence >= 0." % label)
+	if not _has_any_non_negative_number(window, ["gold_spent", "spent_gold", "cost", "gold_cost"]):
+		failures.append("%s must include gold spent/cost evidence >= 0." % label)
+	if not _has_rest_hp_evidence(window):
+		failures.append("%s must include hp_restored or Guardian HP before/after evidence." % label)
+
+func _has_rest_hp_evidence(record: Dictionary) -> bool:
+	if _has_any_non_negative_number(record, ["hp_restored", "restored_hp", "heal_amount"]):
+		return true
+	if _has_any_meaningful_value(record, ["guardian_hp", "guardian_hp_result"]):
+		return true
+	return _has_any_meaningful_value(record, ["guardian_hp_before", "hp_before"]) and _has_any_meaningful_value(record, ["guardian_hp_after", "hp_after"])
+
+func _slot_id_from_record(record: Dictionary, keys: Array[String]) -> int:
+	for key: String in keys:
+		if record.has(key):
+			return _slot_id_from_variant(record.get(key))
+	return 0
+
+func _slot_id_from_variant(value: Variant) -> int:
+	if value is int or value is float:
+		var numeric_slot_id: int = int(value)
+		return numeric_slot_id if _is_valid_slot_id(numeric_slot_id) else 0
+	var text: String = String(value).strip_edges().to_upper()
+	for slot_id: int in [1, 2, 3, 4]:
+		if text == str(slot_id) or text == "S%d" % slot_id:
+			return slot_id
+	return 0
+
+func _is_valid_slot_id(slot_id: int) -> bool:
+	return slot_id >= 1 and slot_id <= 4
+
+func _has_any_meaningful_value(record: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if record.has(key) and _is_meaningful_value(record.get(key)):
+			return true
+	return false
+
+func _has_any_non_empty_container(record: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if not record.has(key):
+			continue
+		var value: Variant = record.get(key)
+		if value is Array and not (value as Array).is_empty():
+			return true
+		if value is Dictionary and not (value as Dictionary).is_empty():
+			return true
+	return false
+
+func _has_any_non_negative_number(record: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if not record.has(key):
+			continue
+		var value: Variant = record.get(key)
+		if (value is int or value is float) and float(value) >= 0.0:
+			return true
+	return false
+
+func _has_true_bool(record: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if record.has(key) and record.get(key) is bool and bool(record.get(key)):
+			return true
+	return false
+
+func _has_bool_key(record: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if record.has(key) and record.get(key) is bool:
+			return true
+	return false
+
+func _is_meaningful_value(value: Variant) -> bool:
+	if value == null:
+		return false
+	if value is bool:
+		return bool(value)
+	if value is int or value is float:
+		return float(value) > 0.0
+	if value is String:
+		return not String(value).strip_edges().is_empty()
+	if value is Array:
+		return not (value as Array).is_empty()
+	if value is Dictionary:
+		return not (value as Dictionary).is_empty()
+	return true
+
+func _has_any_key(record: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if record.has(key):
+			return true
+	return false
+
+func _text_has_all(text: String, needles: Array[String]) -> bool:
+	for needle: String in needles:
+		if not text.contains(needle):
+			return false
+	return true
+
+func _expect_node(run: Node, expected: String) -> bool:
+	var actual: String = String(run.call("get_current_node_id"))
+	if actual != expected:
+		failures.append("Expected run node %s, got %s." % [expected, actual])
+		return false
+	return true
+
+func _require_methods(run: Node) -> bool:
+	var has_all_methods: bool = true
+	for method_name: String in [
+		"select_guardian",
+		"confirm_guardian",
+		"complete_current_battle_for_verifier",
+		"choose_reward_one",
+		"buy_shop_item",
+		"confirm_shop_and_rest",
+		"choose_second_reward",
+		"confirm_endpoint_prep",
+		"get_current_node_id",
+		"get_result_record",
+	]:
+		if not run.has_method(method_name):
+			failures.append("Run scene missing method: %s" % method_name)
+			has_all_methods = false
+	return has_all_methods
+
+func _finish() -> void:
+	if failures.is_empty():
+		print("verify_complete_learning_record: PASS")
+		quit(0)
+		return
+	for failure: String in failures:
+		push_error(failure)
+	quit(1)

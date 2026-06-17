@@ -1,8 +1,8 @@
 # 球机物理表现 MVP v0 输入
 
-**最后更新：** 2026-06-08
-**仓库状态：** 文档主导，MVP v0 实现已在 `mvp/` 启动；本文不作为代码状态证明。
-**文档状态：** MVP v0 实现输入。球机物理表现层的根决策已通过对话逐项确认，并已吸收 2026-06-08 `/plan-design-review` 提出的候选收口内容。用户已确认本文作为 MVP v0 的实现假设进入 `/implementation-handoff`，但这不等于最终 canon；钉子 / 活动块具体布局、层间随机范围、球物理参数和各 Guardian / 修正 / 反制的具体物理表现仍未定，未经 playtest，未最终锁定。
+**最后更新：** 2026-06-17
+**仓库状态：** 文档主导，当前活动 MVP v0 实现目录为 `godot/`；本文不作为代码状态证明。
+**文档状态：** MVP v0 实现输入。球机物理表现层的根决策已通过对话逐项确认，并已吸收 2026-06-08 `/plan-design-review` 提出的候选收口内容。用户已确认本文作为 MVP v0 的实现假设进入 `/implementation-handoff`，但这不等于最终 canon；当前默认槽位顺序、槽宽主导原则、固定钉子模板和 Launch / Tuning 常驻活动机关已作为 MVP v0 实现决定，层间随机范围、球物理参数、活动机关精确参数和各 Guardian / 修正 / 反制的具体物理表现仍需 playtest 后继续调校。
 
 本文只记录球机的**物理表现与运动形态**。机器逻辑结算规则仍以 `docs/machine-warehouses.md` 为准；本文叠加在其之上，不替代其结算定义。战场规则见 `docs/battlefield-rules.md`，Guardian 见 `docs/guardian-system.md`，奖励经济见 `docs/rewards-economy.md`。
 
@@ -39,12 +39,12 @@
 ┌──────────────────┐
 │ 球机① Launch      │  顶部摆动炮台发球
 │  · 钉 · 活动块 ·   │  钉子+活动块塑造弹跳
-│   ·   ·    ·     │  底槽 = 进Tuning / Split / Recycle / Waste
+│   ·   ·    ·     │  底槽 = Split / 进Tuning / Recycle / Waste
 └────┬─────────────┘
      │ 层间传递：范围内随机落点
 ┌────▼─────────────┐
 │ 球机② Tuning      │  钉子+活动块
-│  · 钉 · 活动块 ·   │  底槽 = Gate / Prime / Echo / Surge → 打 tuning_mark
+│  · 钉 · 活动块 ·   │  底槽 = Prime / Gate / Echo / Surge → 打 tuning_mark
 └────┬─────────────┘
      │ 层间传递：范围内随机落点
 ┌────▼─────────────┐
@@ -157,8 +157,8 @@
 |---|---|---|---|---|---|---|---|
 | Pool | 5-slot FIFO visible | ball enters / leaves with direction | Pool full rejects Recycle with clear lost-return feedback | N/A | Junk occupies visible slot | `current / capacity` and full outline | Player can point to supply buffer |
 | Launcher | automatic 1.3s cadence | fired ball visibly leaves Pool | Pool empty shows dry-fire wait, no panic warning | N/A | counter can affect input only if named | N/A | Player sees launch rhythm |
-| Launch Board | ball bounces through pins | Tuning / Split / Recycle / Waste slot bite | Waste greys out as no valid result | forced route uses guide rail if named | Pool Polluter marks input layer | N/A | Player sees supply vs miss vs return |
-| Tuning Board | ball enters four-slot board | Gate / Prime / Echo / Surge label lights | Echo Breaker downgrades copy, not ball | Acid Crown forced Prime uses visible guide rail | Echo area cracks during warning | N/A | Player sees quality conversion |
+| Launch Board | ball bounces through pins | Split / Tuning / Recycle / Waste slot bite | Waste greys out as no valid result | forced route uses guide rail if named | Pool Polluter marks input layer | N/A | Player sees supply vs miss vs return |
+| Tuning Board | ball enters four-slot board | Prime / Gate / Echo / Surge label lights | Echo Breaker downgrades copy, not ball | Acid Crown forced Prime uses visible guide rail | Echo area cracks during warning | N/A | Player sees quality conversion |
 | Unit Board | ball approaches slot bays | progress rises on exposed slot | blocked bounce off unexposed gate | slot-target rules mark target bay | Stagger warns Queue, not slot itself | slot progress overflow obeys machine rules | Player sees low-to-high slots open over time |
 | Queue | next 3 entries visible | entry moves to selected lane on deploy tick | empty queue shows gap timer only when relevant | Surge marks accelerated entry | Stagger gap warning attaches here | N/A | Player sees deployment is delayed |
 | Deploy Lane | selected lane stable | birth flash confirms lane | clicking current lane no-op, no spam effect | named batch lock rules must mark lock | danger uses separate shape / motion | N/A | Player sees click changes route, not output |
@@ -203,20 +203,26 @@
 
 ## 15. 三板底槽映射
 
-| 球机 | 对应仓 | 底部结果槽 | 槽含义（以 machine-warehouses 为准） |
+| 球机 | 对应仓 | 底部结果槽（物理左到右） | 槽含义（以 machine-warehouses 为准） |
 |---|---|---|---|
-| 球机① | `Launch` | 进 Tuning / Split / Recycle / Waste | Route Board 分流，目标分布 `65 / 15 / 15 / 5` |
-| 球机② | `Tuning` | Gate / Prime / Echo / Surge | 打 tuning_mark，目标槽宽 `55 / 15 / 15 / 15` |
+| 球机① | `Launch` | Split / 进 Tuning / Recycle / Waste | Route Board 分流，目标分布 `65 / 15 / 15 / 5` |
+| 球机② | `Tuning` | Prime / Gate / Echo / Surge | 打 tuning_mark，目标槽宽 `55 / 15 / 15 / 15` |
 | 球机③ | `Unit` | slot 1 / slot 2 / slot 3 / slot 4 | 落入已暴露槽得 progress，未暴露弹开；Exposure baseline 见 machine-warehouses |
 
-底部"宽度倾向"靠**槽宽物理宽度**还是**钉子引导**实现，**仍未定**。
+MVP v0 默认采用**槽宽物理宽度主导分布**，固定钉子和活动机关只负责可见扰动、弱打散和构筑改写入口，不替代底槽宽度的主分布读法。当前实现顺序把主路径放在中间：`Launch.Tuning` 位于中部大槽，`Tuning.Gate` 位于中部大槽；回流、奖励和失败结果读作侧路。
+
+默认钉子 / 活动机关结构：
+
+- `Launch`：固定钉子使用稀疏模板；常驻活动机关包含 `launch_diverter` 分流拨片和 `launch_return_flap` 回流侧挡片。
+- `Tuning`：固定钉子使用稀疏模板；常驻活动机关包含 `tuning_quality_cam`，用于让 Gate / Prime 边界读成转换机构。
+- `Unit`：固定钉子最少且避开底部 slot / Exposure Gate 落区；默认活动结构来自 `Unit.Slot.Exposure Gate`，不额外加入随机活动机关。
 
 ## 16. 与现有 canon 的关系
 
 | 现有 canon | 物理层处理 | 性质 |
 |---|---|---|
 | Tuning 槽宽 `55/15/15/15` | 落地为球机②底槽的物理分布 | 改述，不改逻辑 |
-| Route Board `65/15/15/5` | 落地为球机①的钉子/活动块分流 | 改述，需定物理结构 |
+| Route Board `65/15/15/5` | 落地为球机①槽宽主导的物理分布，固定钉子和活动机关提供扰动 | 改述，不改逻辑 |
 | Exposure Gate "球弹开" | 球机③的物理挡板，本就是物理描述 | 无冲突 |
 | Guardian / 修正 / 反制的路由类改写 | 物理化为钉子/活动块/强制导入（第 8 节） | 需逐个设计物理表现 |
 | Guardian / 修正的结算类效果 | 保持逻辑 | 无冲突 |
@@ -238,9 +244,9 @@
 
 ## 18. 仍未定
 
-1. 底部"宽度倾向"靠槽宽物理宽度、钉子引导，还是二者组合。
+1. 槽宽主导 + 钉子 / 活动机关扰动的默认方案经 playtest 后是否需要调参。
 2. 层间随机落点的范围大小（决定正交程度与方差）。
-3. 各板钉子 / 活动块的默认布局与密度。
+3. 各板固定钉子模板、活动机关精确坐标、速度、摆角和碰撞材质的最终调参。
 4. 炮台摆动范围、摆速、是否覆盖整板宽。
 5. 球的物理参数基调（重力 / 弹性 / 速度）与同屏球数。
 6. Split / Recycle / Waste 回流通道的具体物理形态。

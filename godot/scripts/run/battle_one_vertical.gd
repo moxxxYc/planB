@@ -1,0 +1,618 @@
+class_name BattleOneVertical
+extends Control
+
+const MachineStripViewScript := preload("res://scripts/ui/machine_strip_view.gd")
+const QueueBridgeViewScript := preload("res://scripts/ui/queue_bridge_view.gd")
+const BattlefieldViewScript := preload("res://scripts/ui/battlefield_view.gd")
+const CounterStateScript := preload("res://scripts/model/counter/counter_state.gd")
+const MachineSlotExposureStateScript := preload("res://scripts/model/machine/machine_slot_exposure_state.gd")
+const GuardianContractStateScript := preload("res://scripts/model/guardian/guardian_contract_state.gd")
+
+const DEPLOY_TICK_SECONDS: float = 0.5
+const BRIDGE_TRANSFER_DWELL_SECONDS: float = 1.5
+const EXPOSURE_GATE_SAMPLE_TIMES: Array[float] = [0.0, 12.0, 24.0, 30.0]
+const STANDALONE_VERIFIER_PRESSURE_LIMIT_SECONDS: float = 34.0
+
+@onready var machine_view: MachineStripViewScript = %MachineStripView
+@onready var bridge_view: QueueBridgeViewScript = %QueueBridgeView
+@onready var battlefield_view: BattlefieldViewScript = %BattlefieldView
+@onready var status_label: Label = %StatusLabel
+
+var machine: MachineSimulator = MachineSimulator.new()
+var deploy: DeployLaneModel = DeployLaneModel.new()
+var lanes: BattlefieldState = BattlefieldState.new()
+var deploy_timer: float = 0.0
+var elapsed: float = 0.0
+var bridge_transfer_timer: float = 0.0
+var battle_number: int = 1
+var run_session: RunSessionModel = null
+var run_payload: Dictionary = {}
+var counter_state = null
+var counter_definition: Resource = null
+var counter_effect_applied: bool = false
+var echo_breaker_armed: bool = false
+var no_deploy_timer: float = 0.0
+var last_deploy_elapsed: float = 0.0
+var stagger_warning_timer: float = 0.0
+var stagger_target_lane: String = ""
+var pool_polluter_insert_timer: float = 0.0
+var active_counter_record: Dictionary = {}
+var exposure_state: RefCounted = MachineSlotExposureStateScript.new()
+var guardian_contract: RefCounted = GuardianContractStateScript.new()
+
+func _ready() -> void:
+	_ensure_views()
+	_connect_machine_physics()
+	_sync_exposure_runtime()
+	battlefield_view.lane_clicked.connect(_on_lane_clicked)
+	set_physics_process(true)
+	_render()
+
+func _physics_process(delta: float) -> void:
+	advance_simulation(delta)
+
+func select_deploy_lane(lane: String) -> void:
+	deploy.select_lane(lane)
+	if lanes != null and lanes.telemetry != null:
+		lanes.telemetry.record_lane_change(deploy.current_lane, elapsed)
+	_render()
+
+func get_selected_lane() -> String:
+	return deploy.current_lane
+
+func get_lane_units(lane: String) -> int:
+	return lanes.get_player_units(lane)
+
+func get_lane_button_text(lane: String) -> String:
+	_ensure_views()
+	return battlefield_view.get_lane_button_text(lane)
+
+func get_highest_danger_text() -> String:
+	_ensure_views()
+	return battlefield_view.get_highest_danger_text()
+
+func get_bridge_lane_text() -> String:
+	_ensure_views()
+	return bridge_view.get_lane_label_text()
+
+func get_spawn_port_text() -> String:
+	_ensure_views()
+	return bridge_view.get_spawn_port_text()
+
+func get_bridge_route_text() -> String:
+	_ensure_views()
+	return bridge_view.get_bridge_route_text()
+
+func get_bridge_queue_label_text() -> String:
+	_ensure_views()
+	return bridge_view.get_queue_label_text()
+
+func get_bridge_queue_preview_text() -> String:
+	_ensure_views()
+	return bridge_view.get_queue_preview_text()
+
+func get_queue_count() -> int:
+	return machine.queue.size()
+
+func get_machine_event_count() -> int:
+	return machine.event_log.size()
+
+func get_machine_visual_contract() -> Dictionary:
+	_ensure_views()
+	return machine_view.get_visual_contract_summary()
+
+func get_machine_readable_log_text() -> String:
+	_ensure_views()
+	return machine_view.get_readable_log_text()
+
+func get_bridge_transfer_text() -> String:
+	_ensure_views()
+	return bridge_view.get_transfer_text()
+
+func get_battle_result() -> String:
+	return lanes.get_battle_result()
+
+func get_battle_result_text() -> String:
+	return _battle_result_text()
+
+func get_active_counter_banner_text() -> String:
+	if counter_state == null:
+		return "反制：无"
+	var banner: String = String(counter_state.call("banner_text"))
+	if not banner.contains("预警"):
+		banner = "%s | 预警后生效" % banner
+	if _counter_definition_id() == "stagger_punisher" and not banner.contains("队列空档"):
+		banner = "%s | 队列空档" % banner
+	return banner
+
+func get_active_counter_record() -> Dictionary:
+	if counter_state == null:
+		return {}
+	return (counter_state.call("to_record") as Dictionary).duplicate(true)
+
+func get_battlefield_record() -> Dictionary:
+	var record: Dictionary = lanes.get_telemetry_record()
+	if battle_number == 1:
+		if machine_view != null and machine_view.has_method("get_visual_contract_summary"):
+			var machine_contract: Dictionary = machine_view.call("get_visual_contract_summary") as Dictionary
+			var machine_chain_sample: Dictionary = machine_contract.get("machine_chain_sample", {}) as Dictionary
+			if not machine_chain_sample.is_empty():
+				record["battle1.machine_chain_sample"] = _build_machine_chain_learning_sample(machine_chain_sample)
+		record["battle1.exposure_gate_snapshot"] = _build_battle_one_exposure_snapshot()
+		if not record.has("battle1.lane_danger_snapshot") or (record["battle1.lane_danger_snapshot"] is Dictionary and (record["battle1.lane_danger_snapshot"] as Dictionary).is_empty()):
+			record["battle1.lane_danger_snapshot"] = _build_lane_danger_snapshot()
+	if guardian_contract != null and guardian_contract.has_method("telemetry_snapshot"):
+		record["guardian.contract_snapshot"] = guardian_contract.call("telemetry_snapshot")
+	return record
+
+func get_exposure_gate_snapshot_for_verifier() -> Dictionary:
+	return _build_battle_one_exposure_snapshot()
+
+func get_player_guardian_hp() -> int:
+	return lanes.get_player_guardian_hp()
+
+func get_endpoint_guardian_hp() -> int:
+	return lanes.get_endpoint_guardian_hp()
+
+func get_active_machine_log_text() -> String:
+	_ensure_views()
+	var raw_log := PackedStringArray()
+	for log_line: String in machine.event_log:
+		raw_log.append(log_line)
+	return "%s\n%s" % [machine_view.get_readable_log_text(), "\n".join(raw_log)]
+
+func get_machine_physics_queue_chains_for_verifier() -> Array[Dictionary]:
+	if machine.has_method("get_physics_queue_chains_for_verifier"):
+		return machine.call("get_physics_queue_chains_for_verifier") as Array[Dictionary]
+	return []
+
+func configure_for_run(p_battle_number: int, p_session: RunSessionModel, payload: Dictionary = {}) -> void:
+	battle_number = maxi(1, p_battle_number)
+	run_session = p_session
+	run_payload = payload.duplicate(true)
+	lanes.configure(battle_number, battle_number >= 6, run_session.guardian_hp if run_session != null else 100)
+	lanes.telemetry.record_lane_change(deploy.current_lane, elapsed)
+	_configure_guardian_contract()
+	_configure_counter_runtime(payload)
+	_sync_exposure_runtime()
+	_apply_run_modifiers()
+	_render()
+
+func get_battle_modifier_marker_text() -> String:
+	return machine.get_modifier_marker_text()
+
+func advance_simulation(delta: float, use_seeded_physics: bool = false) -> void:
+	elapsed += delta
+	_sync_exposure_runtime()
+	_advance_bridge_transfer(delta)
+	_advance_counter(delta)
+	var launch_requests: Array[Dictionary] = machine.advance_supply(delta)
+	for launch_request: Dictionary in launch_requests:
+		if use_seeded_physics:
+			machine_view.run_seeded_chain_for_verifier(machine.build_verifier_seeded_chain_for_ball(launch_request))
+		else:
+			machine_view.launch_ball(launch_request, elapsed)
+	deploy_timer += delta
+	while deploy_timer >= DEPLOY_TICK_SECONDS:
+		deploy_timer -= DEPLOY_TICK_SECONDS
+		_deploy_queue_head()
+	lanes.advance_battle(delta)
+	_render()
+
+func advance_for_verifier(seconds: float) -> void:
+	_apply_standalone_verifier_result_window()
+	var steps: int = maxi(1, int(ceil(seconds / 0.25)))
+	for _i: int in range(steps):
+		advance_simulation(seconds / float(steps), true)
+
+func force_guardian_recycle_sequence_for_verifier(count: int) -> Dictionary:
+	_configure_guardian_contract()
+	machine.pool.clear()
+	var record: Dictionary
+	if guardian_contract.has_method("force_recycle_sequence_for_verifier"):
+		record = guardian_contract.call("force_recycle_sequence_for_verifier", machine, count) as Dictionary
+	else:
+		record = {}
+	_drain_guardian_logs_to_machine()
+	record["reset_per_battle"] = true
+	record["source"] = "Guardian.StrategicSkill"
+	record["contract_layer"] = "strategic_machine"
+	record["machine_event_log"] = machine.event_log.duplicate()
+	return record
+
+func force_guardian_gate_sequence_for_verifier(count: int) -> Dictionary:
+	_configure_guardian_contract()
+	guardian_contract.call("reset_for_battle")
+	machine.event_log.clear()
+	var sequence: Array[Dictionary] = []
+	for index: int in range(maxi(0, count)):
+		var result := MachinePhysicsResult.make(
+			"Tuning",
+			"Gate",
+			1,
+			1,
+			"clean",
+			"guardian_verifier",
+			"guardian_gate_%02d" % index,
+			elapsed
+		)
+		machine.apply_physics_result(result)
+		sequence.append({
+			"original_result": "Gate",
+			"final_result": result.result_id,
+		})
+	var snapshot: Dictionary = guardian_contract.call("telemetry_snapshot") as Dictionary
+	var record: Dictionary = snapshot.get("last_gate_record", {}) as Dictionary
+	record["converted"] = String(sequence[sequence.size() - 1].get("final_result", "")) == "Prime" if not sequence.is_empty() else false
+	record["gate_count"] = count
+	record["original_result"] = "Gate"
+	record["final_result"] = String(sequence[sequence.size() - 1].get("final_result", "Gate")) if not sequence.is_empty() else "Gate"
+	record["reset"] = bool(record.get("reset", false))
+	record["reset_per_battle"] = true
+	record["no_cross_axis"] = true
+	record["counted_only_gate"] = true
+	record["source"] = "Guardian.StrategicSkill"
+	record["contract_layer"] = "strategic_machine"
+	record["result_sequence"] = sequence
+	record["machine_event_log"] = machine.event_log.duplicate()
+	return record
+
+func force_guardian_tether_intruder_for_verifier() -> Dictionary:
+	_configure_guardian_contract()
+	guardian_contract.call("reset_for_battle")
+	var intruder: BattleEntityState = lanes.spawn_base_intruder_for_verifier("enemy_raider", "Left", 1.5)
+	guardian_contract.call("on_base_zone_intruder", intruder, lanes)
+	var snapshot: Dictionary = guardian_contract.call("telemetry_snapshot") as Dictionary
+	return (snapshot.get("last_tether_record", {}) as Dictionary).duplicate(true)
+
+func force_guardian_acid_counterattack_for_verifier() -> Dictionary:
+	_configure_guardian_contract()
+	guardian_contract.call("reset_for_battle")
+	var attacker: BattleEntityState = lanes.spawn_base_intruder_for_verifier("enemy_raider", "Left", 1.0)
+	lanes.spawn_base_intruder_for_verifier("enemy_grunt", "Mid", 2.0)
+	lanes.spawn_base_intruder_for_verifier("enemy_grunt", "Right", 3.5)
+	lanes.damage_player_guardian_for_verifier(attacker, 1)
+	var snapshot: Dictionary = guardian_contract.call("telemetry_snapshot") as Dictionary
+	return (snapshot.get("last_acid_counter_record", {}) as Dictionary).duplicate(true)
+
+func _on_machine_landing_resolved(result: MachinePhysicsResult) -> void:
+	if result != null:
+		machine.set_battle_elapsed(maxf(elapsed, result.battle_elapsed))
+	machine.apply_physics_result(result)
+	_render()
+
+func _on_lane_clicked(lane: String) -> void:
+	select_deploy_lane(lane)
+
+func _deploy_queue_head() -> void:
+	if not machine.has_queue_entry() or not machine.queue_head_ready(elapsed):
+		machine.record_empty_deploy_gap(DEPLOY_TICK_SECONDS, elapsed, exposure_state)
+		return
+
+	var entry: Dictionary = machine.pop_queue_entry()
+	machine.record_queue_deployed()
+	lanes.deploy_player_queue_entry(deploy.current_lane, entry)
+	no_deploy_timer = 0.0
+	last_deploy_elapsed = elapsed
+	stagger_warning_timer = 0.0
+	if not stagger_target_lane.is_empty():
+		lanes.clear_lane_danger(stagger_target_lane, "Queue 已恢复部署")
+	stagger_target_lane = ""
+	bridge_transfer_timer = BRIDGE_TRANSFER_DWELL_SECONDS
+	bridge_view.show_deploy_transfer(deploy.current_lane, entry)
+
+func _render() -> void:
+	_ensure_views()
+	_sync_exposure_runtime()
+	machine_view.render(machine, _counter_target_component())
+	bridge_view.render(machine, deploy)
+	battlefield_view.render(deploy, lanes)
+	if lanes.get_battle_result() == BattleLaneState.RESULT_RUNNING:
+		var counter_text: String = " | %s" % get_active_counter_banner_text() if [3, 5, 6].has(battle_number) else ""
+		status_label.text = "%s | %.1fs | 部署：%s | 修正：%s%s" % [
+			_battle_label(),
+			elapsed,
+			_lane_name(deploy.current_lane),
+			_active_modifier_names(),
+			counter_text,
+		]
+	else:
+		status_label.text = "%s | %.1fs | %s" % [_battle_label(), elapsed, _battle_result_text()]
+
+func _apply_run_modifiers() -> void:
+	if run_session == null:
+		return
+
+	if battle_number >= 2 and not run_session.reward_one_id.is_empty():
+		machine.apply_modifier(run_session.reward_one_id, _modifier_payload(run_session.reward_one_id))
+	if battle_number >= 3 and not run_session.shop_purchase_id.is_empty():
+		machine.apply_modifier(run_session.shop_purchase_id, _modifier_payload(run_session.shop_purchase_id))
+	if battle_number >= 5 and not run_session.second_reward_id.is_empty():
+		machine.apply_modifier(run_session.second_reward_id, _modifier_payload(run_session.second_reward_id))
+
+func _modifier_payload(modifier_id: String) -> Dictionary:
+	if run_payload.has(modifier_id):
+		var modifier_payload: Variant = run_payload[modifier_id]
+		if modifier_payload is Dictionary:
+			return modifier_payload
+	return {}
+
+func _configure_counter_runtime(payload: Dictionary) -> void:
+	counter_state = null
+	counter_definition = null
+	counter_effect_applied = false
+	echo_breaker_armed = false
+	no_deploy_timer = 0.0
+	last_deploy_elapsed = 0.0
+	stagger_warning_timer = 0.0
+	stagger_target_lane = ""
+	pool_polluter_insert_timer = 0.0
+	active_counter_record = {}
+	if not [3, 5, 6].has(battle_number) or not payload.has("counter_definition"):
+		return
+	counter_definition = payload["counter_definition"] as Resource
+	if counter_definition == null:
+		return
+	counter_state = CounterStateScript.new()
+	counter_state.call("configure", counter_definition, String(payload.get("counter_response_link", "无")))
+	active_counter_record = counter_state.call("to_record") as Dictionary
+
+func _advance_counter(delta: float) -> void:
+	if counter_state == null:
+		return
+	counter_state.call("advance", delta)
+	match _counter_definition_id():
+		"pool_polluter":
+			_advance_pool_polluter(delta)
+		"echo_breaker":
+			_advance_echo_breaker()
+		"stagger_punisher":
+			_advance_stagger_punisher(delta)
+	active_counter_record = (counter_state.call("to_record") as Dictionary).duplicate(true)
+
+func _advance_pool_polluter(delta: float) -> void:
+	if not bool(counter_state.call("is_active")):
+		return
+	if int(counter_state.get("trigger_count")) >= 3:
+		return
+	if int(counter_state.get("trigger_count")) > 0:
+		pool_polluter_insert_timer = maxf(0.0, pool_polluter_insert_timer - delta)
+		if pool_polluter_insert_timer > 0.0:
+			return
+	if machine.apply_pool_polluter_junk():
+		counter_state.set("visible_effect", "Junk 插入 Pool")
+		counter_state.set("trigger_count", int(counter_state.get("trigger_count")) + 1)
+		pool_polluter_insert_timer = 6.0
+
+func _advance_echo_breaker() -> void:
+	if counter_effect_applied:
+		return
+	if _machine_counter_log_contains("Echo 复制降级为 Gate"):
+		counter_state.set("visible_effect", "Echo 复制降级为 Gate")
+		counter_state.set("trigger_count", int(counter_state.get("trigger_count")) + 1)
+		counter_effect_applied = true
+		return
+	if not bool(counter_state.call("is_active")):
+		if echo_breaker_armed and bool(counter_state.call("is_resolved")):
+			machine.disarm_echo_breaker()
+			echo_breaker_armed = false
+		return
+	if echo_breaker_armed:
+		return
+	machine.arm_echo_breaker()
+	counter_state.set("visible_effect", "Echo 槽已标记，等待下一次 Echo")
+	echo_breaker_armed = true
+
+func _advance_stagger_punisher(delta: float) -> void:
+	if not bool(counter_state.call("is_active")):
+		return
+	if int(counter_state.get("trigger_count")) >= 2:
+		return
+	no_deploy_timer = maxf(0.0, elapsed - last_deploy_elapsed)
+	if no_deploy_timer >= 4.0 and stagger_warning_timer <= 0.0:
+		stagger_warning_timer = 3.0
+		stagger_target_lane = lanes.get_most_dangerous_lane()
+		lanes.set_lane_danger(stagger_target_lane, 2, "断档惩罚者队列空档预警")
+	if stagger_warning_timer > 0.0:
+		stagger_warning_timer = maxf(0.0, stagger_warning_timer - delta)
+		if stagger_warning_timer <= 0.0 and no_deploy_timer >= 4.0:
+			var target_lane: String = stagger_target_lane if not stagger_target_lane.is_empty() else lanes.get_most_dangerous_lane()
+			lanes.spawn_enemy_raiders(target_lane, 2, "Queue 空档惩罚")
+			counter_state.set("visible_effect", "敌方突袭虫因 Queue 空档出现")
+			counter_state.set("trigger_count", int(counter_state.get("trigger_count")) + 1)
+			no_deploy_timer = 0.0
+			last_deploy_elapsed = elapsed
+			stagger_target_lane = ""
+
+func _counter_definition_id() -> String:
+	if counter_definition == null:
+		return ""
+	return String(counter_definition.get("id"))
+
+func _counter_target_component() -> String:
+	if counter_state == null or counter_definition == null:
+		return ""
+	return String(counter_definition.get("target_component"))
+
+func _machine_counter_log_contains(fragment: String) -> bool:
+	for log_line: String in machine.counter_log:
+		if log_line.contains(fragment):
+			return true
+	return false
+
+func _battle_label() -> String:
+	if battle_number >= 6:
+		return "终点战"
+	return "战斗 %d" % battle_number
+
+func _active_modifier_names() -> String:
+	if run_session == null:
+		return "无"
+	var names := PackedStringArray()
+	if battle_number >= 2 and not run_session.reward_one_id.is_empty():
+		names.append(_modifier_display_name(run_session.reward_one_id))
+	if battle_number >= 3 and not run_session.shop_purchase_id.is_empty():
+		names.append(_modifier_display_name(run_session.shop_purchase_id))
+	if battle_number >= 5 and not run_session.second_reward_id.is_empty():
+		names.append(_modifier_display_name(run_session.second_reward_id))
+	if names.is_empty():
+		return "无"
+	return " + ".join(names)
+
+func _modifier_display_name(modifier_id: String) -> String:
+	match modifier_id:
+		"pool_pocket":
+			return "Pool 扩容袋"
+		"prime_charge":
+			return "Prime 充能"
+		"slot_primer":
+			return "槽位打底"
+		"front_recycle":
+			return "前置回流"
+		"surge_buffer":
+			return "Surge 缓冲"
+		"queue_brace":
+			return "Queue 支撑"
+		"junk_sieve":
+			return "废球筛"
+		"muster_pair":
+			return "成对集结"
+		"echo_latch":
+			return "Echo 锁存"
+		_:
+			return modifier_id
+
+func _lane_name(lane: String) -> String:
+	match lane:
+		"Left":
+			return "左路"
+		"Mid":
+			return "中路"
+		"Right":
+			return "右路"
+		_:
+			return lane
+
+func _battle_result_text() -> String:
+	return lanes.get_result_text().replace("战斗 1", _battle_label())
+
+func _advance_bridge_transfer(delta: float) -> void:
+	if bridge_transfer_timer <= 0.0:
+		return
+	bridge_transfer_timer = maxf(0.0, bridge_transfer_timer - delta)
+	if bridge_transfer_timer <= 0.0:
+		_ensure_views()
+		bridge_view.clear_deploy_transfer()
+
+func _ensure_views() -> void:
+	if machine_view == null:
+		machine_view = get_node("SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView") as MachineStripViewScript
+	if bridge_view == null:
+		bridge_view = get_node("SafeArea/RootRows/MainColumns/BridgePanel/QueueBridgeView") as QueueBridgeViewScript
+	if battlefield_view == null:
+		battlefield_view = get_node("SafeArea/RootRows/MainColumns/BattlefieldPanel/BattlefieldView") as BattlefieldViewScript
+	if status_label == null:
+		status_label = get_node("SafeArea/RootRows/StatusBar/StatusLabel") as Label
+	_connect_machine_physics()
+	_sync_exposure_runtime()
+
+func _connect_machine_physics() -> void:
+	if machine_view == null:
+		return
+	if not machine_view.landing_resolved.is_connected(_on_machine_landing_resolved):
+		machine_view.landing_resolved.connect(_on_machine_landing_resolved)
+	if machine_view.has_method("set_redirect_resolver"):
+		machine_view.call("set_redirect_resolver", Callable(self, "_resolve_machine_redirect"))
+
+func _resolve_machine_redirect(natural_result_id: String) -> Dictionary:
+	if machine == null:
+		return {
+			"final_result_id": natural_result_id,
+			"forced_by": "",
+			"feedback_state": "Natural Hit",
+		}
+	return machine.redirect_tuning_result_if_needed(natural_result_id)
+
+func _sync_exposure_runtime() -> void:
+	if machine != null:
+		machine.set_exposure_state(exposure_state)
+		machine.set_battle_elapsed(elapsed)
+		machine.set_guardian_contract(guardian_contract)
+	if lanes != null:
+		lanes.set_guardian_contract(guardian_contract)
+	if machine_view != null:
+		machine_view.set_exposure_state(exposure_state)
+		if machine_view.has_method("set_battle_elapsed"):
+			machine_view.call("set_battle_elapsed", elapsed)
+
+func _build_battle_one_exposure_snapshot() -> Dictionary:
+	var sampled_times: Array[float] = EXPOSURE_GATE_SAMPLE_TIMES.duplicate()
+	var snapshots: Array[Dictionary] = []
+	var record: Dictionary = {
+		"runtime_elapsed": elapsed,
+		"sampled_times": sampled_times,
+		"snapshots": snapshots,
+	}
+	for sample_time: float in sampled_times:
+		var sample: Dictionary = exposure_state.call("snapshot", sample_time) as Dictionary
+		record["t_%d" % int(sample_time)] = sample
+		snapshots.append(sample)
+	return record
+
+func _build_lane_danger_snapshot() -> Dictionary:
+	var snapshot: Dictionary = {}
+	for lane: String in ["Left", "Mid", "Right"]:
+		snapshot[lane] = {
+			"danger": lanes.get_lane_danger_level(lane),
+			"enemy_raiders": lanes.get_enemy_raiders(lane),
+			"player_units": lanes.get_player_units(lane),
+		}
+	return snapshot
+
+func _build_machine_chain_learning_sample(raw_chain: Dictionary) -> Dictionary:
+	return {
+		"Pool": raw_chain.get("pool", {}),
+		"Tuning": _first_chain_result(raw_chain, "Tuning"),
+		"Unit": _first_chain_result(raw_chain, "Unit"),
+		"Queue": raw_chain.get("queue_entries", []),
+	}
+
+func _first_chain_result(raw_chain: Dictionary, component: String) -> Dictionary:
+	for result_variant: Variant in raw_chain.get("results", []):
+		if not (result_variant is Dictionary):
+			continue
+		var result: Dictionary = result_variant as Dictionary
+		if String(result.get("component", "")) == component:
+			return result
+	return {}
+
+func _configure_guardian_contract() -> void:
+	if guardian_contract == null:
+		guardian_contract = GuardianContractStateScript.new()
+	var selected_guardian_id: String = run_session.selected_guardian_id if run_session != null else ""
+	guardian_contract.call("configure", selected_guardian_id, _guardian_seed())
+	machine.set_guardian_contract(guardian_contract)
+	lanes.set_guardian_contract(guardian_contract)
+
+func _drain_guardian_logs_to_machine() -> void:
+	if guardian_contract == null or not guardian_contract.has_method("consume_machine_event_log"):
+		return
+	var drained_variant: Variant = guardian_contract.call("consume_machine_event_log")
+	if not (drained_variant is Array):
+		return
+	for log_variant: Variant in drained_variant:
+		machine.event_log.append(String(log_variant))
+
+func _guardian_seed() -> int:
+	var guardian_hash: int = 0
+	if run_session != null:
+		guardian_hash = run_session.selected_guardian_id.hash()
+	return int(abs(guardian_hash) + battle_number * 1009)
+
+func _apply_standalone_verifier_result_window() -> void:
+	if run_session != null or battle_number != 1 or lanes == null or lanes.wave == null:
+		return
+	lanes.wave.pressure_limit_seconds = minf(
+		lanes.wave.pressure_limit_seconds,
+		STANDALONE_VERIFIER_PRESSURE_LIMIT_SECONDS
+	)
