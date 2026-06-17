@@ -16,6 +16,7 @@ var selected_lane: String = "Mid"
 var lane_snapshots: Dictionary = {}
 var result_text: String = "战斗进行中"
 var last_deploy_text: String = "最近部署：暂无"
+var highest_danger_text: String = "最高危险：无"
 var player_guardian_hp: int = 100
 var endpoint_guardian_hp: int = 120
 var endpoint_guardian_max_hp: int = 120
@@ -32,6 +33,7 @@ func render(deploy, lanes) -> void:
 		lane_snapshots[lane] = _snapshot_for_lane(lanes, lane)
 	result_text = lanes.get_result_text() if lanes.has_method("get_result_text") else "战斗进行中"
 	last_deploy_text = _last_deploy_text(lanes.get("deploy_log") as Array if lanes.get("deploy_log") != null else [])
+	highest_danger_text = _highest_danger_text()
 	player_guardian_hp = int(lanes.call("get_player_guardian_hp")) if lanes.has_method("get_player_guardian_hp") else 100
 	endpoint_guardian_hp = int(lanes.call("get_endpoint_guardian_hp")) if lanes.has_method("get_endpoint_guardian_hp") else 120
 	endpoint_guardian_max_hp = int(lanes.get("endpoint_guardian_max_hp")) if lanes.get("endpoint_guardian_max_hp") != null else 120
@@ -61,6 +63,9 @@ func get_lane_button_text(lane: String) -> String:
 		raider_text,
 		units,
 	]
+
+func get_highest_danger_text() -> String:
+	return highest_danger_text
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -150,6 +155,7 @@ func _draw_units(font: Font, snapshot: Dictionary) -> void:
 		_draw_text(font, Vector2(x - 9.0, y - 13.0), str(int(entity.get("hp", 0))), 10, TEXT_PRIMARY)
 
 func _draw_footer(font: Font, rect: Rect2) -> void:
+	_draw_text(font, Vector2(18.0, rect.size.y - 80.0), highest_danger_text, 13, DANGER if not highest_danger_text.ends_with("无") else TEXT_PRIMARY)
 	_draw_text(font, Vector2(18.0, rect.size.y - 54.0), result_text, 14, TEXT_PRIMARY)
 	_draw_text(font, Vector2(18.0, rect.size.y - 28.0), last_deploy_text, 13, PLAYER_BLUE)
 
@@ -197,6 +203,19 @@ func _localized_deploy_log(deploy_line: String) -> String:
 	var unit_id := payload.get_slice(" ", 0)
 	var count_text := payload.get_slice("x", 1)
 	return "%s %s x%s" % [_lane_name(lane), _unit_name(unit_id), count_text]
+
+func _highest_danger_text() -> String:
+	var best_lane: String = ""
+	var best_danger: int = 0
+	for lane: String in ["Left", "Mid", "Right"]:
+		var snapshot: Dictionary = lane_snapshots.get(lane, {}) as Dictionary
+		var danger: int = int(snapshot.get("danger", 0))
+		if danger > best_danger:
+			best_danger = danger
+			best_lane = lane
+	if best_danger <= 0:
+		return "最高危险：无"
+	return "最高危险：%s 危险 %d" % [_lane_name(best_lane), best_danger]
 
 func _lane_name(lane: String) -> String:
 	match lane:

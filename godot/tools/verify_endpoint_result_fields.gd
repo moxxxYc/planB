@@ -65,6 +65,7 @@ func _verify_record(run: Node) -> void:
 		"endpoint.next_run_watch_tag",
 		"endpoint.deploy_lane_impact",
 		"endpoint.guardian_hp",
+		"rest.opportunity_cost",
 		"session.decision_windows",
 	]:
 		if not record.has(key):
@@ -72,7 +73,7 @@ func _verify_record(run: Node) -> void:
 
 func _verify_visible_text(run: Node) -> void:
 	var summary: String = String(run.call("get_result_summary_text"))
-	for text: String in ["最终结果", "主要机器轴", "关键选择", "敌方反制", "部署路线影响", "守护者压力", "终点战结论", "下一局观察"]:
+	for text: String in ["最终结果", "主要机器轴", "关键选择", "敌方反制", "部署路线影响", "守护者压力", "终点战结论", "休整机会成本", "下一局观察"]:
 		if not _tree_contains_text(run, text) and not summary.contains(text):
 			failures.append("Final Result missing visible Chinese label: %s" % text)
 	for forbidden: String in [

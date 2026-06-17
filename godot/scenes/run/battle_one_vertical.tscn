@@ -52,7 +52,7 @@ text = "战斗 1"
 
 [node name="InputHintLabel" type="Label" parent="SafeArea/RootRows/StatusBar"]
 layout_mode = 2
-text = "点击路线，或按 A / S / D 切换部署路线"
+text = "直接点击战场路线选择后续部署路线"
 horizontal_alignment = 2
 
 [node name="MainColumns" type="HBoxContainer" parent="SafeArea/RootRows"]
@@ -133,11 +133,16 @@ text = "Queue 待部署条目：0"
 layout_mode = 2
 text = "机器读法"
 
-[node name="MachineLogLabel" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+[node name="MachineLogScroll" type="ScrollContainer" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 64)
+horizontal_scroll_mode = 0
+
+[node name="MachineLogLabel" type="Label" parent="SafeArea/RootRows/MainColumns/MachinePanel/MachineStripView/MachineLogScroll"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_vertical = 1
-custom_minimum_size = Vector2(0, 64)
+size_flags_horizontal = 3
+autowrap_mode = 3
 text = ""
 
 [node name="BridgePanel" type="PanelContainer" parent="SafeArea/RootRows/MainColumns"]

@@ -1,6 +1,6 @@
 # 进度与决策日志
 
-**最后更新：** 2026-06-12
+**最后更新：** 2026-06-16
 **仓库状态：** 文档主导；原 `mvp/` Godot MVP v0 实现已归档到 `docs/archive/implementations/godot-mvp-v0-20260611/`，当前活动 Godot 实现目录为 `godot/`，当前实现目标对齐原 reset handoff 的 M0-M4 全范围。本文记录设计状态和决策日志，不作为代码状态证明。
 
 ## 当前正式文档
@@ -35,7 +35,7 @@
 
 - 仓库当前处于“文档主导 + MVP v0 原 handoff M0-M4 全范围 gap repair”阶段；原 `mvp/` Godot MVP v0 实现已归档，当前活动实现目录为 `godot/`。
 - 此前 Battle 4 / Reward 2 的窄版 M4 只是中间切片；Battle 5、Endpoint Prep、Endpoint 和 Final Result 属于原 handoff M3/M4 未完成部分，不另起 M5/M6。
-- 当前可运行的 Godot MVP 主验证命令是 `bash tools/verify_godot.sh`；验证链覆盖 project parse、M1 machine-to-lane、M2 run flow、M3 counters、Battle 4 / Reward 2、entity battlefield、full handoff flow、Endpoint result fields、machine physics contract。归档目录里的旧验证脚本只作历史背景，不作为当前验收入口。
+- 当前可运行的 Godot MVP 主验证命令是 `bash tools/verify_godot.sh`；验证链覆盖 project parse、M1 machine-to-lane、M2 run flow、M3 counters、Battle 4 / Reward 2、entity battlefield、full handoff flow、Endpoint result fields、machine physics contract、ball machine design alignment、physics-machine integration、exposure gate、Guardian Contract、Hive unit/battle profile、modifier semantics 和 complete learning record。归档目录里的旧验证脚本只作历史背景，不作为当前验收入口。
 - 旧 Web MVP、旧脚本、旧验证命令和旧实现假设都不再作为当前设计依据。
 - 旧 Godot prototype 已归档到 `docs/archive/prototypes/`，完全过期，不再作为 build、验证、评审或路由信号。
 - 当前正在从基础机制整理转入 Hive 第一种族设计；`Caste Hive` 方向已确认，单位工作名、占位剪影、轻行为和第一版攻击几何已定，两个 Guardian 的身份、轴倾向、技能结构、技能方向、战术技能目标优先级和第一版战术技能范围已定，最终美术资源和最终数值仍未定。
@@ -205,6 +205,20 @@
 - 本次修正了玩家可见实现状态和英文残留：项目/窗口标题不再带 `DEBUG` / `MVP Reset`；奖励、商店、第二奖励、反制和敌方突袭虫名称改为中文显示；Final Result 不再显示 `lane leak watch`、`queue gap`、`进行中` 或英文奖励/反制名；机器板说明将 `Split / Recycle / Waste` 显示为 `分流 / 回流 / 废弃`。
 - 当前自动验证入口 `bash tools/verify_godot.sh` 已覆盖 project、M1-M4 run flow、实体战场、完整 handoff、Endpoint result fields、物理机器、暴露闸门、Guardian Contract、Hive unit/battle profile、modifier semantics 和 complete learning record。非实现者是否能读懂 `Launch / Tuning / Unit`、奖励预期、反制目标、Deploy Lane 和 Endpoint 胜负原因，仍必须通过单独 playtest acceptance protocol 记录，不能仅凭实现者烟测宣称已证明。
 - Task 8 实现提交为 `b4291b6`。Task 9 已新增 `docs/playtest/planb-mvp-v0-acceptance-protocol.md`，明确当前 M0-M4 人工验收必须使用默认 `godot/` 启动路径、当前验证入口、非实现者测试者、完整短局、至少一个胜利路径和一个失败路径，以及 Battle 1 / 第一次反制 / 第二次奖励 / Endpoint / Final Result 截图记录。
+
+## 2026-06-16
+
+- 完成当前 `godot/` 球机实现与 `docs/machine-warehouses.md`、`docs/ball-machine-physical.md`、`docs/DESIGN.md` 和 `docs/rewards-economy.md` 的一致性修复。
+- Runtime 普通落点不再使用预选结果 label；正常发球 / 层间转移由可见 2D 物理进入底部 `Area2D` bin 后决定结果。确定性结果序列只保留在明确的 verifier seeded path 中。
+- Launch / Tuning 物理底槽宽度表达当前 MVP v0 实现输入中的 first-pass 分布目标；2026-06-17 后当前物理左到右顺序为 Launch `Split / Tuning / Recycle / Waste`，Tuning `Prime / Gate / Echo / Surge`。具体钉子 / 活动机关参数、炮台摆动和最终物理参数仍属未定 playtest 项。
+- 强制单球改道现在记录自然落点、最终落点、触发来源和反馈状态；酸冠母 `Gate -> Prime` 通过强制导轨反馈进入机器日志 / 物理结果元数据。
+- Ball Payload 现在包含 `kind`、`value`、`tags`、`tuning_mark`、`source_pass`、`chain_id` 和 `source`；Pool、Junk、Tuning 标记和物理链路样本使用同一 payload 形状。
+- Machine Contract 记录现在覆盖 modifier、Guardian strategic skill 和 counter record 的 `source`、`warehouse`、`target_component`、`operation`、`scope`、`player_read`、`failure_risk`、`guardrail` 字段。
+- Base `Surge` 生成的 Queue entry 现在使用 `deploy_delay = 0.25s`，普通 entry 使用 `0.5s`；Queue entry 记录 `generated_elapsed`、`deploy_delay` 和 `ready_elapsed`，部署循环按 ready 时间判断。
+- `Slot Primer` 已从固定 S1 改为选择一个合法 Unit 槽；旧兼容入口仍默认 S1，新 UI / payload / Final Result 会记录玩家选择的 `slot_id`。
+- 新增 `verify_ball_machine_design_alignment.gd` 并接入 `bash tools/verify_godot.sh`；`verify_machine_physics_contract.gd` 与 `verify_physics_machine_integration.gd` 已补强，不再只验证结构存在。
+- 新增球机单独调试场景 `res://scenes/machine/ball_machine_debug.tscn`，只加载当前球机整体和调试面板，不加载战场或 Queue Bridge；调试入口支持暂停 / 加速 / 步进、手动发净球或 Junk、Pool / Queue 操作、基础中立修正和 Echo Breaker 切换，并由 `verify_ball_machine_debug_scene.gd` 覆盖。
+- 验证：`bash tools/verify_godot.sh` 已通过。
 
 ## 2026-06-05
 
@@ -494,16 +508,42 @@
   - `docs/gstack-artifacts/planb-battle-ui-flow-1.0-draft-20260610.md`
   - 这些 artifact 是本次 UI flow 讨论记录和草案来源；正式规则仍以当前正式文档为准。
 
+## 2026-06-16
+
+- 对当前 `godot/` 实现做了一轮正式文档对齐修复，范围仍限于 MVP v0 原 handoff M0-M4：
+  - 修正正式文档页眉中的旧 `mvp/` 实现路径引用，统一为当前活动实现目录 `godot/`。
+  - 补强球机物理与可见表达合同：运行时普通落点不预选目标标签，Launch 顶部有玩家可见的自动摆动炮台，物理发射 origin / velocity 来自炮口；Launch / Tuning 物理底槽和玩家可见 schematic 槽宽都按文档权重，强制改道记录 natural/final/forced_by/feedback_state，并显示强制导轨语义。
+  - 补齐 Ball Payload 与 Machine Contract：球 payload 统一包含 `kind/value/tags/tuning_mark/source_pass/chain_id/source`；中立修正、Guardian 战略效果和反制合同都要求 `source/warehouse/target_component/operation/scope/player_read/failure_risk/guardrail`。
+  - 补齐 Queue 与 Loop Safety：基础 Surge 入队使用 `0.25s` 部署延迟；Queue entry 记录 `generated_elapsed/deploy_delay/ready_elapsed`；Echo 原命中 + 复制在同一物理球链内最多产生一个基础 Queue entry。
+  - 补齐 `Slot Primer` 选择槽位：第一次奖励允许选择合法 Unit slot，并在战斗 payload 与结果页记录 `slot_primer.selected_slot`。
+  - 补齐 P0 扫视信息：Battle Screen 保持直接点击战场路线；移除未确认的 A/S/D 切路入口和提示；Queue Bridge 显示队首下一次部署倒计时；战场 footer 显示最高危险路线；Tuning 四槽用形状 token 区分，不只靠颜色和文字。
+  - 补齐结果页学习记录：`rest.opportunity_cost` 进入结果记录与可见总结；普通战斗失败的 `result_routing` 也生成断裂原因、下一局观察、Deploy Lane 影响、休整机会成本等学习字段，同时保留未触发反制的空 `visible_effect`，避免伪造可见事件。
+- 新增 / 强化当前验证门：
+  - `godot/tools/verify_ball_machine_design_alignment.gd` 覆盖球机设计对齐、Machine Contract、Echo loop safety、Surge timing 和 Slot Primer selection。
+  - `verify_m1_machine_to_lane.gd` 增加 Deploy Lane 直接点击、无键盘快捷键残留、Queue Bridge 队首部署时间和最高危险路线检查。
+  - `verify_machine_physics_contract.gd` 增加 Tuning 槽形状区分、Launch 自动摆动炮台和 Launch / Tuning 玩家可见 schematic 槽宽权重检查。
+  - `verify_complete_learning_record.gd` / `verify_endpoint_result_fields.gd` 增加 `rest.opportunity_cost` 检查。
+- 当前验证入口 `bash tools/verify_godot.sh` 通过。精确物理参数、最终美术资源、音频资产、最终平衡和 playtest 结果仍按下方未定项处理，不能因为 verifier 通过而宣称已最终锁定。
+
+## 2026-06-17
+
+- 确认球机默认物理结构的 MVP v0 实现决定，仍不提升为长期最终 canon：
+  - 底槽分布采用槽宽物理宽度主导，固定钉子和活动机关只负责可见扰动、弱打散和构筑改写入口。
+  - `Launch` 物理左到右顺序调整为 `Split / Tuning / Recycle / Waste`，让 `Tuning` 主路径位于中部大槽，回流和废弃读成侧路。
+  - `Tuning` 物理左到右顺序调整为 `Prime / Gate / Echo / Surge`，让 `Gate` 普通主路径位于中部大槽，并为 `Gate -> Prime` 强制导轨保留邻接关系。
+  - `Launch` 默认包含 `launch_diverter` 分流拨片和 `launch_return_flap` 回流侧活动挡片；`Tuning` 默认包含 `tuning_quality_cam` 质量转换活动机关；这些活动机关使用真实 `AnimatableBody2D` 碰撞体，由物理时间驱动。
+  - `Unit` 默认不额外加入随机活动机关，活动结构主要来自 `Unit.Slot.Exposure Gate`，避免底部 slot / gate 落区被过多运动件干扰。
+- 当前 verifier 已将槽位顺序、固定钉子模板和 Launch / Tuning 活动机关写入球机物理合同。精确坐标、速度、摆角、碰撞材质和实际分布手感仍需 playtest 调整。
+
 ## 当前未定
 
 - 中立修正的精确 playtest 后最终平衡。
 - Hive 4 个 Unit slot 的最终 sprite sheet、攻击频率和 playtest 后最终平衡。
 - 两个 Guardian 的 playtest 后最终数值。MVP 实现输入使用已确认的职责带口径和 first-pass 参数。
 - `Unit.Slot.Exposure Gate` 暴露开始到完全暴露之间的插值方式。
-- 球机物理层的层间随机范围、钉子 / 活动块布局、炮台摆动参数、球物理参数与同屏球数、回流与 Exposure 挡板物理形态、各 Guardian / 修正 / 反制的具体物理表现（见 `docs/ball-machine-physical.md`），以及是否提升为正式规则。
+- 球机物理层的层间随机范围、钉子 / 活动块精确参数、炮台摆动参数、球物理参数与同屏球数、回流与 Exposure 挡板物理形态、各 Guardian / 修正 / 反制的具体物理表现（见 `docs/ball-machine-physical.md`），以及是否提升为正式规则。
 - `docs/DESIGN.md` 已确认生产风格基线和 Battle Screen 三段布局方向；最终字体、图标、具体种族 skin kit、sprite sheet 尺寸、pivot、碰撞区域、音频资产、精确色值、布局响应式细节和无障碍对比仍需实现后验证。
 
 ## 下一步
 
 下一步应围绕当前 Godot 实现做人工可玩性 review、视觉 QA 和 playtest；新的里程碑、玩法 canon 变更或原 handoff M0-M4 之外的范围，必须重新写计划并等待确认。
-3. 如实现需要，再收束 `Unit.Slot.Exposure Gate` 暴露插值方式。

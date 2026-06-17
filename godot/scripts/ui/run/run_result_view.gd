@@ -34,8 +34,11 @@ func _build_summary_text(
 	var shop_name: String = _modifier_name(session.shop_purchase_id, shop_defs)
 	var second_reward_text: String = _second_reward_summary(session, second_reward_defs)
 	var counter_text: String = _counter_summary(session.counter_record)
+	var record: Dictionary = session.result_record.duplicate(true)
+	if record.is_empty():
+		record = session.build_final_result_record()
 
-	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\n%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次，终点前 %d 次\n最后战斗：%s\n结果：%s\n%s" % [
+	return "守护者：%s\n第一次奖励：%s\n第一次商店：%s\n%s\nGold：%d\n休息：第一次商店 %d 次，战斗 3 后 %d 次，终点前 %d 次\n最后战斗：%s\n结果：%s\n%s\n断裂原因：%s\nDeploy Lane 影响：%s\n休整机会成本：%s\n下一局观察：%s" % [
 		guardian_name,
 		reward_name,
 		shop_name,
@@ -47,6 +50,10 @@ func _build_summary_text(
 		_battle_display_name(session.last_battle),
 		_result_display_name(session.last_battle_result),
 		counter_text,
+		String(record.get("endpoint.main_break_reason", "未定")),
+		String(record.get("endpoint.deploy_lane_impact", "未记录")),
+		String(record.get("rest.opportunity_cost", "无")),
+		_result_tag_text(String(record.get("endpoint.next_run_watch_tag", "未记录"))),
 	]
 
 func _battle_display_name(battle_id: String) -> String:
@@ -140,6 +147,21 @@ func _visible_effect_text(visible_effect: String) -> String:
 	if visible_effect.is_empty():
 		return "未触发"
 	return visible_effect
+
+func _result_tag_text(value: String) -> String:
+	match value:
+		"Launch pollution patch":
+			return "观察 Launch 污染补洞"
+		"Tuning repeated hit":
+			return "观察 Tuning 重复命中"
+		"Unit gap patch":
+			return "观察 Unit 队列空档"
+		"lane leak watch":
+			return "观察部署路线漏兵"
+		"Guardian HP pressure":
+			return "观察守护者 HP 压力"
+		_:
+			return value
 
 func _make_label(text: String, font_size: int) -> Label:
 	var label: Label = Label.new()

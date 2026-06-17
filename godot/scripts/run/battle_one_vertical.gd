@@ -51,17 +51,6 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	advance_simulation(delta)
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("deploy_left"):
-		select_deploy_lane("Left")
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("deploy_mid"):
-		select_deploy_lane("Mid")
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("deploy_right"):
-		select_deploy_lane("Right")
-		get_viewport().set_input_as_handled()
-
 func select_deploy_lane(lane: String) -> void:
 	deploy.select_lane(lane)
 	if lanes != null and lanes.telemetry != null:
@@ -78,6 +67,10 @@ func get_lane_button_text(lane: String) -> String:
 	_ensure_views()
 	return battlefield_view.get_lane_button_text(lane)
 
+func get_highest_danger_text() -> String:
+	_ensure_views()
+	return battlefield_view.get_highest_danger_text()
+
 func get_bridge_lane_text() -> String:
 	_ensure_views()
 	return bridge_view.get_lane_label_text()
@@ -89,6 +82,14 @@ func get_spawn_port_text() -> String:
 func get_bridge_route_text() -> String:
 	_ensure_views()
 	return bridge_view.get_bridge_route_text()
+
+func get_bridge_queue_label_text() -> String:
+	_ensure_views()
+	return bridge_view.get_queue_label_text()
+
+func get_bridge_queue_preview_text() -> String:
+	_ensure_views()
+	return bridge_view.get_queue_preview_text()
 
 func get_queue_count() -> int:
 	return machine.queue.size()
@@ -284,7 +285,7 @@ func _on_lane_clicked(lane: String) -> void:
 	select_deploy_lane(lane)
 
 func _deploy_queue_head() -> void:
-	if not machine.has_queue_entry():
+	if not machine.has_queue_entry() or not machine.queue_head_ready(elapsed):
 		machine.record_empty_deploy_gap(DEPLOY_TICK_SECONDS, elapsed, exposure_state)
 		return
 
@@ -465,7 +466,7 @@ func _modifier_display_name(modifier_id: String) -> String:
 		"prime_charge":
 			return "Prime 充能"
 		"slot_primer":
-			return "S1 打底"
+			return "槽位打底"
 		"front_recycle":
 			return "前置回流"
 		"surge_buffer":
@@ -520,6 +521,17 @@ func _connect_machine_physics() -> void:
 		return
 	if not machine_view.landing_resolved.is_connected(_on_machine_landing_resolved):
 		machine_view.landing_resolved.connect(_on_machine_landing_resolved)
+	if machine_view.has_method("set_redirect_resolver"):
+		machine_view.call("set_redirect_resolver", Callable(self, "_resolve_machine_redirect"))
+
+func _resolve_machine_redirect(natural_result_id: String) -> Dictionary:
+	if machine == null:
+		return {
+			"final_result_id": natural_result_id,
+			"forced_by": "",
+			"feedback_state": "Natural Hit",
+		}
+	return machine.redirect_tuning_result_if_needed(natural_result_id)
 
 func _sync_exposure_runtime() -> void:
 	if machine != null:

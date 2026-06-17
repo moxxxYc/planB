@@ -95,11 +95,14 @@ func get_reward_card_text(modifier_id: String) -> String:
 	return definition.to_card_text()
 
 func choose_reward_one(modifier_id: String) -> void:
+	choose_reward_one_with_payload(modifier_id, {"slot_id": 1} if modifier_id == "slot_primer" else {})
+
+func choose_reward_one_with_payload(modifier_id: String, payload: Dictionary) -> void:
 	_ensure_catalogs()
 	if not reward_defs.has(modifier_id):
 		push_error("Unknown Reward 1 modifier: %s" % modifier_id)
 		return
-	session.choose_reward_one(modifier_id)
+	session.choose_reward_one_with_payload(modifier_id, payload)
 	_ensure_planned_counter()
 	_render_current_node()
 
@@ -307,6 +310,7 @@ func _show_reward_one() -> void:
 	var view = RewardChoiceViewScript.new()
 	_add_screen_child(view)
 	view.reward_chosen.connect(_on_reward_chosen)
+	view.reward_chosen_with_payload.connect(_on_reward_chosen_with_payload)
 	view.render(reward_defs)
 
 func _show_second_reward() -> void:
@@ -371,6 +375,9 @@ func _on_guardian_confirmed() -> void:
 
 func _on_reward_chosen(modifier_id: String) -> void:
 	choose_reward_one(modifier_id)
+
+func _on_reward_chosen_with_payload(modifier_id: String, payload: Dictionary) -> void:
+	choose_reward_one_with_payload(modifier_id, payload)
 
 func _on_second_reward_chosen(modifier_id: String) -> void:
 	choose_second_reward(modifier_id)
@@ -561,14 +568,14 @@ func _build_catalogs() -> void:
 		),
 		"slot_primer": _make_modifier(
 			"slot_primer",
-			"S1 打底",
+			"槽位打底",
 			ModifierDefinition.SourceType.REWARD,
 			"Unit",
-			"Unit.S1.progress_floor",
-			"S1 底线进度 = 1",
+			"Unit.selected.progress_floor",
+			"所选槽底线进度 = 1",
 			"奖励",
 			0,
-			"固定让 S1 保留 1 点底线进度，减少短牙槽空转感。"
+			"选择一个 Unit 槽保留 1 点底线进度，减少对应槽位空转感。"
 		),
 	}
 
@@ -710,6 +717,7 @@ func _make_modifier(
 	var definition: ModifierDefinition = ModifierDefinition.new()
 	definition.id = id
 	definition.display_name = display_name
+	definition.source = _modifier_source(source_type)
 	definition.source_type = source_type
 	definition.warehouse = warehouse
 	definition.target_component = target_component
@@ -717,7 +725,21 @@ func _make_modifier(
 	definition.role = role
 	definition.gold_cost = gold_cost
 	definition.player_read = player_read
+	definition.scope = _modifier_scope(id)
+	definition.failure_risk = _modifier_failure_risk(id)
+	definition.guardrail = _modifier_guardrail(id)
 	return definition
+
+func _modifier_source(source_type: ModifierDefinition.SourceType) -> String:
+	match source_type:
+		ModifierDefinition.SourceType.REWARD:
+			return "Neutral reward"
+		ModifierDefinition.SourceType.SHOP:
+			return "Neutral shop"
+		ModifierDefinition.SourceType.REST:
+			return "Rest"
+		_:
+			return "Neutral modifier"
 
 func _make_second_reward_modifier_from_shop(modifier_id: String) -> ModifierDefinition:
 	var source: ModifierDefinition = shop_defs.get(modifier_id, null) as ModifierDefinition
@@ -758,13 +780,106 @@ func _make_counter(
 	var definition = CounterDefinitionScript.new()
 	definition.id = id
 	definition.display_name = display_name
+	definition.source = "Enemy.Counter"
+	definition.warehouse = _counter_warehouse(id)
 	definition.target_component = target_component
+	definition.operation = visible_effect
 	definition.first_warning_start_seconds = first_warning_start_seconds
 	definition.warning_seconds = warning_seconds
 	definition.active_seconds = active_seconds
 	definition.visible_effect = visible_effect
 	definition.patch_ids = patch_ids.duplicate()
+	definition.scope = "单场反制窗口"
+	definition.player_read = "%s 预警后攻击 %s：%s" % [display_name, target_component, visible_effect]
+	definition.failure_risk = _counter_failure_risk(id)
+	definition.guardrail = _counter_guardrail(id)
 	return definition
+
+func _modifier_scope(modifier_id: String) -> String:
+	match modifier_id:
+		"surge_buffer", "queue_brace", "junk_sieve", "muster_pair", "echo_latch":
+			return "整局，触发窗口按单场战斗重置"
+		_:
+			return "整局"
+
+func _modifier_failure_risk(modifier_id: String) -> String:
+	match modifier_id:
+		"pool_pocket":
+			return "Pool 容量过高会削弱 Launch 溢出压力"
+		"prime_charge":
+			return "Prime 数值过高会压过 Gate / Echo / Surge 的读法"
+		"slot_primer":
+			return "固定锚点不清楚会让 Unit 槽选择读成隐藏规则"
+		"front_recycle":
+			return "回流位置不透明会让玩家误读 Pool 顺序"
+		"surge_buffer":
+			return "加速不显示会让 Surge 仍像无效结果"
+		"queue_brace":
+			return "补洞过强会替代 Unit 槽推进"
+		"junk_sieve":
+			return "过滤不提示会让 Junk 消失读成 bug"
+		"muster_pair":
+			return "合并窗口不清楚会让 Queue 数量变化难复盘"
+		"echo_latch":
+			return "幽影命中不显示会让 Echo 复制因果断裂"
+		_:
+			return "未记录风险"
+
+func _modifier_guardrail(modifier_id: String) -> String:
+	match modifier_id:
+		"pool_pocket":
+			return "MVP v0 容量上限保持 6"
+		"prime_charge":
+			return "只提升 Prime，不改变其他 Tuning 结果"
+		"slot_primer":
+			return "玩家明确选择一个 S1-S4 Unit 槽"
+		"front_recycle":
+			return "Pool 满时可见拒绝，不静默增加容量"
+		"surge_buffer":
+			return "每个 Unit 槽最多保留 1 次缓冲"
+		"queue_brace":
+			return "3 秒空档触发，12 秒冷却"
+		"junk_sieve":
+			return "10 秒冷却，只处理 Pool 头部 Junk"
+		"muster_pair":
+			return "同槽 1.2 秒内最多合并为 2 个单位"
+		"echo_latch":
+			return "保留 baseline Echo 原命中和一次复制，不额外加第三跳"
+		_:
+			return "按当前 MVP verifier 限制触发"
+
+func _counter_warehouse(counter_id: String) -> String:
+	match counter_id:
+		"pool_polluter":
+			return "Launch"
+		"echo_breaker":
+			return "Tuning"
+		"stagger_punisher":
+			return "Unit"
+		_:
+			return "Unknown"
+
+func _counter_failure_risk(counter_id: String) -> String:
+	match counter_id:
+		"pool_polluter":
+			return "无预警塞满 Pool 会读成沉默删除构筑"
+		"echo_breaker":
+			return "降级不显示会让 Echo / Surge 价值读法断裂"
+		"stagger_punisher":
+			return "队列空档惩罚过快会遮蔽 Deploy Lane 决策"
+		_:
+			return "未记录风险"
+
+func _counter_guardrail(counter_id: String) -> String:
+	match counter_id:
+		"pool_polluter":
+			return "同一时间 Pool 内最多 2 个来自本反制的 Junk Ball"
+		"echo_breaker":
+			return "每次活跃窗口只锁定一次 Echo 复制"
+		"stagger_punisher":
+			return "先给路线危险预警，再生成突袭虫"
+		_:
+			return "预警后生效"
 
 func _ensure_planned_counter() -> void:
 	if not planned_counter_id.is_empty():
@@ -893,11 +1008,11 @@ func _selected_modifier_marker_text() -> String:
 	return "本局机器修正：%s" % ", ".join(markers)
 
 func _battle_modifier_payload() -> Dictionary:
-	var payload: Dictionary = {
-		"slot_primer": {
-			"slot_id": 1,
-		},
-	}
+	var payload: Dictionary = {}
+	if session.reward_one_id == "slot_primer":
+		payload["slot_primer"] = {
+			"slot_id": clampi(int(session.reward_one_payload.get("slot_id", 1)), 1, 4),
+		}
 	if not session.reward_one_id.is_empty():
 		_ensure_planned_counter()
 	if not planned_counter_id.is_empty() and counter_defs.has(planned_counter_id):

@@ -2,6 +2,7 @@ class_name MachineSimulator
 extends RefCounted
 
 const MachineSlotExposureStateScript := preload("res://scripts/model/machine/machine_slot_exposure_state.gd")
+const MachineBallPayloadScript := preload("res://scripts/model/machine/machine_ball_payload.gd")
 
 const SLOT_REQUIREMENTS: Dictionary = {
 	1: 3,
@@ -209,10 +210,21 @@ func apply_physics_result(result: MachinePhysicsResult) -> Array[Dictionary]:
 			event_log.append("Unit：S%d 暴露闸门未开启，球被挡开" % guarded_slot_id)
 			_commit_queue_chain_if_needed(blocked_result, [])
 			return []
-	if result.component == "Tuning" and guardian_contract != null:
-		result.result_id = String(guardian_contract.call("on_tuning_result", result.result_id))
-		_drain_guardian_machine_logs()
+	if result.component == "Tuning" and guardian_contract != null and result.feedback_state != "Forced Redirect":
+		var redirect: Dictionary = redirect_tuning_result_if_needed(result.result_id)
+		var final_result_id: String = String(redirect.get("final_result_id", result.result_id))
+		if final_result_id != result.result_id:
+			result.natural_result_id = result.result_id
+			result.result_id = final_result_id
+			result.forced_by = String(redirect.get("forced_by", ""))
+			result.feedback_state = String(redirect.get("feedback_state", "Forced Redirect"))
 	_register_physics_result(result)
+	if result.feedback_state == "Forced Redirect":
+		event_log.append("物理改道：%s 将 %s 导入 %s" % [
+			result.forced_by,
+			result.natural_result_id,
+			result.result_id,
+		])
 	var produced_entries: Array[Dictionary] = []
 	match result.component:
 		"Launch":
@@ -293,6 +305,11 @@ func get_physics_queue_chain_count() -> int:
 func has_queue_entry() -> bool:
 	return not queue.is_empty()
 
+func queue_head_ready(p_battle_elapsed: float) -> bool:
+	if queue.is_empty():
+		return false
+	return p_battle_elapsed >= float(queue[0].get("ready_elapsed", p_battle_elapsed))
+
 func pop_queue_entry() -> Dictionary:
 	if queue.is_empty():
 		return {}
@@ -329,11 +346,27 @@ func record_empty_deploy_gap(delta: float, p_battle_elapsed: float, p_exposure_s
 func add_guardian_clean_pool_ball() -> bool:
 	return _add_pool_ball("clean")
 
+func redirect_tuning_result_if_needed(natural_result_id: String) -> Dictionary:
+	if guardian_contract == null:
+		return {
+			"final_result_id": natural_result_id,
+			"forced_by": "",
+			"feedback_state": "Natural Hit",
+		}
+	var final_result_id: String = String(guardian_contract.call("on_tuning_result", natural_result_id))
+	_drain_guardian_machine_logs()
+	return {
+		"final_result_id": final_result_id,
+		"forced_by": "Guardian.StrategicSkill:hive_acid_crown_mother" if final_result_id != natural_result_id else "",
+		"feedback_state": "Forced Redirect" if final_result_id != natural_result_id else "Natural Hit",
+	}
+
 func _add_pool_ball(kind: String) -> bool:
 	if pool.size() >= pool_capacity:
 		event_log.append("Launch.Pool full rejected %s" % kind)
 		return false
-	pool.append({"kind": kind, "value": 1})
+	var payload: Dictionary = MachineBallPayloadScript.junk() if kind == "junk" else MachineBallPayloadScript.clean()
+	pool.append(payload)
 	event_log.append("Launch.Forge added %s ball" % kind)
 	return true
 
@@ -341,7 +374,9 @@ func _add_pool_ball_front(kind: String, source: String) -> bool:
 	if pool.size() >= pool_capacity:
 		event_log.append("Modifier:%s front recycle rejected %s ball pool full" % [source, kind])
 		return false
-	pool.push_front({"kind": kind, "value": 1})
+	var payload: Dictionary = MachineBallPayloadScript.junk("", source) if kind == "junk" else MachineBallPayloadScript.clean()
+	payload["source"] = source
+	pool.push_front(payload)
 	event_log.append("Modifier:%s returned %s ball to Pool front" % [source, kind])
 	return true
 
@@ -385,6 +420,19 @@ func _apply_unit_hit(
 
 	return entries
 
+func _apply_unit_progress_without_queue(slot_id: int, value: int, source: String, chain_id: String = "") -> void:
+	slot_progress[slot_id] = int(slot_progress[slot_id]) + value
+	var required: int = int(SLOT_REQUIREMENTS[slot_id])
+	if int(slot_progress[slot_id]) >= required:
+		slot_progress[slot_id] = required - 1
+		event_log.append("LoopSafety:%s S%d progress capped below queue threshold for chain %s" % [
+			source,
+			slot_id,
+			chain_id,
+		])
+	var floor_value: int = int(slot_progress_floor.get(slot_id, 0))
+	slot_progress[slot_id] = maxi(int(slot_progress[slot_id]), floor_value)
+
 func _finalize_queue_output(
 	added_entries: Array[Dictionary],
 	natural_slot_id: int,
@@ -408,6 +456,7 @@ func _finalize_queue_output(
 					merged_tags.append(tag)
 			entry["source_tags"] = merged_tags
 		_apply_surge_buffer_to_queue_entry(entry)
+		_schedule_queue_entry(entry, generated_time)
 		var entry_slot_id: int = int(entry.get("slot_id", natural_slot_id))
 		var entry_value: int = QUEUE_BRACE_COMPENSATION_VALUE if String(entry.get("source", "")) == "QueueBrace" else natural_value
 		if not _try_merge_muster_pair_entry(entry, generated_time):
@@ -439,6 +488,17 @@ func _apply_surge_buffer_to_queue_entry(entry: Dictionary) -> void:
 	entry["source_tags"] = source_tags
 	surge_buffer_charge_by_slot[slot_id] = false
 	event_log.append("Modifier:Surge Buffer S%d charge consumed by next queue entry deploy_delay=0.25" % slot_id)
+
+func _schedule_queue_entry(entry: Dictionary, generated_time: float) -> void:
+	var source_tags: Array = []
+	if entry.get("source_tags", []) is Array:
+		source_tags = (entry.get("source_tags", []) as Array).duplicate()
+	var deploy_delay: float = 0.25 if source_tags.has("Surge") else 0.5
+	if entry.has("deploy_delay"):
+		deploy_delay = float(entry.get("deploy_delay", deploy_delay))
+	entry["generated_elapsed"] = generated_time
+	entry["deploy_delay"] = deploy_delay
+	entry["ready_elapsed"] = generated_time + deploy_delay
 
 func _maybe_store_surge_buffer_charge(tuning_result: String, slot_id: int, produced_entries: Array[Dictionary]) -> void:
 	if not surge_buffer_enabled or tuning_result != "Surge" or not produced_entries.is_empty():
@@ -563,6 +623,13 @@ func _apply_tuning_physics_result(result: MachinePhysicsResult) -> Array[Diction
 	if _is_staged_physics_source(result.source):
 		var chain: Dictionary = _chain_for_result(result)
 		var value: int = _value_for_tuning_result(result)
+		var payload: Dictionary = MachineBallPayloadScript.normalize(chain.get("pool", {}))
+		if int(payload.get("source_pass", 0)) > 0 and not String(payload.get("tuning_mark", "")).is_empty():
+			event_log.append("LoopSafety: ignored secondary tuning mark for %s" % result.chain_id)
+		else:
+			payload["tuning_mark"] = result.result_id
+			payload["source_pass"] = int(payload.get("source_pass", 0)) + 1
+		chain["pool"] = payload
 		chain["tuning_result_id"] = result.result_id
 		chain["tuning_value"] = value
 		_pending_physics_chains[result.chain_id] = chain
@@ -576,7 +643,10 @@ func _apply_tuning_direct_result(result: MachinePhysicsResult) -> Array[Dictiona
 	var value: int = maxi(1, result.value)
 	var entries: Array[Dictionary] = _apply_unit_hit(slot_id, value, result.result_id, result.chain_id, [result.source, result.result_id])
 	if result.result_id == "Echo":
-		entries.append_array(_apply_unit_hit(slot_id, value, "EchoCopy", result.chain_id, [result.source, "EchoCopy"]))
+		if entries.is_empty():
+			entries.append_array(_apply_unit_hit(slot_id, value, "EchoCopy", result.chain_id, [result.source, "EchoCopy"]))
+		else:
+			_apply_unit_progress_without_queue(slot_id, value, "EchoCopy", result.chain_id)
 		if echo_latch_enabled:
 			event_log.append("Modifier:Echo Latch ghost hit marker locked to S%d" % slot_id)
 	event_log.append(MachineResult.new("Tuning", result.result_id, slot_id, value, {}).to_log_line())
@@ -603,7 +673,10 @@ func _apply_unit_physics_result(result: MachinePhysicsResult) -> Array[Dictionar
 			echo_breaker_active = false
 			_append_counter_event("Counter:Echo Breaker Echo 复制降级为 Gate")
 		else:
-			entries.append_array(_apply_unit_hit(slot_id, value, result.source, result.chain_id, [result.source, "EchoCopy"]))
+			if entries.is_empty():
+				entries.append_array(_apply_unit_hit(slot_id, value, result.source, result.chain_id, [result.source, "EchoCopy"]))
+			else:
+				_apply_unit_progress_without_queue(slot_id, value, "EchoCopy", result.chain_id)
 			if echo_latch_enabled:
 				event_log.append("Modifier:Echo Latch ghost hit marker locked to S%d" % slot_id)
 
@@ -619,7 +692,7 @@ func apply_pool_polluter_junk() -> bool:
 	if pool.size() >= pool_capacity:
 		_append_counter_event("Counter:Pool Polluter 因 Pool 已满未插入 Junk")
 		return false
-	pool.append({"kind": "junk", "value": 0, "source": "Pool Polluter"})
+	pool.append(MachineBallPayloadScript.junk("", "Pool Polluter"))
 	pool_polluter_junk_count += 1
 	_append_counter_event("Counter:Pool Polluter Junk 插入 Pool 槽 %d" % pool.size())
 	return true
@@ -658,7 +731,7 @@ func _modifier_display_name(modifier_id: String) -> String:
 		"prime_charge":
 			return "Prime 充能"
 		"slot_primer":
-			return "S1 打底"
+			return "槽位打底"
 		"front_recycle":
 			return "前置回流"
 		"surge_buffer":
@@ -689,7 +762,7 @@ func _modifier_active_key(modifier_id: String, slot_id: int) -> String:
 	match modifier_id:
 		"slot_primer":
 			if not SLOT_REQUIREMENTS.has(slot_id):
-				push_error("Unknown Slot Primer slot_id: %d" % slot_id)
+				push_error("Unknown slot_primer slot_id: %d" % slot_id)
 				return ""
 			return "%s:%d" % [modifier_id, slot_id]
 		"pool_pocket", "prime_charge", "front_recycle", "surge_buffer", "queue_brace", "junk_sieve", "muster_pair", "echo_latch":
@@ -699,7 +772,7 @@ func _modifier_active_key(modifier_id: String, slot_id: int) -> String:
 			return ""
 
 func _make_launch_request(ball: Dictionary) -> Dictionary:
-	var request: Dictionary = ball.duplicate(true)
+	var request: Dictionary = MachineBallPayloadScript.normalize(ball)
 	request["kind"] = String(request.get("kind", "clean"))
 	request["value"] = int(request.get("value", 1))
 	request["chain_id"] = _next_chain_id("physics")
@@ -716,7 +789,7 @@ func _begin_machine_chain(ball: Dictionary) -> void:
 		return
 	var chain: Dictionary = {
 		"chain_id": chain_id,
-		"pool": ball.duplicate(true),
+		"pool": MachineBallPayloadScript.normalize(ball),
 		"pool_to_launch": true,
 		"results": [],
 		"queue_entries": [],
@@ -759,10 +832,7 @@ func _chain_for_result(result: MachinePhysicsResult) -> Dictionary:
 		return (_pending_physics_chains[chain_id] as Dictionary).duplicate(true)
 	return {
 		"chain_id": chain_id,
-		"pool": {
-			"kind": result.ball_kind,
-			"value": maxi(1, result.value),
-		},
+		"pool": MachineBallPayloadScript.clean(chain_id),
 		"results": [],
 		"queue_entries": [],
 		"source": result.source,

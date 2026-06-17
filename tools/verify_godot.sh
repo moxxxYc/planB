@@ -98,6 +98,27 @@ fi
 
 run_godot_verifier "res://tools/verify_machine_physics_contract.gd"
 
+if [[ ! -f "$PROJECT_DIR/tools/verify_ball_machine_design_alignment.gd" ]]; then
+  echo "Missing required ball machine design alignment verifier at $PROJECT_DIR/tools/verify_ball_machine_design_alignment.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_ball_machine_design_alignment.gd"
+
+if [[ ! -f "$PROJECT_DIR/tools/verify_ball_machine_debug_scene.gd" ]]; then
+  echo "Missing required ball machine debug scene verifier at $PROJECT_DIR/tools/verify_ball_machine_debug_scene.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_ball_machine_debug_scene.gd"
+
+if [[ ! -f "$PROJECT_DIR/tools/verify_ball_machine_layout_stability.gd" ]]; then
+  echo "Missing required ball machine layout stability verifier at $PROJECT_DIR/tools/verify_ball_machine_layout_stability.gd" >&2
+  exit 1
+fi
+
+run_godot_verifier "res://tools/verify_ball_machine_layout_stability.gd"
+
 red_gate_failures=0
 
 run_red_godot_verifier() {

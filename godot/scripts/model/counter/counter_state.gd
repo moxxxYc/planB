@@ -77,7 +77,14 @@ func to_record() -> Dictionary:
 		return {}
 	return {
 		"family": String(definition.get("id")),
+		"source": String(definition.get("source")),
+		"warehouse": String(definition.get("warehouse")),
 		"target_component": String(definition.get("target_component")),
+		"operation": String(definition.get("operation")),
+		"scope": String(definition.get("scope")),
+		"player_read": String(definition.get("player_read")),
+		"failure_risk": String(definition.get("failure_risk")),
+		"guardrail": String(definition.get("guardrail")),
 		"visible_effect": visible_effect,
 		"response_link": response_link,
 		"phase": _phase_label(),

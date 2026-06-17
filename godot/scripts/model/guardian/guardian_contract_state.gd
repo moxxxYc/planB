@@ -91,6 +91,7 @@ func on_launch_recycle(machine: MachineSimulator) -> bool:
 		"contract_layer": "strategic_machine",
 		"machine_event_log": machine_event_log.duplicate(),
 	}
+	last_recycle_record.merge(_strategic_contract_fields("recycle"), true)
 	return triggered
 
 func on_tuning_result(result_id: String) -> String:
@@ -127,6 +128,7 @@ func on_tuning_result(result_id: String) -> String:
 		"result_sequence": gate_result_sequence.duplicate(true),
 		"machine_event_log": machine_event_log.duplicate(),
 	}
+	last_gate_record.merge(_strategic_contract_fields("gate"), true)
 	return final_result
 
 func on_player_guardian_damaged(attacker: BattleEntityState, battlefield: BattlefieldState) -> void:
@@ -194,3 +196,30 @@ func _remember_gate_sequence(original_result: String, final_result: String) -> v
 	})
 	while gate_result_sequence.size() > 12:
 		gate_result_sequence.pop_front()
+
+func _strategic_contract_fields(kind: String) -> Dictionary:
+	match kind:
+		"recycle":
+			return {
+				"source": "Guardian.StrategicSkill",
+				"warehouse": "Launch",
+				"target_component": "Launch.Recycle.return_count / Launch.Pool",
+				"operation": "trigger",
+				"scope": "每场战斗重置，整局固定",
+				"player_read": "Route Board / Recycle path 表现为巢脉回流",
+				"failure_risk": "战略技能过强会替代第一次奖励和商店",
+				"guardrail": "只统计合法 Recycle，Pool 满时可见拒绝",
+			}
+		"gate":
+			return {
+				"source": "Guardian.StrategicSkill",
+				"warehouse": "Tuning",
+				"target_component": "Tuning.Gate.result",
+				"operation": "Gate 转 Prime",
+				"scope": "每场战斗重置，整局固定",
+				"player_read": "Tuning Board 显示酸冠强制导轨",
+				"failure_risk": "隐藏转换会让玩家误读 Gate / Prime 因果",
+				"guardrail": "只统计 Gate，转换后计数归零，不跨轴触发",
+			}
+		_:
+			return {}

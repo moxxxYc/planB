@@ -23,6 +23,7 @@ const RESULT_LOSS: String = "Loss"
 var current_node_id: String = NODE_GUARDIAN_CONTRACT
 var selected_guardian_id: String = ""
 var reward_one_id: String = ""
+var reward_one_payload: Dictionary = {}
 var shop_purchase_id: String = ""
 var shop_gold_before: int = -1
 var shop_gold_after: int = -1
@@ -119,10 +120,15 @@ func complete_battle(battle_result: String) -> void:
 			current_node_id = NODE_ENDPOINT_PREP
 
 func choose_reward_one(reward_id: String) -> void:
+	var payload: Dictionary = {"slot_id": 1} if reward_id == "slot_primer" else {}
+	choose_reward_one_with_payload(reward_id, payload)
+
+func choose_reward_one_with_payload(reward_id: String, payload: Dictionary) -> void:
 	if current_node_id != NODE_REWARD_1:
 		push_error("Reward 1 can only be chosen at Reward 1.")
 		return
 	reward_one_id = reward_id
+	reward_one_payload = payload.duplicate(true)
 	current_node_id = NODE_BATTLE_2
 
 func set_planned_counter(counter_id: String) -> void:
@@ -239,6 +245,9 @@ func build_final_result_record() -> Dictionary:
 	result_record["guardian.outcome"] = _guardian_outcome()
 	result_record["guardian.hp_pressure_events"] = guardian_hp_pressure_events.duplicate()
 	result_record["reward1.choice_id"] = reward_one_id
+	result_record["reward1.payload"] = reward_one_payload.duplicate(true)
+	if reward_one_id == "slot_primer":
+		result_record["slot_primer.selected_slot"] = int(reward_one_payload.get("slot_id", 0))
 	result_record["reward1.axis"] = _axis_for_reward_one()
 	result_record["reward1.component_operation"] = _operation_for_reward_one()
 	result_record["reward1.battlefield_expectation"] = _battlefield_expectation_for_reward_one()
@@ -253,6 +262,7 @@ func build_final_result_record() -> Dictionary:
 	result_record["rest.total_gold_spent"] = int(result_record["rest.gold_spent"])
 	result_record["rest.total_hp_restored"] = rest_total_hp_restored
 	result_record["rest.endpoint_relevance"] = _rest_endpoint_relevance()
+	result_record["rest.opportunity_cost"] = _rest_opportunity_cost()
 	result_record["session.decision_windows"] = _decision_windows()
 	_merge_counter_records()
 	_merge_battle_records()
@@ -334,9 +344,7 @@ func _rest_limit_remaining() -> int:
 
 func _route_to_result() -> void:
 	current_node_id = NODE_RESULT_ROUTING
-	result_record = _base_result_record()
-	_merge_counter_records()
-	_merge_battle_records()
+	build_final_result_record()
 
 func _route_to_final_result() -> void:
 	current_node_id = NODE_FINAL_RESULT
@@ -346,6 +354,7 @@ func _base_result_record() -> Dictionary:
 	var record: Dictionary = {
 		"guardian_id": selected_guardian_id,
 		"reward1_id": reward_one_id,
+		"reward1_payload": reward_one_payload.duplicate(true),
 		"shop1_purchase_id": shop_purchase_id,
 		"gold": gold,
 		"rest_first_shop": first_shop_rest_count,
@@ -424,7 +433,7 @@ func _operation_for_reward_one() -> String:
 		"prime_charge":
 			return "Prime hit value +1 -> +2"
 		"slot_primer":
-			return "Unit slot progress floor = 1"
+			return "Unit S%d progress floor = 1" % clampi(int(reward_one_payload.get("slot_id", 1)), 1, 4)
 		_:
 			return "无"
 
@@ -530,6 +539,39 @@ func _rest_endpoint_relevance() -> String:
 	if last_battle == NODE_ENDPOINT and last_battle_result == RESULT_LOSS:
 		return "insufficient"
 	return "helped_survive_to_endpoint"
+
+func _rest_opportunity_cost() -> String:
+	var total_rest_purchases: int = first_shop_rest_count + battle_three_rest_count + endpoint_prep_rest_count
+	if total_rest_purchases <= 0:
+		return "无"
+	var total_spent: int = total_rest_purchases * 3
+	var roles := PackedStringArray()
+	for role: String in _rest_opportunity_roles():
+		if not roles.has(role):
+			roles.append(role)
+	if roles.is_empty():
+		roles.append("后续整备余量")
+	return "休整花费 %d Gold；机会成本：%s" % [total_spent, " / ".join(roles)]
+
+func _rest_opportunity_roles() -> Array[String]:
+	var roles: Array[String] = []
+	var first_shop_pool: Dictionary = {
+		"front_recycle": "转向",
+		"junk_sieve": "补洞",
+		"surge_buffer": "补洞",
+		"queue_brace": "补洞",
+		"muster_pair": "转向",
+	}
+	if first_shop_rest_count > 0:
+		for item_id: String in first_shop_pool.keys():
+			if item_id == shop_purchase_id:
+				continue
+			roles.append(String(first_shop_pool[item_id]))
+	if battle_three_rest_count > 0 or endpoint_prep_rest_count > 0:
+		roles.append("补洞")
+		roles.append("转向")
+		roles.append("深化")
+	return roles
 
 func _decision_windows() -> Array[String]:
 	var windows: Array[String] = ["Guardian", "第一次奖励", "第一次商店", "战斗 3 后休整", "第二次奖励"]

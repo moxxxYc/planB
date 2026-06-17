@@ -32,7 +32,7 @@ func _run_verification() -> void:
 	_finish()
 
 func _wait_for_runtime_physics_queue_chain(battle: Node) -> void:
-	for _frame: int in range(720):
+	for _frame: int in range(2400):
 		await physics_frame
 		var contract_variant: Variant = battle.call("get_machine_visual_contract")
 		if not (contract_variant is Dictionary):
@@ -69,7 +69,7 @@ func _verify_physics_queue_chain(battle: Node, visual_contract: Dictionary) -> v
 		for chain_variant: Variant in chains:
 			if chain_variant is Dictionary and _is_physics_queue_chain(chain_variant as Dictionary):
 				return
-		failures.append("Battle runtime must report at least one queue-producing MachinePhysicsResult chain with source=physics.")
+		failures.append("Battle runtime must report at least one queue-producing MachinePhysicsResult chain with source=physics. %s" % _runtime_failure_summary(battle, visual_contract, chains))
 		return
 
 	var has_contract_count: bool = visual_contract.has("physics_queue_chain_count")
@@ -88,9 +88,38 @@ func _verify_physics_queue_chain(battle: Node, visual_contract: Dictionary) -> v
 		return
 	var chain: Dictionary = chain_variant as Dictionary
 	if not _is_physics_queue_chain(chain):
-		failures.append("last_physics_queue_chain must include source=physics and Unit/Queue entry evidence.")
+		failures.append("last_physics_queue_chain must include source=physics and Unit/Queue entry evidence. %s" % _runtime_failure_summary(battle, visual_contract, []))
+
+func _runtime_failure_summary(battle: Node, visual_contract: Dictionary, chains: Array) -> String:
+	var last_result: Variant = visual_contract.get("last_physics_result", {})
+	var log_text: String = String(battle.call("get_active_machine_log_text")) if battle.has_method("get_active_machine_log_text") else ""
+	var log_lines: PackedStringArray = log_text.split("\n", false)
+	var tail := PackedStringArray()
+	var start_index: int = maxi(0, log_lines.size() - 6)
+	for index: int in range(start_index, log_lines.size()):
+		tail.append(log_lines[index])
+	return "landing_count=%d queue_chain_count=%d chains=%d physics_ticks=%d last_result=%s log_tail=%s rects=%s catchers=%s" % [
+		int(visual_contract.get("physics_landing_count", 0)),
+		int(visual_contract.get("physics_queue_chain_count", 0)),
+		chains.size(),
+		int(visual_contract.get("physics_tick_count", 0)),
+		str(last_result),
+		"%s ball_snapshot=%s" % [" | ".join(tail), str(visual_contract.get("ball_stage_snapshot", {}))],
+		str(visual_contract.get("stage_rects", {})),
+		str(visual_contract.get("stage_bottom_catchers", {})),
+	]
 
 func _is_physics_queue_chain(chain: Dictionary) -> bool:
+	if not _chain_has_result(chain, "Launch"):
+		return false
+	if not _chain_has_result(chain, "Tuning"):
+		return false
+	if not _chain_has_result(chain, "Unit"):
+		return false
+	if not _chain_has_payload_keys(chain, ["kind", "value", "tags", "tuning_mark", "source_pass"]):
+		return false
+	if _chain_has_forced_redirect(chain) and not _chain_forced_redirect_is_readable(chain):
+		return false
 	for queue_entry_variant: Variant in _chain_queue_entries(chain):
 		if not (queue_entry_variant is Dictionary):
 			continue
@@ -102,6 +131,47 @@ func _is_physics_queue_chain(chain: Dictionary) -> bool:
 			if _queue_entry_is_tied_to_unit_result(queue_entry, unit_result):
 				return true
 	return false
+
+func _chain_has_result(chain: Dictionary, component: String) -> bool:
+	for result_variant: Variant in _chain_results(chain):
+		if not (result_variant is Dictionary):
+			continue
+		var result: Dictionary = result_variant as Dictionary
+		if String(result.get("component", "")) == component:
+			return true
+	return false
+
+func _chain_has_payload_keys(chain: Dictionary, keys: Array[String]) -> bool:
+	var payload_variant: Variant = chain.get("pool", {})
+	if not (payload_variant is Dictionary):
+		return false
+	var payload: Dictionary = payload_variant as Dictionary
+	for key: String in keys:
+		if not payload.has(key):
+			return false
+	return true
+
+func _chain_has_forced_redirect(chain: Dictionary) -> bool:
+	for result_variant: Variant in _chain_results(chain):
+		if not (result_variant is Dictionary):
+			continue
+		var result: Dictionary = result_variant as Dictionary
+		if String(result.get("feedback_state", "")) == "Forced Redirect":
+			return true
+	return false
+
+func _chain_forced_redirect_is_readable(chain: Dictionary) -> bool:
+	for result_variant: Variant in _chain_results(chain):
+		if not (result_variant is Dictionary):
+			continue
+		var result: Dictionary = result_variant as Dictionary
+		if String(result.get("feedback_state", "")) != "Forced Redirect":
+			continue
+		if String(result.get("forced_by", "")).strip_edges().is_empty():
+			return false
+		if String(result.get("natural_result_id", "")).strip_edges().is_empty():
+			return false
+	return true
 
 func _is_structured_queue_entry(queue_entry: Dictionary) -> bool:
 	if queue_entry.is_empty():

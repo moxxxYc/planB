@@ -70,12 +70,38 @@ static func _ensure_rest_fields(record: Dictionary, session: Object) -> void:
 	record["rest.total_purchases"] = int(record.get("rest.total_purchases", total_purchases))
 	record["rest.total_gold_spent"] = int(record.get("rest.total_gold_spent", total_gold_spent))
 	record["rest.total_hp_restored"] = int(record.get("rest.total_hp_restored", total_hp_restored))
+	if not record.has("rest.endpoint_relevance") or _is_empty(record["rest.endpoint_relevance"]):
+		record["rest.endpoint_relevance"] = "none"
+	if not record.has("rest.opportunity_cost") or _is_empty(record["rest.opportunity_cost"]):
+		record["rest.opportunity_cost"] = _rest_opportunity_cost_from_session(session, total_purchases)
 	if not record.has("rest_windows") or _is_empty(record["rest_windows"]):
 		record["rest_windows"] = _rest_windows_from_session(session)
+
+static func _rest_opportunity_cost_from_session(session: Object, total_purchases: int) -> String:
+	if total_purchases <= 0:
+		return "无"
+	var roles := PackedStringArray()
+	if int(session.get("first_shop_rest_count")) > 0:
+		roles.append("补洞")
+		roles.append("转向")
+	if int(session.get("battle_three_rest_count")) > 0 or int(session.get("endpoint_prep_rest_count")) > 0:
+		roles.append("补洞")
+		roles.append("转向")
+		roles.append("深化")
+	if roles.is_empty():
+		roles.append("后续整备余量")
+	return "休整花费 %d Gold；机会成本：%s" % [total_purchases * 3, " / ".join(roles)]
 
 static func _ensure_counter_fields(record: Dictionary) -> void:
 	for key: String in ["family", "target_component", "visible_effect", "response_link"]:
 		var full_key: String = "counter1.%s" % key
+		if (
+			key == "visible_effect"
+			and record.has(full_key)
+			and _is_empty(record[full_key])
+			and String(record.get("last_battle", "")) != "endpoint"
+		):
+			continue
 		if not record.has(full_key) or _is_empty(record[full_key]):
 			record[full_key] = "未触发" if key == "visible_effect" else "无"
 

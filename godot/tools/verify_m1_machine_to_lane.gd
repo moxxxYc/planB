@@ -4,7 +4,6 @@ const ALLOWED_TUNING_RESULTS: Array[String] = ["Gate", "Prime", "Echo", "Surge"]
 const MIN_MACHINE_BOARD_HEIGHT: float = 560.0
 const MIN_SUPPLY_STRIP_HEIGHT: float = 140.0
 const MIN_POOL_BALL_RADIUS: float = 14.0
-const MIN_ACTIVE_BALL_RADIUS: float = 12.0
 
 func _initialize() -> void:
 	var failed := false
@@ -148,6 +147,9 @@ func _verify_battle_scene() -> bool:
 
 	root.add_child(instance)
 
+	if not _verify_deploy_lane_direct_click_only(instance):
+		passed = false
+
 	if not instance.has_method("get_selected_lane"):
 		push_error("Battle scene does not expose selected lane state.")
 		passed = false
@@ -156,6 +158,9 @@ func _verify_battle_scene() -> bool:
 		passed = false
 
 	if not _verify_scene_route_text(instance, "Mid"):
+		passed = false
+	if not instance.has_method("get_highest_danger_text") or not String(instance.call("get_highest_danger_text")).contains("最高危险"):
+		push_error("Battlefield P0 scan text must expose highest danger route.")
 		passed = false
 	if not _verify_machine_visual_contract(instance):
 		passed = false
@@ -193,6 +198,8 @@ func _verify_battle_scene() -> bool:
 		passed = false
 	else:
 		var left_units_before_deploy: int = int(instance.call("get_lane_units", "Left"))
+		if not _verify_queue_bridge_next_deploy_time(instance):
+			passed = false
 		var saw_left_transfer_feedback := _verify_bridge_transfer_feedback_after_next_deploy(
 			instance,
 			"Left",
@@ -244,6 +251,50 @@ func _verify_battle_scene() -> bool:
 	root.remove_child(instance)
 	instance.free()
 	return passed
+
+func _verify_queue_bridge_next_deploy_time(instance: Node) -> bool:
+	if not instance.has_method("get_bridge_queue_label_text") or not instance.has_method("get_bridge_queue_preview_text"):
+		push_error("Battle scene must expose Queue Bridge queue timing text.")
+		return false
+	for _index: int in range(180):
+		_advance_battle_for_verifier(instance, 0.1)
+		if int(instance.call("get_queue_count")) <= 0:
+			continue
+		var queue_label: String = String(instance.call("get_bridge_queue_label_text"))
+		var queue_preview: String = String(instance.call("get_bridge_queue_preview_text"))
+		if not queue_label.contains("队首") or not queue_label.contains("部署"):
+			push_error("Queue Bridge label must show next queue deploy time: %s" % queue_label)
+			return false
+		if not queue_preview.contains("后部署") and not queue_preview.contains("已就绪"):
+			push_error("Queue Bridge preview must show per-entry deploy timing: %s" % queue_preview)
+			return false
+		return true
+	push_error("Could not observe a queued entry to verify Queue Bridge next deploy time.")
+	return false
+
+func _verify_deploy_lane_direct_click_only(instance: Node) -> bool:
+	var passed := true
+	for action_name: String in ["deploy_left", "deploy_mid", "deploy_right"]:
+		if InputMap.has_action(action_name):
+			push_error("Deploy Lane must not expose unconfirmed keyboard action: %s." % action_name)
+			passed = false
+	if _tree_contains_text(instance, "A / S / D"):
+		push_error("Battle scene must not advertise unconfirmed A/S/D deploy lane shortcuts.")
+		passed = false
+	if not _tree_contains_text(instance, "直接点击战场路线"):
+		push_error("Battle scene must tell players to select Deploy Lane by clicking battlefield lanes.")
+		passed = false
+	return passed
+
+func _tree_contains_text(node: Node, needle: String) -> bool:
+	if node is Label and String((node as Label).text).contains(needle):
+		return true
+	if node is Button and String((node as Button).text).contains(needle):
+		return true
+	for child: Node in node.get_children():
+		if _tree_contains_text(child, needle):
+			return true
+	return false
 
 func _verify_battle_result_paths() -> bool:
 	var passed := true
@@ -379,8 +430,11 @@ func _verify_machine_visual_contract(instance: Node) -> bool:
 	if int(visual_contract.get("queue_preview_count", 0)) < 3:
 		push_error("Machine view must expose at least three Queue preview slots.")
 		passed = false
-	if not bool(visual_contract.get("has_active_ball", false)):
-		push_error("Machine view must expose an active ball marker.")
+	if bool(visual_contract.get("has_schematic_active_ball_overlay", true)):
+		push_error("Machine view must not expose the legacy schematic active-ball overlay.")
+		passed = false
+	if not bool(visual_contract.get("has_visible_rigidbody_ball", false)):
+		push_error("Machine view must expose a real visible RigidBody2D ball.")
 		passed = false
 	if float(visual_contract.get("machine_board_min_height", 0.0)) < MIN_MACHINE_BOARD_HEIGHT:
 		push_error("Machine view must reserve enough height for readable ball-machine boards.")
@@ -391,10 +445,6 @@ func _verify_machine_visual_contract(instance: Node) -> bool:
 	if float(visual_contract.get("pool_ball_radius", 0.0)) < MIN_POOL_BALL_RADIUS:
 		push_error("Pool balls are too small to satisfy the M1 readability gate.")
 		passed = false
-	if float(visual_contract.get("active_ball_radius", 0.0)) < MIN_ACTIVE_BALL_RADIUS:
-		push_error("Active ball marker is too small to satisfy the M1 readability gate.")
-		passed = false
-
 	return passed
 
 func _verify_scene_route_text(instance: Node, lane: String) -> bool:

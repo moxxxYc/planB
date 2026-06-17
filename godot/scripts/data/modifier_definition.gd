@@ -5,13 +5,17 @@ enum SourceType { REWARD, SHOP, REST }
 
 @export var id: String = ""
 @export var display_name: String = ""
+@export var source: String = ""
 @export var source_type: SourceType = SourceType.REWARD
 @export var warehouse: String = ""
 @export var target_component: String = ""
 @export var operation: String = ""
+@export var scope: String = "整局"
 @export var role: String = ""
 @export var gold_cost: int = 0
 @export_multiline var player_read: String = ""
+@export_multiline var failure_risk: String = ""
+@export_multiline var guardrail: String = ""
 
 func to_card_text() -> String:
 	var cost_text: String = "" if gold_cost <= 0 else "%d Gold\n" % gold_cost
@@ -30,7 +34,7 @@ func _effect_text() -> String:
 		"prime_charge":
 			return "Tuning / Prime 数值 +1 提升到 +2"
 		"slot_primer":
-			return "Unit / S1 保留 1 点底线进度"
+			return "Unit / 选择 1 个 Unit 槽保留 1 点底线进度"
 		"front_recycle":
 			return "Launch 前段回收，让球更容易回到 Pool"
 		"surge_buffer":

@@ -26,8 +26,14 @@ const MIN_VIEW_SIZE: Vector2 = Vector2(380.0, 600.0)
 const SUPPLY_STRIP_HEIGHT: float = 164.0
 const POOL_BALL_RADIUS: float = 16.0
 const POOL_BALL_RING_RADIUS: float = 20.0
-const ACTIVE_BALL_RADIUS: float = 14.0
-const ACTIVE_BALL_RING_RADIUS: float = 19.0
+const LAUNCH_SLOT_ORDER: Array[String] = ["Split", "Tuning", "Recycle", "Waste"]
+const TUNING_SLOT_ORDER: Array[String] = ["Prime", "Gate", "Echo", "Surge"]
+const UNIT_SLOT_ORDER: Array[String] = ["S1", "S2", "S3", "S4"]
+const BOARD_SUBTITLES: Dictionary = {
+	"Launch": "Split / Tuning / Recycle / Waste",
+	"Tuning": "Prime / Gate / Echo / Surge",
+	"Unit": "S1 / S2 / S3 / S4",
+}
 
 var forge_ratio: float = 0.0
 var launcher_ratio: float = 0.0
@@ -41,6 +47,7 @@ var last_tuning_result: String = ""
 var last_queue_unit: String = ""
 var active_board_index: int = 0
 var counter_target_component: String = ""
+var physics_clip: Control = null
 var physics_board: MachinePhysicsBoardView = null
 var physics_landing_count: int = 0
 var last_physics_result: Dictionary = {}
@@ -51,8 +58,10 @@ var exposure_gate_snapshot: Dictionary = {}
 var blocked_bounce_count: int = 0
 var last_blocked_bounce: Dictionary = {}
 var has_unit_gate_blockers: bool = false
+var _last_physics_layout_size: Vector2 = Vector2(-1.0, -1.0)
 
 func _ready() -> void:
+	clip_contents = true
 	custom_minimum_size = MIN_VIEW_SIZE
 	_ensure_physics_board()
 	if not resized.is_connected(_on_resized):
@@ -114,14 +123,41 @@ func get_visual_contract_summary() -> Dictionary:
 	)
 	if physics_landing_count_value > 0:
 		runtime_physics_drives_results = runtime_physics_drives_results and last_result_source == "physics"
+
 	return {
 		"board_count": 3,
 		"pool_slot_count": pool_capacity,
 		"queue_preview_count": QUEUE_PREVIEW_COUNT,
 		"unit_slot_count": 4,
-		"has_active_ball": true,
+		"has_schematic_active_ball_overlay": false,
+		"has_schematic_peg_overlay": false,
 		"has_visible_rigidbody_ball": bool(board_contract.get("has_visible_rigidbody_ball", false)),
 		"runtime_physics_drives_results": runtime_physics_drives_results,
+		"runtime_uses_preselected_target_labels": bool(board_contract.get("runtime_uses_preselected_target_labels", true)),
+		"bin_width_ratios": (board_contract.get("bin_width_ratios", {}) as Dictionary).duplicate(true),
+		"bin_orders": (board_contract.get("bin_orders", {}) as Dictionary).duplicate(true),
+		"stage_rects": (board_contract.get("stage_rects", {}) as Dictionary).duplicate(true),
+		"stage_bottom_catchers": (board_contract.get("stage_bottom_catchers", {}) as Dictionary).duplicate(true),
+		"moving_mechanism_counts": (board_contract.get("moving_mechanism_counts", {}) as Dictionary).duplicate(true),
+		"moving_mechanisms": (board_contract.get("moving_mechanisms", {}) as Dictionary).duplicate(true),
+		"clips_physics_children": physics_clip != null and physics_clip.clip_contents,
+		"physics_clip_children_mode": int(physics_clip.clip_children) if physics_clip != null else -1,
+		"physics_board_uses_stage_clip": physics_clip != null and physics_board != null and physics_board.get_parent() == physics_clip,
+		"physics_clip_rect": _current_physics_clip_rect(),
+		"physics_clip_excludes_supply_strip": _current_physics_clip_rect().position.y >= SUPPLY_STRIP_HEIGHT,
+		"physics_board_position": physics_board.position,
+		"physics_board_canvas_origin": (physics_clip.position + physics_board.position) if physics_clip != null else physics_board.position,
+		"schematic_slot_width_ratios": _schematic_slot_width_ratio_snapshot(),
+		"schematic_slot_orders": _schematic_slot_order_snapshot(),
+		"board_subtitles": _board_subtitle_snapshot(),
+		"launcher_turret": (board_contract.get("launcher_turret", {}) as Dictionary).duplicate(true),
+		"launcher_turret_visual_source": "MachinePhysicsBoardView",
+		"launcher_turret_visual_source_count": 1,
+		"active_ball_position": board_contract.get("active_ball_position", Vector2.INF),
+		"active_ball_chain_id": String(board_contract.get("active_ball_chain_id", "")),
+		"active_ball_at_visible_muzzle": bool(board_contract.get("active_ball_at_visible_muzzle", false)),
+		"ball_stage_snapshot": (board_contract.get("ball_stage_snapshot", {}) as Dictionary).duplicate(true),
+		"physics_tick_count": int(board_contract.get("physics_tick_count", 0)),
 		"physics_landing_count": physics_landing_count_value,
 		"last_physics_result": last_result_variant,
 		"physics_queue_chain_count": physics_queue_chain_count,
@@ -137,12 +173,12 @@ func get_visual_contract_summary() -> Dictionary:
 		"counter_target_component": counter_target_component,
 		"last_launch_result": last_launch_result,
 		"last_tuning_result": last_tuning_result,
+		"tuning_slots_distinguished_by_shape": true,
+		"tuning_slot_shape_tokens": _tuning_slot_shape_tokens(),
 		"machine_board_min_height": MIN_VIEW_SIZE.y,
 		"supply_strip_height": SUPPLY_STRIP_HEIGHT,
 		"pool_ball_radius": POOL_BALL_RADIUS,
 		"pool_ball_ring_radius": POOL_BALL_RING_RADIUS,
-		"active_ball_radius": ACTIVE_BALL_RADIUS,
-		"active_ball_ring_radius": ACTIVE_BALL_RING_RADIUS,
 	}
 
 func launch_ball(ball: Dictionary, battle_elapsed: float) -> void:
@@ -156,6 +192,10 @@ func set_exposure_state(exposure_state) -> void:
 func set_battle_elapsed(seconds: float) -> void:
 	_ensure_physics_board()
 	physics_board.set_battle_elapsed(seconds)
+
+func set_redirect_resolver(resolver: Callable) -> void:
+	_ensure_physics_board()
+	physics_board.set_redirect_resolver(resolver)
 
 func emit_seeded_landing_for_verifier(result: MachinePhysicsResult) -> MachinePhysicsResult:
 	_ensure_physics_board()
@@ -241,31 +281,47 @@ func _draw_machine_boards(rect: Rect2) -> void:
 	var board_height := maxf(96.0, available_height / 3.0)
 	var board_rect := Rect2(rect.position.x + 14.0, board_top, rect.size.x - 28.0, board_height)
 
-	_draw_board(board_rect, "Launch", "进 Tuning / 分流 / 回流 / 废弃", COLOR_LAUNCH, active_board_index == 0, _targets_pool())
+	_draw_board(board_rect, "Launch", String(BOARD_SUBTITLES["Launch"]), COLOR_LAUNCH, active_board_index == 0, _targets_pool())
 	_draw_launch_slots(board_rect)
 
 	board_rect.position.y += board_height + board_gap
-	_draw_board(board_rect, "Tuning", "Gate / Prime / Echo / Surge", COLOR_TUNING, active_board_index == 1, _targets_echo())
+	_draw_board(board_rect, "Tuning", String(BOARD_SUBTITLES["Tuning"]), COLOR_TUNING, active_board_index == 1, _targets_echo())
 	_draw_tuning_slots(board_rect)
 
 	board_rect.position.y += board_height + board_gap
-	_draw_board(board_rect, "Unit", "S1 / S2 / S3 / S4", COLOR_UNIT, active_board_index == 2, _targets_unit_or_queue())
+	_draw_board(board_rect, "Unit", String(BOARD_SUBTITLES["Unit"]), COLOR_UNIT, active_board_index == 2, _targets_unit_or_queue())
 	_draw_unit_slots(board_rect)
 
 func _ensure_physics_board() -> void:
+	clip_contents = true
+	if physics_clip == null or not is_instance_valid(physics_clip):
+		physics_clip = Control.new()
+		physics_clip.name = "PhysicsStageClip"
+		physics_clip.clip_contents = true
+		physics_clip.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+		physics_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		physics_clip.z_index = 4
+		add_child(physics_clip)
 	if physics_board != null and is_instance_valid(physics_board):
 		return
 	physics_board = MachinePhysicsBoardViewScript.new() as MachinePhysicsBoardView
 	physics_board.name = "MachinePhysicsBoardView"
-	physics_board.z_index = 4
-	add_child(physics_board)
-	physics_board.landing_resolved.connect(_on_physics_board_landing_resolved)
+	physics_board.position = Vector2.ZERO
+	physics_clip.add_child(physics_board)
+	if not physics_board.landing_resolved.is_connected(_on_physics_board_landing_resolved):
+		physics_board.landing_resolved.connect(_on_physics_board_landing_resolved)
 	_layout_physics_board()
 
 func _layout_physics_board() -> void:
 	if physics_board == null or not is_instance_valid(physics_board):
 		return
-	physics_board.set_stage_rects(_stage_rects_for_current_size())
+	var current_size: Vector2 = _stable_layout_size()
+	_update_physics_clip_for_size(current_size)
+	if current_size.is_equal_approx(_last_physics_layout_size):
+		_update_exposure_contract_from_physics_board()
+		return
+	_last_physics_layout_size = current_size
+	physics_board.set_stage_rects(_stage_rects_for_size(current_size))
 	_update_exposure_contract_from_physics_board()
 
 func _update_exposure_contract_from_physics_board() -> void:
@@ -285,9 +341,15 @@ func _apply_exposure_contract(board_contract: Dictionary) -> void:
 	has_unit_gate_blockers = bool(board_contract.get("has_unit_gate_blockers", false))
 
 func _stage_rects_for_current_size() -> Dictionary:
+	return _stage_rects_for_size(_stable_layout_size())
+
+func _stable_layout_size() -> Vector2:
 	var current_size: Vector2 = size
 	if current_size.x <= 0.0 or current_size.y <= 0.0:
 		current_size = MIN_VIEW_SIZE
+	return current_size
+
+func _stage_rects_for_size(current_size: Vector2) -> Dictionary:
 	var rect := Rect2(Vector2.ZERO, current_size)
 	var board_top := rect.position.y + SUPPLY_STRIP_HEIGHT + 32.0
 	var board_gap := 12.0
@@ -300,6 +362,27 @@ func _stage_rects_for_current_size() -> Dictionary:
 		"Tuning": Rect2(board_rect.position + Vector2(0.0, board_height + board_gap), board_rect.size),
 		"Unit": Rect2(board_rect.position + Vector2(0.0, (board_height + board_gap) * 2.0), board_rect.size),
 	}
+
+func _update_physics_clip_for_size(current_size: Vector2) -> void:
+	if physics_clip == null or not is_instance_valid(physics_clip):
+		return
+	var clip_rect: Rect2 = _physics_clip_rect_for_size(current_size)
+	physics_clip.position = clip_rect.position
+	physics_clip.size = clip_rect.size
+	if physics_board != null and is_instance_valid(physics_board):
+		physics_board.position = -clip_rect.position
+
+func _current_physics_clip_rect() -> Rect2:
+	if physics_clip == null or not is_instance_valid(physics_clip):
+		return Rect2()
+	return Rect2(physics_clip.position, physics_clip.size)
+
+func _physics_clip_rect_for_size(current_size: Vector2) -> Rect2:
+	var stage_rects: Dictionary = _stage_rects_for_size(current_size)
+	var clip_rect: Rect2 = stage_rects["Launch"] as Rect2
+	clip_rect = clip_rect.merge(stage_rects["Tuning"] as Rect2)
+	clip_rect = clip_rect.merge(stage_rects["Unit"] as Rect2)
+	return clip_rect
 
 func _on_physics_board_landing_resolved(result: MachinePhysicsResult) -> void:
 	physics_landing_count += 1
@@ -315,52 +398,121 @@ func _draw_board(board_rect: Rect2, title: String, subtitle: String, accent: Col
 	_draw_text(font, board_rect.position + Vector2(90.0, 18.0), subtitle, 12, COLOR_MUTED)
 	if is_counter_target:
 		_draw_text(font, board_rect.position + Vector2(board_rect.size.x - 82.0, 18.0), "反制目标", 12, COLOR_COUNTER_TARGET)
-	_draw_pegs(board_rect, accent)
-	if is_active:
-		_draw_active_ball(board_rect, accent)
-
-func _draw_pegs(board_rect: Rect2, accent: Color) -> void:
-	var peg_y := board_rect.position.y + board_rect.size.y * 0.42
-	for row: int in range(2):
-		for index: int in range(5):
-			var x := board_rect.position.x + 42.0 + float(index) * ((board_rect.size.x - 84.0) / 4.0)
-			if row == 1:
-				x += 18.0
-			var y := peg_y + float(row) * 18.0
-			draw_circle(Vector2(x, y), 3.0, accent.darkened(0.15))
-
-func _draw_active_ball(board_rect: Rect2, accent: Color) -> void:
-	var local_ratio := fmod(launcher_ratio * 3.0, 1.0)
-	var x := board_rect.position.x + board_rect.size.x * (0.18 + 0.64 * local_ratio)
-	var wobble := sin(local_ratio * TAU) * board_rect.size.x * 0.08
-	var y := board_rect.position.y + board_rect.size.y * (0.28 + 0.46 * local_ratio)
-	var center := Vector2(x + wobble, y)
-	draw_line(center - Vector2(36.0, 16.0), center - Vector2(10.0, 5.0), accent.darkened(0.25), 4.0, true)
-	draw_line(center - Vector2(22.0, 10.0), center, accent, 2.5, true)
-	draw_circle(center, ACTIVE_BALL_RADIUS, COLOR_ACTIVE)
-	draw_arc(center, ACTIVE_BALL_RING_RADIUS, 0.0, TAU, 28, accent, 2.5, true)
 
 func _draw_launch_slots(board_rect: Rect2) -> void:
-	var labels: Array[String] = ["Tuning", "Split", "Recycle", "Waste"]
-	_draw_result_slots(board_rect, labels, COLOR_LAUNCH, last_launch_result)
+	_draw_result_slots(board_rect, "Launch", LAUNCH_SLOT_ORDER, COLOR_LAUNCH, last_launch_result)
 
 func _draw_tuning_slots(board_rect: Rect2) -> void:
-	var labels: Array[String] = ["Gate", "Prime", "Echo", "Surge"]
-	_draw_result_slots(board_rect, labels, COLOR_TUNING, last_tuning_result, "Echo" if _targets_echo() else "")
+	_draw_result_slots(board_rect, "Tuning", TUNING_SLOT_ORDER, COLOR_TUNING, last_tuning_result, "Echo" if _targets_echo() else "")
+	if String(last_physics_result.get("feedback_state", "")) == "Forced Redirect":
+		var font := get_theme_default_font()
+		var rail_start := board_rect.position + Vector2(board_rect.size.x * 0.32, 42.0)
+		var rail_end := board_rect.position + Vector2(board_rect.size.x * 0.68, 42.0)
+		draw_line(rail_start, rail_end, COLOR_ACTIVE, 3.0, true)
+		_draw_text(font, rail_start + Vector2(8.0, -6.0), "强制导轨", 10, COLOR_ACTIVE)
 
-func _draw_result_slots(board_rect: Rect2, labels: Array[String], accent: Color, active_label: String, counter_target_label: String = "") -> void:
+func _draw_result_slots(board_rect: Rect2, stage: String, labels: Array[String], accent: Color, active_label: String, counter_target_label: String = "") -> void:
 	var font := get_theme_default_font()
 	var gap := 6.0
-	var slot_width := (board_rect.size.x - 20.0 - gap * 3.0) / 4.0
-	var slot_y := board_rect.position.y + board_rect.size.y - 24.0
+	var total_gap: float = gap * float(maxi(0, labels.size() - 1))
+	var usable_width: float = maxf(32.0, board_rect.size.x - 20.0 - total_gap)
+	var total_weight: float = 0.0
+	for label: String in labels:
+		total_weight += _schematic_slot_weight_for_label(stage, label)
+	var cursor_x: float = board_rect.position.x + 10.0
+	var slot_y := board_rect.position.y + board_rect.size.y - 28.0
 	for index: int in range(labels.size()):
 		var label := labels[index]
-		var slot_rect := Rect2(board_rect.position.x + 10.0 + float(index) * (slot_width + gap), slot_y, slot_width, 16.0)
+		var slot_width: float = usable_width * (_schematic_slot_weight_for_label(stage, label) / maxf(total_weight, 0.001))
+		var slot_rect := Rect2(cursor_x, slot_y, slot_width, 20.0)
 		var is_active := active_label == label or (label == "Tuning" and active_label == "Tuning")
 		var is_counter_target := counter_target_label == label
 		draw_rect(slot_rect, accent.darkened(0.25) if is_active else COLOR_BG, true)
 		draw_rect(slot_rect, COLOR_COUNTER_TARGET if is_counter_target else (accent if is_active else COLOR_TRIM), false, 2.0 if is_counter_target else 1.0)
-		_draw_text(font, slot_rect.position + Vector2(4.0, 12.0), _slot_display_label(label), 10, COLOR_TEXT)
+		_draw_result_slot_shape_token(slot_rect, label, accent, is_active)
+		var text_x: float = 20.0 if _has_tuning_slot_shape(label) else 4.0
+		_draw_text(font, slot_rect.position + Vector2(text_x, 14.0), _slot_display_label(label), 10, COLOR_TEXT)
+		cursor_x += slot_width + gap
+
+func _draw_result_slot_shape_token(slot_rect: Rect2, label: String, accent: Color, is_active: bool) -> void:
+	if not _has_tuning_slot_shape(label):
+		return
+	var color: Color = COLOR_ACTIVE if is_active else accent
+	var center := slot_rect.position + Vector2(10.0, slot_rect.size.y * 0.5)
+	match label:
+		"Gate":
+			draw_line(center + Vector2(-5.0, -6.0), center + Vector2(-5.0, 6.0), color, 1.8, true)
+			draw_line(center + Vector2(4.0, -6.0), center + Vector2(4.0, 6.0), color, 1.8, true)
+			draw_line(center + Vector2(-5.0, -6.0), center + Vector2(4.0, -6.0), color, 1.8, true)
+		"Prime":
+			draw_circle(center, 4.4, color)
+			draw_line(center + Vector2(-7.0, 0.0), center + Vector2(7.0, 0.0), color.darkened(0.2), 1.2, true)
+			draw_line(center + Vector2(0.0, -7.0), center + Vector2(0.0, 7.0), color.darkened(0.2), 1.2, true)
+		"Echo":
+			draw_circle(center + Vector2(-3.2, 0.0), 3.2, color)
+			draw_circle(center + Vector2(3.2, 0.0), 3.2, color.darkened(0.22))
+		"Surge":
+			draw_line(center + Vector2(-7.0, 4.0), center + Vector2(-2.0, -5.0), color, 1.8, true)
+			draw_line(center + Vector2(-2.0, -5.0), center + Vector2(2.0, 5.0), color, 1.8, true)
+			draw_line(center + Vector2(2.0, 5.0), center + Vector2(7.0, -4.0), color, 1.8, true)
+
+func _has_tuning_slot_shape(label: String) -> bool:
+	return ["Gate", "Prime", "Echo", "Surge"].has(label)
+
+func _tuning_slot_shape_tokens() -> Dictionary:
+	return {
+		"Gate": "wide_entry",
+		"Prime": "charge_core",
+		"Echo": "double_hit",
+		"Surge": "pulse_wave",
+	}
+
+func _schematic_slot_width_ratio_snapshot() -> Dictionary:
+	return {
+		"Launch": _schematic_slot_ratios_for_labels("Launch", LAUNCH_SLOT_ORDER),
+		"Tuning": _schematic_slot_ratios_for_labels("Tuning", TUNING_SLOT_ORDER),
+		"Unit": _schematic_slot_ratios_for_labels("Unit", UNIT_SLOT_ORDER),
+	}
+
+func _schematic_slot_order_snapshot() -> Dictionary:
+	return {
+		"Launch": LAUNCH_SLOT_ORDER.duplicate(),
+		"Tuning": TUNING_SLOT_ORDER.duplicate(),
+		"Unit": UNIT_SLOT_ORDER.duplicate(),
+	}
+
+func _board_subtitle_snapshot() -> Dictionary:
+	return BOARD_SUBTITLES.duplicate()
+
+func _schematic_slot_ratios_for_labels(stage: String, labels: Array[String]) -> Dictionary:
+	var total_weight: float = 0.0
+	for label: String in labels:
+		total_weight += _schematic_slot_weight_for_label(stage, label)
+	var ratios: Dictionary = {}
+	for label: String in labels:
+		ratios[label] = _schematic_slot_weight_for_label(stage, label) / maxf(total_weight, 0.001)
+	return ratios
+
+func _schematic_slot_weight_for_label(stage: String, label: String) -> float:
+	if stage == "Launch":
+		match label:
+			"Tuning":
+				return 0.65
+			"Split", "Recycle":
+				return 0.15
+			"Waste":
+				return 0.05
+			_:
+				return 1.0
+	if stage == "Tuning":
+		match label:
+			"Gate":
+				return 0.55
+			"Prime", "Echo", "Surge":
+				return 0.15
+			_:
+				return 1.0
+	return 1.0
 
 func _slot_display_label(label: String) -> String:
 	match label:

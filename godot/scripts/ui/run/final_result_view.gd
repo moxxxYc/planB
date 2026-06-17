@@ -33,7 +33,10 @@ func _build_summary_text(
 	var reward_id := String(record.get("reward1.choice_id", record.get("reward1_id", "")))
 	var shop_id := String(record.get("shop1.purchase_id", record.get("shop1_purchase_id", "")))
 	var second_reward_id := String(record.get("second_offer.choice_id", ""))
-	return "主要机器轴：%s\n关键选择：守护者 %s；奖励 %s / %s；商店 %s\n守护者选择：%s\n关键奖励：第一次 %s；第二次 %s\n关键商店：%s\nUnit 槽贡献：%s\n主要反制：第一次 %s 攻击 %s，效果 %s；第二次 %s\n敌方反制：%s\nDeploy Lane 影响：%s\n部署路线影响：%s\n守护者压力：%s\n终点战结论：%s；主轴兑现：%s；断裂原因：%s；HP：%s\n休整与 Gold：购买 %d 次，花费 %d Gold，恢复 %d HP\n下一局观察：%s" % [
+	var slot_primer_text: String = ""
+	if reward_id == "slot_primer":
+		slot_primer_text = "\n槽位打底：S%d 作为 Unit 锚点槽" % int(record.get("slot_primer.selected_slot", 0))
+	return "主要机器轴：%s\n关键选择：守护者 %s；奖励 %s / %s；商店 %s\n守护者选择：%s\n关键奖励：第一次 %s；第二次 %s%s\n关键商店：%s\nUnit 槽贡献：%s\n主要反制：第一次 %s 攻击 %s，效果 %s；第二次 %s\n敌方反制：%s\nDeploy Lane 影响：%s\n部署路线影响：%s\n守护者压力：%s\n终点战结论：%s；主轴兑现：%s；断裂原因：%s；HP：%s\n休整与 Gold：购买 %d 次，花费 %d Gold，恢复 %d HP\n休整机会成本：%s\n下一局观察：%s" % [
 		String(record.get("reward1.axis", "未记录")),
 		_guardian_name(guardian_id, guardian_defs),
 		_modifier_name(reward_id, reward_defs),
@@ -42,6 +45,7 @@ func _build_summary_text(
 		_guardian_name(guardian_id, guardian_defs),
 		_modifier_name(reward_id, reward_defs),
 		_modifier_name(second_reward_id, second_reward_defs),
+		slot_primer_text,
 		_modifier_name(shop_id, shop_defs),
 		_unit_contribution_text(record.get("unit.visible_contribution_slots", [])),
 		_counter_name(String(record.get("counter1.family", ""))),
@@ -59,6 +63,7 @@ func _build_summary_text(
 		int(record.get("rest.total_purchases", 0)),
 		int(record.get("rest.total_gold_spent", 0)),
 		int(record.get("rest.total_hp_restored", 0)),
+		String(record.get("rest.opportunity_cost", "无")),
 		_result_tag_text(record.get("endpoint.next_run_watch_tag", "未记录")),
 	]
 

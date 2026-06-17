@@ -20,9 +20,10 @@ func _ready() -> void:
 func render(machine, deploy) -> void:
 	_ensure_nodes()
 	var lane_name := _lane_name(deploy.current_lane)
+	var battle_elapsed: float = float(machine.call("get_battle_elapsed")) if machine.has_method("get_battle_elapsed") else 0.0
 	lane_label.text = "部署路线：%s" % lane_name
-	queue_label.text = "Queue 条目：%d" % machine.queue.size()
-	queue_preview_label.text = transfer_text if not transfer_text.is_empty() else _queue_preview_text(machine.queue, deploy.current_lane)
+	queue_label.text = "Queue 条目：%d%s" % [machine.queue.size(), _queue_head_time_text(machine.queue, battle_elapsed)]
+	queue_preview_label.text = transfer_text if not transfer_text.is_empty() else _queue_preview_text(machine.queue, deploy.current_lane, battle_elapsed)
 	bridge_label.text = "Queue Bridge -> %s出兵口" % lane_name
 	spawn_port_label.text = "连线：Queue 队首 ===> %s玩家侧出兵口" % lane_name
 
@@ -53,7 +54,15 @@ func get_bridge_route_text() -> String:
 	_ensure_nodes()
 	return bridge_label.text
 
-func _queue_preview_text(queue: Array[Dictionary], current_lane: String) -> String:
+func get_queue_label_text() -> String:
+	_ensure_nodes()
+	return queue_label.text
+
+func get_queue_preview_text() -> String:
+	_ensure_nodes()
+	return queue_preview_label.text
+
+func _queue_preview_text(queue: Array[Dictionary], current_lane: String, battle_elapsed: float) -> String:
 	if queue.is_empty():
 		return "预览：等待 Unit 槽满后生成 Queue 条目。"
 
@@ -61,13 +70,26 @@ func _queue_preview_text(queue: Array[Dictionary], current_lane: String) -> Stri
 	var limit: int = mini(PREVIEW_COUNT, queue.size())
 	for index: int in range(limit):
 		var entry: Dictionary = queue[index]
-		lines.append("%d. %s x%d -> %s" % [
+		lines.append("%d. %s x%d / %s -> %s" % [
 			index + 1,
 			_unit_name(String(entry.get("unit_id", "unknown_unit"))),
 			int(entry.get("count", 1)),
+			_entry_ready_text(entry, battle_elapsed),
 			_lane_name(current_lane),
 		])
 	return "\n".join(lines)
+
+func _queue_head_time_text(queue: Array[Dictionary], battle_elapsed: float) -> String:
+	if queue.is_empty():
+		return " | 队首：等待"
+	return " | 队首：%s" % _entry_ready_text(queue[0], battle_elapsed)
+
+func _entry_ready_text(entry: Dictionary, battle_elapsed: float) -> String:
+	var ready_elapsed: float = float(entry.get("ready_elapsed", battle_elapsed + float(entry.get("deploy_delay", 0.5))))
+	var remaining: float = maxf(0.0, ready_elapsed - battle_elapsed)
+	if remaining <= 0.001:
+		return "已就绪"
+	return "%.2fs 后部署" % remaining
 
 func _lane_name(lane: String) -> String:
 	match lane:

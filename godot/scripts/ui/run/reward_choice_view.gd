@@ -2,6 +2,7 @@ class_name RewardChoiceView
 extends VBoxContainer
 
 signal reward_chosen(modifier_id: String)
+signal reward_chosen_with_payload(modifier_id: String, payload: Dictionary)
 
 const REWARD_ORDER: Array[String] = [
 	"pool_pocket",
@@ -24,6 +25,9 @@ func render(p_reward_defs: Dictionary) -> void:
 	for modifier_id: String in REWARD_ORDER:
 		if not reward_defs.has(modifier_id):
 			continue
+		if modifier_id == "slot_primer":
+			add_child(_make_slot_primer_choice())
+			continue
 		var button: Button = Button.new()
 		button.text = get_card_text(modifier_id)
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -45,6 +49,30 @@ func get_card_text(modifier_id: String) -> String:
 
 func _on_reward_pressed(modifier_id: String) -> void:
 	reward_chosen.emit(modifier_id)
+
+func _on_reward_pressed_with_payload(modifier_id: String, payload: Dictionary) -> void:
+	reward_chosen_with_payload.emit(modifier_id, payload.duplicate(true))
+
+func _make_slot_primer_choice() -> VBoxContainer:
+	var container := VBoxContainer.new()
+	container.add_theme_constant_override("separation", 8)
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var label := _make_label(get_card_text("slot_primer"), 16)
+	label.custom_minimum_size = Vector2(0.0, 92.0)
+	container.add_child(label)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for slot_id: int in range(1, 5):
+		var slot_button := Button.new()
+		slot_button.text = "S%d" % slot_id
+		slot_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slot_button.focus_mode = Control.FOCUS_ALL
+		_style_card_button(slot_button)
+		slot_button.pressed.connect(_on_reward_pressed_with_payload.bind("slot_primer", {"slot_id": slot_id}))
+		row.add_child(slot_button)
+	container.add_child(row)
+	return container
 
 func _make_label(text: String, font_size: int) -> Label:
 	var label: Label = Label.new()

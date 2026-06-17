@@ -105,7 +105,7 @@ func _verify_reward_one_and_battle_two(run: Node) -> bool:
 	if (
 		not _node_tree_text_contains(run, "Pool 扩容袋")
 		or not _node_tree_text_contains(run, "Prime 充能")
-		or not _node_tree_text_contains(run, "S1 打底")
+		or not _node_tree_text_contains(run, "槽位打底")
 	):
 		push_error("Reward 1 screen must visibly render all three reward cards.")
 		return false
@@ -231,6 +231,10 @@ func _verify_result_routing(run: Node) -> bool:
 	if not result_text.contains("巢脉母") or not result_text.contains("Prime 充能") or not result_text.contains("Surge 缓冲"):
 		push_error("Result Routing must summarize Guardian, Reward 1, and Shop 1.")
 		return false
+	for required_text: String in ["断裂原因", "Deploy Lane 影响", "休整机会成本", "下一局观察"]:
+		if not result_text.contains(required_text):
+			push_error("Result Routing must expose learning-result text: %s." % required_text)
+			return false
 	if result_text.contains("battle_3") or result_text.contains("Loss"):
 		push_error("Result Routing should localize battle and result display text.")
 		return false
@@ -242,6 +246,16 @@ func _verify_result_routing(run: Node) -> bool:
 	if String(record.get("battle_result", "")) != "Loss":
 		push_error("Result record should include battle_result=Loss.")
 		return false
+	for required_key: String in [
+		"endpoint.main_break_reason",
+		"endpoint.next_run_watch_tag",
+		"endpoint.deploy_lane_impact",
+		"rest.opportunity_cost",
+		"session.decision_windows",
+	]:
+		if not record.has(required_key):
+			push_error("Loss result record missing learning-result field: %s." % required_key)
+			return false
 
 	return true
 

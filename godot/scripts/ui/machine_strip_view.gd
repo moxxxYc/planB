@@ -39,7 +39,7 @@ func render(machine, counter_target_component: String = "") -> void:
 	forge_label.text = "Forge 造球 %.0f%% -> Pool" % (forge_ratio * 100.0)
 	launcher_label.text = "Launcher 发射 %.0f%% -> Tuning" % (launcher_ratio * 100.0)
 	pool_label.text = "Pool 球池 %d / %d 颗净球" % [machine.pool.size(), pool_capacity]
-	tuning_label.text = "Tuning 槽：Gate / Prime / Echo / Surge"
+	tuning_label.text = "Tuning 槽：Prime / Gate / Echo / Surge"
 	unit_label.text = "Unit 槽：S1 %d/3 | S2 %d/5 | S3 %d/8 | S4 %d/12" % [
 		int(machine.slot_progress.get(1, 0)),
 		int(machine.slot_progress.get(2, 0)),
@@ -65,6 +65,10 @@ func launch_ball(ball: Dictionary, battle_elapsed: float) -> void:
 func set_exposure_state(exposure_state) -> void:
 	_ensure_nodes()
 	machine_board.set_exposure_state(exposure_state)
+
+func set_redirect_resolver(resolver: Callable) -> void:
+	_ensure_nodes()
+	machine_board.set_redirect_resolver(resolver)
 
 func emit_seeded_landing_for_verifier(result: MachinePhysicsResult) -> MachinePhysicsResult:
 	_ensure_nodes()
@@ -142,6 +146,8 @@ func _localized_log_line(log_line: String) -> String:
 	if log_line.contains("Front Recycle front recycle rejected"):
 		return "Launch：Pool 已满，前置回流未能放回净球"
 	if log_line.begins_with("物理落点"):
+		return log_line
+	if log_line.begins_with("物理改道"):
 		return log_line
 	if log_line.begins_with("Unit："):
 		return log_line
@@ -245,8 +251,15 @@ func _configure_machine_panel_layout() -> void:
 	]
 	for readout: Control in redundant_readouts:
 		readout.visible = false
-	log_label.custom_minimum_size = Vector2(0.0, 64.0)
+	var log_scroll: ScrollContainer = log_label.get_parent() as ScrollContainer
+	if log_scroll != null:
+		log_scroll.custom_minimum_size = Vector2(0.0, 64.0)
+		log_scroll.size_flags_vertical = Control.SIZE_FILL
+		log_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	log_label.custom_minimum_size = Vector2.ZERO
+	log_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	log_label.size_flags_vertical = Control.SIZE_FILL
+	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 func _ensure_nodes() -> void:
 	if machine_board == null:
@@ -268,7 +281,7 @@ func _ensure_nodes() -> void:
 	if queue_hint_label == null:
 		queue_hint_label = get_node("QueueHintLabel") as Label
 	if log_label == null:
-		log_label = get_node("MachineLogLabel") as Label
+		log_label = find_child("MachineLogLabel", true, false) as Label
 	_connect_machine_board()
 
 func _connect_machine_board() -> void:

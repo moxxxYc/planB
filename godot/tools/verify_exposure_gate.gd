@@ -10,6 +10,7 @@ var failures: Array[String] = []
 func _initialize() -> void:
 	_verify_exposure_state_model()
 	_verify_exposure_state_assignment_contract()
+	_verify_exposure_gate_visual_contract()
 	_verify_blocked_bounce_escape_contract()
 	_verify_simulator_blocked_guard_terminates_chain()
 	_verify_battle_one_learning_record()
@@ -79,6 +80,57 @@ func _verify_exposure_state_assignment_contract() -> void:
 	else:
 		if bool(board.call("_has_exposure_state_contract", RefCounted.new())):
 			failures.append("MachinePhysicsBoardView must reject exposure states without required methods.")
+	board.free()
+
+func _verify_exposure_gate_visual_contract() -> void:
+	var board_script: Script = load(PHYSICS_BOARD_PATH) as Script
+	if board_script == null:
+		failures.append("MachinePhysicsBoardView script failed to load for visual contract.")
+		return
+	var board: Node = board_script.new() as Node
+	if board == null:
+		failures.append("MachinePhysicsBoardView failed to instantiate for visual contract.")
+		return
+	root.add_child(board)
+	board.call("set_battle_elapsed", 9.0)
+	var contract: Dictionary = board.call("get_runtime_contract") as Dictionary
+	var bin_visuals: Dictionary = contract.get("bin_visuals", {}) as Dictionary
+	for bin_key: String in [
+		"Launch:Tuning",
+		"Launch:Split",
+		"Launch:Recycle",
+		"Launch:Waste",
+		"Tuning:Gate",
+		"Tuning:Prime",
+		"Tuning:Echo",
+		"Tuning:Surge",
+		"Unit:S1",
+		"Unit:S2",
+		"Unit:S3",
+		"Unit:S4",
+	]:
+		var bin_visual: Dictionary = bin_visuals.get(bin_key, {}) as Dictionary
+		if String(bin_visual.get("visual_role", "")) != "landing_rail":
+			failures.append("%s must draw as a landing rail, not a solid bin plate." % bin_key)
+		if float(bin_visual.get("visual_height", 999.0)) >= 12.0:
+			failures.append("%s landing rail must be visibly thinner than the slot label row." % bin_key)
+	var visuals: Dictionary = contract.get("unit_gate_visuals", {}) as Dictionary
+	var slot_one: Dictionary = visuals.get(1, {}) as Dictionary
+	if bool(slot_one.get("blocker_visible", true)):
+		failures.append("S1 must not draw a blocker plate at 9s; it starts fully exposed.")
+	if String(slot_one.get("bin_visual_role", "")) != "landing_rail":
+		failures.append("Open Unit slots must draw as landing rails, not solid blocker plates.")
+	if float(slot_one.get("bin_visual_height", 999.0)) >= 12.0:
+		failures.append("Open Unit slot landing rail must be visibly thinner than a closed blocker.")
+	for slot_id: int in range(2, 5):
+		var slot_visual: Dictionary = visuals.get(slot_id, {}) as Dictionary
+		if not bool(slot_visual.get("blocker_visible", false)):
+			failures.append("S%d must still draw a blocker plate at 9s." % slot_id)
+		if int(slot_visual.get("blocker_z_index", 0)) <= 0:
+			failures.append("S%d blocker plate must render above Unit bin rails." % slot_id)
+		if float(slot_visual.get("closed_width", 0.0)) <= 0.0:
+			failures.append("S%d blocker plate must report positive closed width at 9s." % slot_id)
+	root.remove_child(board)
 	board.free()
 
 func _verify_blocked_bounce_escape_contract() -> void:
